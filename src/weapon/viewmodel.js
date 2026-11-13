@@ -190,7 +190,7 @@ function makeMaterials() {
   const dark = patchViewmodel(new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.9, metalness: 0.2 }));
   const brass = patchViewmodel(new THREE.MeshStandardMaterial({ color: 0xc9a45a, roughness: 0.3, metalness: 1.0, roughnessMap: metalRough }));
   const glass = patchViewmodel(new THREE.MeshStandardMaterial({ color: 0x2a5577, roughness: 0.02, metalness: 1.0, transparent: true, opacity: 0.32, depthWrite: false, envMapIntensity: 2.2 }));
-  const reticle = patchDepthOnly(new THREE.MeshBasicMaterial({ map: T.reticle, color: new THREE.Color(3.0, 1.2, 1.0), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+  const reticle = patchDepthOnly(new THREE.MeshBasicMaterial({ map: T.reticle, color: new THREE.Color(1.8, 0.55, 0.45), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
   const glove = patchViewmodel(new THREE.MeshStandardMaterial({ color: 0x5d5040, roughness: 0.92, metalness: 0, normalMap: rep(T.fabricNormal, 1 / 0.08), normalScale: new THREE.Vector2(0.7, 0.7) }));
   const gloveDark = patchViewmodel(new THREE.MeshStandardMaterial({ color: 0x232325, roughness: 0.7, metalness: 0, normalMap: rep(T.polyNormal, 1 / 0.05), normalScale: new THREE.Vector2(0.5, 0.5) }));
   const sleeveMap = rep(T.camo, 1 / 0.35);
@@ -387,7 +387,7 @@ export function buildViewmodel() {
   rifle.add(leftHand);
 
   // ===== reticle (inside the optic, at the front lens) =====
-  const ret = new THREE.Mesh(new THREE.PlaneGeometry(0.014, 0.014), M.reticle);
+  const ret = new THREE.Mesh(new THREE.PlaneGeometry(0.0065, 0.0065), M.reticle);
   ret.position.set(0, oy + 0.008, oz - 0.026); ret.renderOrder = 12; ret.frustumCulled = false;
   rifle.add(ret);
 

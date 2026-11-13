@@ -39,7 +39,7 @@
 .nv-xh i.h { width: 9px; height: 2px; }
 .nv-xh i.dot { width: 3px; height: 3px; transform: translate(-1.5px, -1.5px); border-radius: 50%; }
 .nv-xh.hidden { opacity: 0; }
-.nv-xh.aim i:not(.dot) { opacity: 0; }
+.nv-xh.aim i { opacity: 0; } /* ADS: the optic's red dot is the only aiming reference */
 
 .nv-hm { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0; color: #fff; }
 .nv-hm i { position: absolute; left: 0; top: 0; width: 2.5px; height: 10px; background: currentColor; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .4); }

@@ -255,10 +255,12 @@ export function createWeapon(ctx) {
         vm.mag.visible = true; vm.magFresh.visible = false; vm.mag.position.copy(MAG_REST);
       }
       if (this.adsK > 0) { // blend toward the sight picture, keep a little of the motion
-        const k = this.adsK, m = 1 - 0.8 * k;
+        // x/y offsets and rotations fade out completely so the dot stays on the view axis in every stance
+        // (crouch shift/cant, bob, sway); only the recoil push along z is kept.
+        const k = this.adsK, m = 1 - k, mz = 1 - 0.6 * k;
         root.position.x = ADS.x + (root.position.x - BASE.x) * m + (BASE.x - ADS.x) * (1 - k);
         root.position.y = ADS.y + (root.position.y - BASE.y) * m + (BASE.y - ADS.y) * (1 - k);
-        root.position.z = ADS.z + (root.position.z - BASE.z) * m + (BASE.z - ADS.z) * (1 - k);
+        root.position.z = ADS.z + (root.position.z - BASE.z) * mz + (BASE.z - ADS.z) * (1 - k);
         root.rotation.x = (root.rotation.x - BROT.x) * m + BROT.x * (1 - k);
         root.rotation.y = (root.rotation.y - BROT.y) * m + BROT.y * (1 - k);
         root.rotation.z = (root.rotation.z - BROT.z) * m + BROT.z * (1 - k);
