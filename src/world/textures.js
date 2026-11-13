@@ -206,8 +206,8 @@ function genCorrugated(n = 512) { // vertical ribs, rust; color tinted by vertex
     const rust = fbm(u, v, 8, 5, 2) + (1 - v) * 0.0; const streak = vnoise(u * 1, v * 0.1, 64, 0);
     const scratch = vnoise(u, v, 256, 1);
     let r = 0.92, g = 0.92, b = 0.92, rough = 0.5; let shade = 0.9 + (fbm(u, v, 16, 3, 0) - 0.5) * 0.15;
-    const rt = clamp01((rust - 0.6) * 6) + clamp01((streak - 0.75) * 3) * 0.5;
-    if (rt > 0) { const t = Math.min(1, rt); r = r * (1 - t) + 0.45 * t; g = g * (1 - t) + 0.25 * t; b = b * (1 - t) + 0.14 * t; rough = 0.5 + t * 0.4; }
+    const rt = (clamp01((rust - 0.7) * 5) + clamp01((streak - 0.8) * 3) * 0.35) * 0.75;
+    if (rt > 0) { const t = Math.min(1, rt); r = r * (1 - t) + 0.62 * t; g = g * (1 - t) + 0.42 * t; b = b * (1 - t) + 0.3 * t; rough = 0.5 + t * 0.4; }
     if (scratch > 0.96) shade *= 1.1;
     f.col[i * 3] = r * shade; f.col[i * 3 + 1] = g * shade; f.col[i * 3 + 2] = b * shade; f.h[i] = h; f.r[i] = rough;
   }
@@ -262,7 +262,7 @@ function genMetal(n = 256) { // generic painted/scratched metal (barrels, posts)
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
     const u = x / n, v = y / n, i = y * n + x;
     const a = fbm(u, v, 8, 4, 0), s = vnoise(u * 0.1, v, 128, 1);
-    const rust = clamp01((fbm(u, v, 6, 4, 2) - 0.62) * 5);
+    const rust = clamp01((fbm(u, v, 6, 4, 2) - 0.7) * 4) * 0.8;
     let shade = 0.85 + (a - 0.5) * 0.2 + (s > 0.9 ? 0.1 : 0);
     const r = 1 - rust * 0.5, g = 1 - rust * 0.7, b = 1 - rust * 0.8;
     f.col[i * 3] = r * shade; f.col[i * 3 + 1] = g * shade; f.col[i * 3 + 2] = b * shade; f.h[i] = a * 0.4 + rust * 0.3; f.r[i] = 0.45 + rust * 0.45;

@@ -30,9 +30,10 @@ export function createWorld(ctx) {
     frond: sway(std({ map: T.frond, side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.8 }), uTime, { amp: 0.12, freq: 1.4, key: 'frond', weight: 'uv.y' }),
     facade: std({ map: T.facade.map, normalMap: T.facade.normalMap, roughnessMap: T.facade.roughnessMap, alphaTest: 0.5, vertexColors: false }),
     decal: std({ map: T.decals, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, roughness: 0.9 }),
+    glass: std({ roughness: 0.08, metalness: 0.6 }),
     glow: std({ color: 0xffffff, emissive: 0xffb860, emissiveIntensity: 3.0, roughness: 0.4 }),
   };
-  const TILE = { plaster: 4, stone: 2, concrete: 4, corr: 2.4, roof: 2, metal: 1, paint: 1.5, wood: 1.2, bark: 1, cloth: 1, frond: 1, facade: 1, decal: 1, glow: 1 };
+  const TILE = { plaster: 4, stone: 2, concrete: 4, corr: 2.4, roof: 2, metal: 1, paint: 1.5, wood: 1.2, bark: 1, cloth: 1, frond: 1, facade: 1, decal: 1, glow: 1, glass: 1 };
   const G = {}; for (const k in MAT) G[k] = new Geo(TILE[k]);
 
   // ---------- content ----------

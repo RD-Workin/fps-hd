@@ -7,7 +7,7 @@ import { faceQuad, decalUV, cellUV } from './buildings.js';
 import { FACADE } from './textures.js';
 
 const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), E = new THREE.Euler();
-const mat4 = (x, y, z, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) => M4.compose(V.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz)), S.set(sx, sy, sz));
+const mat4 = (x, y, z, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) => M4.compose(V.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz, 'XYZ')), S.set(sx, sy, sz));
 
 export function buildProps(G, T, physics, scene, uTime) {
   const solid = (x0, y0, z0, x1, y1, z1, m = 'wood') => physics.add(new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, y1, z1)), m, null);
@@ -41,21 +41,26 @@ export function buildProps(G, T, physics, scene, uTime) {
     }
     if (collide) solid(x0, y, z0, x1, y + H, z1, 'metal');
   };
-  const wheel = (x, y, z, ry, rad = 0.42, w = 0.3) => G.paint.add(new THREE.CylinderGeometry(rad, rad, w, 16), mat4(x, y, z, ry, 1, 1, 1, 0, Math.PI / 2), col(0x1d1d1d));
-  const car = (x, z, alongX, c) => { // rusty sedan wreck, 4.4 x 1.8
-    const hx = alongX ? 2.2 : 0.9, hz = alongX ? 0.9 : 2.2, cc = col(c);
-    G.paint.box(x - hx, 0.32, z - hz, x + hx, 0.95, z + hz, cc);
-    const cx = alongX ? 1.15 : 0.82, cz = alongX ? 0.82 : 1.15;
-    G.paint.box(x - cx + (alongX ? -0.2 : 0), 0.95, z - cz + (alongX ? 0 : -0.2), x + cx + (alongX ? -0.2 : 0), 1.42, z + cz + (alongX ? 0 : -0.2), col(0x23282c));
-    G.paint.box(x - cx + 0.05 + (alongX ? -0.2 : 0), 1.42, z - cz + 0.05 + (alongX ? 0 : -0.2), x + cx - 0.05 + (alongX ? -0.2 : 0), 1.48, z + cz - 0.05 + (alongX ? 0 : -0.2), cc);
-    for (const a of [-1, 1]) for (const b of [-1, 1]) alongX ? wheel(x + a * 1.35, 0.38, z + b * 0.82, 0) : wheel(x + b * 0.82, 0.38, z + a * 1.35, Math.PI / 2);
+  const wheel = (x, y, z, ry, rad = 0.42, w = 0.3) => G.paint.add(new THREE.CylinderGeometry(rad, rad, w, 16), M4.compose(V.set(x, y, z), Q.setFromEuler(E.set(Math.PI / 2, ry, 0, 'YXZ')), S.set(1, 1, 1)), col(0x1d1d1d)); // axle along local z rotated by ry
+  const carProfile = (() => { // sedan side silhouette (length along +x, centered), extruded across width with bevel
+    const sh = new THREE.Shape(); const pts = [[-2.2, 0.3], [2.2, 0.3], [2.25, 0.62], [2.05, 0.9], [0.95, 0.98], [0.45, 1.42], [-0.95, 1.45], [-1.55, 1.0], [-2.2, 0.92], [-2.28, 0.6]];
+    sh.moveTo(...pts[0]); for (const p of pts.slice(1)) sh.lineTo(...p);
+    const g = new THREE.ExtrudeGeometry(sh, { depth: 1.62, bevelEnabled: true, bevelThickness: 0.09, bevelSize: 0.07, bevelSegments: 3, curveSegments: 4 }); g.translate(0, 0, -0.81); return g;
+  })();
+  const glassProfile = (() => { const sh = new THREE.Shape(); const pts = [[0.9, 1.0], [0.42, 1.38], [-0.92, 1.4], [-1.48, 1.02]]; sh.moveTo(...pts[0]); for (const p of pts.slice(1)) sh.lineTo(...p);
+    const g = new THREE.ExtrudeGeometry(sh, { depth: 1.66, bevelEnabled: false }); g.translate(0, 0.005, -0.83); return g; })();
+  const car = (x, z, alongX, c) => { // rusty sedan wreck, 4.5 x 1.8
+    const ry = alongX ? 0 : Math.PI / 2, hx = alongX ? 2.3 : 0.9, hz = alongX ? 0.9 : 2.3;
+    G.paint.add(carProfile, mat4(x, 0, z, ry), col(c)); G.glass.add(glassProfile, mat4(x, 0, z, ry), col(0x2a3238));
+    for (const a of [-1.35, 1.4]) for (const b of [-0.78, 0.78]) { const wx = alongX ? x + a : x + b, wz = alongX ? z + b : z - a; wheel(wx, 0.36, wz, ry, 0.36, 0.26); }
+    for (const b of [-1, 1]) { const lx = alongX ? x + 2.3 : x + b * 0.6, lz = alongX ? z + b * 0.6 : z - 2.3; G.glow.box(lx - 0.06, 0.62, lz - 0.06, lx + 0.06, 0.74, lz + 0.06, col(0x806040, 0.3)); }
     solid(x - hx, 0, z - hz, x + hx, 1.45, z + hz, 'metal');
   };
   const truck = (x, z, c) => { // along z, cab at +z. 2.4 x 7.6
     G.paint.box(x - 1.2, 0.55, z + 1.6, x + 1.2, 2.6, z + 3.8, col(c)); G.paint.box(x - 1.0, 1.75, z + 3.79, x + 1.0, 2.45, z + 3.82, col(0x1c2226));
     G.paint.box(x - 1.15, 0.5, z - 3.8, x + 1.15, 0.85, z + 1.6, col(0x2a2a2a));
     G.cloth.box(x - 1.25, 0.85, z - 3.8, x + 1.25, 3.2, z + 1.5, col(0x6f6a48), '', 3);
-    for (const zz of [-2.7, -1.5, 2.8]) for (const s of [-1, 1]) wheel(x + s * 1.05, 0.5, z + zz, 0, 0.5, 0.35);
+    for (const zz of [-2.7, -1.5, 2.8]) for (const s of [-1, 1]) wheel(x + s * 1.05, 0.5, z + zz, Math.PI / 2, 0.5, 0.35);
     solid(x - 1.25, 0, z - 3.8, x + 1.25, 3.2, z + 1.5, 'metal'); solid(x - 1.2, 0, z + 1.5, x + 1.2, 2.6, z + 3.8, 'metal');
   };
   const decal = (reg, x, z, w, h, ang = 0, c = W) => { // ground decal; ang rotates the decal's "up" from -z

@@ -48,8 +48,8 @@ export const NAV = {
   },
   // Defender hold spots near cover (yaw: 0 looks -z, PI looks +z, PI/2 looks -x).
   holds: {
-    A: [{ x: -40, z: -30, yaw: Math.PI }, { x: -25, z: -31, yaw: 2.5 }, { x: -36, z: -17.2, yaw: Math.PI }, { x: -21, z: -20, yaw: -2.0 }],
-    B: [{ x: 40, z: -30, yaw: Math.PI }, { x: 25, z: -31, yaw: -2.5 }, { x: 36, z: -17.2, yaw: Math.PI }, { x: 21, z: -20, yaw: 2.0 }],
+    A: [{ x: -40, z: -30, yaw: Math.PI }, { x: -25, z: -32.4, yaw: Math.PI }, { x: -36, z: -17.2, yaw: Math.PI }, { x: -21, z: -20, yaw: -2.0 }],
+    B: [{ x: 40, z: -30, yaw: Math.PI }, { x: 25, z: -32.4, yaw: Math.PI }, { x: 36, z: -17.2, yaw: Math.PI }, { x: 21, z: -20, yaw: 2.0 }],
   },
   chokes: [[-50.5, -6], [-31.5, -7], [-12, -9.5], [0.5, -18], [12, -9.5], [31.5, -7], [50.5, -6], [-16, -32], [16, -32]],
 };
