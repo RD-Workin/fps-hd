@@ -151,11 +151,14 @@ export function createAudio(ctx) {
   // ---------------- events
   const E = ctx.events, P = () => ctx.player, me = a => a && a === ctx.player;
   let lastKillSfx = -1;
-  E.on('weapon:fire', () => {
+  E.on('weapon:fire', (e) => {
     duck('amb', 0.6, 0.08, 0.35);
-    play('rifle', { gain: 1, prio: 4, max: 5, send: 0.28, pitchVar: 0.03 });
+    if (e?.weapon === 'sniper') play('sniper', { gain: 1, prio: 5, max: 2, send: 0.4, pitchVar: 0.02 });
+    else play('rifle', { gain: 1, prio: 4, max: 5, send: 0.28, pitchVar: 0.03 });
     if (Math.random() < 0.6) play('casing', { gain: 0.25, delay: 0.35 + Math.random() * 0.25, prio: 0, max: 2, send: 0.05, pitchVar: 0.1 });
   });
+  E.on('weapon:bolt', () => play('bolt', { prio: 4, max: 1 }));
+  E.on('weapon:equip', (e) => { if (e?.switched) play('draw', { prio: 3, max: 1 }); });
   E.on('weapon:dryfire', () => play('dryFire', { prio: 3 }));
   E.on('weapon:hit', p => {
     if (p?.point && !p.actor) return;
@@ -264,7 +267,7 @@ export function createAudio(ctx) {
           const rp = w.reloadProgress || 0;
           if (reloadStage === 0 && rp >= 0.1) { play('magOut', { prio: 4 }); reloadStage = 1; }
           if (reloadStage === 1 && rp >= 0.52) { play('magIn', { prio: 4 }); reloadStage = 2; }
-          if (reloadStage === 2 && rp >= 0.78) { play('charge', { prio: 4 }); reloadStage = 3; }
+          if (reloadStage === 2 && rp >= 0.78) { if (w.current !== 'sniper') play('charge', { prio: 4 }); reloadStage = 3; } // sniper: bolt sound comes from 'weapon:bolt'
         }
         wasReloading = !!w.reloading;
         if (inp?.firePressed && w.mag === 0 && !w.reloading && p?.alive) play('dryFire', { prio: 3, max: 1 });
@@ -303,7 +306,8 @@ export function createAudio(ctx) {
           if (a.lastShotTime !== s.shot && a.lastShotTime > 0) {
             const pos = tmpV.copy(a.position).setY(a.position.y + 1.4), dist = camPos.distanceTo(pos);
             const enemy = a.team !== p?.team;
-            play(dist > 40 ? 'rifleFar' : (enemy ? 'rifleEnemy' : 'rifle'), { pos, gain: dist > 40 ? 1 : 0.9, prio: 3, max: 8, send: Math.min(0.6, 0.15 + dist / 80), pitchVar: 0.04 });
+            const sn = a.weapon === 'sniper';
+            play(dist > 40 ? 'rifleFar' : sn ? (enemy ? 'sniperEnemy' : 'sniper') : (enemy ? 'rifleEnemy' : 'rifle'), { pos, gain: dist > 40 ? 1 : 0.9, prio: 3, max: 8, send: Math.min(0.6, 0.15 + dist / 80), pitchVar: 0.04 });
           }
         }
         s.shot = a.lastShotTime; s.pos.copy(a.position);

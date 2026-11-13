@@ -60,7 +60,7 @@ function cylAttrs(geo, r, h) { // axis Y, centered
     }
   });
 }
-function genericAttrs(geo) {
+export function genericAttrs(geo) {
   return finalize(geo, (pos, nor, n, uv, ed) => {
     for (let t = 0; t < n / 3; t++) {
       const ax = triAxis(nor, t);
@@ -74,7 +74,7 @@ function genericAttrs(geo) {
 }
 
 // ---------- builder ----------
-class Builder {
+export class Builder {
   constructor() { this.lists = new Map(); this.base = new THREE.Matrix4(); }
   add(mat, geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
     _m.compose(_p.set(x, y, z), _q.setFromEuler(_e.set(rx, ry, rz)), _s.set(1, 1, 1));
@@ -170,6 +170,8 @@ export function patchDepthOnly(mat) {
   return mat;
 }
 
+let matCache = null;
+export function getMaterials() { return matCache ||= makeMaterials(); }
 function makeMaterials() {
   const T = getWeaponTextures();
   const rep = (t, r) => { const c = t.clone(); c.repeat.set(r, r); c.needsUpdate = true; return c; };
@@ -201,7 +203,7 @@ function makeMaterials() {
 
 // ---------- the model ----------
 export function buildViewmodel() {
-  const M = makeMaterials();
+  const M = getMaterials();
   const b = new Builder();
   const rifle = new THREE.Group(); rifle.name = 'NV-4';
 
@@ -304,31 +306,7 @@ export function buildViewmodel() {
   b.cyl(M.steel, 0.008, 0.008, 0.006, -0.032, -0.01, -0.18, 'x', 14);
 
   // ===== right hand on the grip =====
-  {
-    b.base.compose(_p.set(0, -0.1, 0.1), _q.setFromEuler(_e.set(-0.32, 0, 0)), _s.set(1, 1, 1));
-    // back of hand / palm on the right side of the grip
-    b.box(M.glove, 0.03, 0.085, 0.066, 0.027, 0.004, 0.004, 0, 0, 0.06, 0.013);
-    b.box(M.gloveDark, 0.008, 0.06, 0.05, 0.043, 0.006, 0.0, 0, 0, 0.06, 0.004);   // knuckle armour
-    b.box(M.glove, 0.05, 0.034, 0.03, 0.008, 0.036, 0.034, 0, 0, 0, 0.012);        // web over the backstrap
-    // fingers wrapping the front strap
-    for (let i = 0; i < 3; i++) {
-      const y = -0.004 - i * 0.022, r = 0.0098 - i * 0.0006;
-      b.limb(M.glove, [0.03, y, -0.012], [0.016, y, -0.033], r);
-      b.limb(M.glove, [0.016, y, -0.033], [-0.012, y - 0.002, -0.032], r * 0.96);
-      b.limb(M.glove, [-0.012, y - 0.002, -0.032], [-0.024, y - 0.004, -0.014], r * 0.92);
-    }
-    // index finger on the trigger
-    b.limb(M.glove, [0.029, 0.028, -0.014], [0.018, 0.04, -0.045], 0.0098);
-    b.limb(M.glove, [0.018, 0.04, -0.045], [0.004, 0.035, -0.07], 0.0094);
-    // thumb along the left side
-    b.limb(M.glove, [0.0, 0.04, 0.035], [-0.022, 0.05, 0.012], 0.011);
-    b.limb(M.glove, [-0.022, 0.05, 0.012], [-0.026, 0.057, -0.018], 0.0098);
-    b.base.identity();
-    // wrist + forearm + sleeve
-    b.limb(M.glove, [0.022, -0.105, 0.135], [0.045, -0.15, 0.2], 0.026, 0.03);
-    b.limb(M.sleeve, [0.05, -0.16, 0.22], [0.15, -0.33, 0.5], 0.036, 0.05);
-    b.cyl(M.sleeve, 0.042, 0.042, 0.04, 0.052, -0.163, 0.225, 'z', 16, false, 0.5, -0.33, 0);
-  }
+  addRightHand(b, M);
 
   b.build(rifle, { receiveShadow: true });
 
@@ -365,8 +343,65 @@ export function buildViewmodel() {
 
   // ===== left hand on the handguard (separate: it moves during reload) =====
   const leftHand = new THREE.Group(); leftHand.name = 'leftHand';
-  {
-    const z0 = -0.36;
+  addLeftHand(b, M);
+  b.build(leftHand, { receiveShadow: true });
+  rifle.add(leftHand);
+
+  // ===== reticle (inside the optic, at the front lens) =====
+  const ret = new THREE.Mesh(new THREE.PlaneGeometry(0.0065, 0.0065), M.reticle);
+  ret.position.set(0, oy + 0.008, oz - 0.026); ret.renderOrder = 12; ret.frustumCulled = false;
+  rifle.add(ret);
+
+  const { muzzle, flash, star } = makeMuzzle(rifle, 0.002, -0.705);
+
+  const eject = new THREE.Object3D(); eject.position.set(0.03, 0.002, -0.03); rifle.add(eject);
+
+  return { rifle, mag, magFresh, charger, leftHand, muzzle, flash, star, eject, materials: M, reticle: ret };
+}
+
+// muzzle point + flash (front star + crossed side cones), parented to the rifle at (0, y, z)
+export function makeMuzzle(rifle, y, z, size = 1) {
+  const FX = getFxTextures();
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, y, z); rifle.add(muzzle);
+  const flashMat = patchDepthOnly(new THREE.MeshBasicMaterial({ map: FX.flashFront, color: new THREE.Color(4.0, 2.2, 0.9), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+  const flashSideMat = patchDepthOnly(new THREE.MeshBasicMaterial({ map: FX.flashSide, color: new THREE.Color(3.5, 1.8, 0.7), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+  const flash = new THREE.Group(); muzzle.add(flash);
+  const star = new THREE.Mesh(new THREE.PlaneGeometry(0.16 * size, 0.16 * size), flashMat); star.position.z = -0.02; flash.add(star);
+  const sideGeo = new THREE.PlaneGeometry(0.22 * size, 0.09 * size); sideGeo.translate(0.11 * size, 0, 0); sideGeo.rotateY(Math.PI / 2);
+  for (let i = 0; i < 2; i++) { const s = new THREE.Mesh(sideGeo, flashSideMat); s.rotation.z = i * Math.PI / 2 + Math.PI / 4; flash.add(s); }
+  flash.traverse(o => { o.frustumCulled = false; o.renderOrder = 13; });
+  flash.visible = false;
+  return { muzzle, flash, star };
+}
+
+// gloved right hand around the pistol grip (grip at (0,-0.1,0.1), rx -0.32) + forearm
+export function addRightHand(b, M) {
+    b.base.compose(_p.set(0, -0.1, 0.1), _q.setFromEuler(_e.set(-0.32, 0, 0)), _s.set(1, 1, 1));
+    // back of hand / palm on the right side of the grip
+    b.box(M.glove, 0.03, 0.085, 0.066, 0.027, 0.004, 0.004, 0, 0, 0.06, 0.013);
+    b.box(M.gloveDark, 0.008, 0.06, 0.05, 0.043, 0.006, 0.0, 0, 0, 0.06, 0.004);   // knuckle armour
+    b.box(M.glove, 0.05, 0.034, 0.03, 0.008, 0.036, 0.034, 0, 0, 0, 0.012);        // web over the backstrap
+    // fingers wrapping the front strap
+    for (let i = 0; i < 3; i++) {
+      const y = -0.004 - i * 0.022, r = 0.0098 - i * 0.0006;
+      b.limb(M.glove, [0.03, y, -0.012], [0.016, y, -0.033], r);
+      b.limb(M.glove, [0.016, y, -0.033], [-0.012, y - 0.002, -0.032], r * 0.96);
+      b.limb(M.glove, [-0.012, y - 0.002, -0.032], [-0.024, y - 0.004, -0.014], r * 0.92);
+    }
+    // index finger on the trigger
+    b.limb(M.glove, [0.029, 0.028, -0.014], [0.018, 0.04, -0.045], 0.0098);
+    b.limb(M.glove, [0.018, 0.04, -0.045], [0.004, 0.035, -0.07], 0.0094);
+    // thumb along the left side
+    b.limb(M.glove, [0.0, 0.04, 0.035], [-0.022, 0.05, 0.012], 0.011);
+    b.limb(M.glove, [-0.022, 0.05, 0.012], [-0.026, 0.057, -0.018], 0.0098);
+    b.base.identity();
+    // wrist + forearm + sleeve
+    b.limb(M.glove, [0.022, -0.105, 0.135], [0.045, -0.15, 0.2], 0.026, 0.03);
+    b.limb(M.sleeve, [0.05, -0.16, 0.22], [0.15, -0.33, 0.5], 0.036, 0.05);
+    b.cyl(M.sleeve, 0.042, 0.042, 0.04, 0.052, -0.163, 0.225, 'z', 16, false, 0.5, -0.33, 0);
+}
+// gloved left hand under the handguard at z0 + forearm
+export function addLeftHand(b, M, z0 = -0.36) {
     b.box(M.glove, 0.064, 0.03, 0.09, 0.004, -0.044, z0, 0, 0, -0.08, 0.013);         // palm under the handguard
     b.box(M.gloveDark, 0.05, 0.008, 0.07, 0.006, -0.06, z0, 0, 0, -0.08, 0.004);
     // fingers curling up the right side
@@ -382,28 +417,4 @@ export function buildViewmodel() {
     b.limb(M.glove, [-0.01, -0.06, z0 + 0.04], [-0.04, -0.09, z0 + 0.1], 0.025, 0.029);
     b.limb(M.sleeve, [-0.045, -0.095, z0 + 0.11], [-0.17, -0.25, z0 + 0.4], 0.035, 0.05);
     b.cyl(M.sleeve, 0.04, 0.04, 0.035, -0.048, -0.098, z0 + 0.115, 'z', 16, false, 0.6, 0.38, 0);
-  }
-  b.build(leftHand, { receiveShadow: true });
-  rifle.add(leftHand);
-
-  // ===== reticle (inside the optic, at the front lens) =====
-  const ret = new THREE.Mesh(new THREE.PlaneGeometry(0.0065, 0.0065), M.reticle);
-  ret.position.set(0, oy + 0.008, oz - 0.026); ret.renderOrder = 12; ret.frustumCulled = false;
-  rifle.add(ret);
-
-  // ===== muzzle flash (front star + crossed side planes), parented at the muzzle =====
-  const FX = getFxTextures();
-  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0.002, -0.705); rifle.add(muzzle);
-  const flashMat = patchDepthOnly(new THREE.MeshBasicMaterial({ map: FX.flashFront, color: new THREE.Color(4.0, 2.2, 0.9), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
-  const flashSideMat = patchDepthOnly(new THREE.MeshBasicMaterial({ map: FX.flashSide, color: new THREE.Color(3.5, 1.8, 0.7), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
-  const flash = new THREE.Group(); muzzle.add(flash);
-  const star = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.16), flashMat); star.position.z = -0.02; flash.add(star);
-  const sideGeo = new THREE.PlaneGeometry(0.22, 0.09); sideGeo.translate(0.11, 0, 0); sideGeo.rotateY(Math.PI / 2);
-  for (let i = 0; i < 2; i++) { const s = new THREE.Mesh(sideGeo, flashSideMat); s.rotation.z = i * Math.PI / 2 + Math.PI / 4; flash.add(s); }
-  flash.traverse(o => { o.frustumCulled = false; o.renderOrder = 13; });
-  flash.visible = false;
-
-  const eject = new THREE.Object3D(); eject.position.set(0.03, 0.002, -0.03); rifle.add(eject);
-
-  return { rifle, mag, magFresh, charger, leftHand, muzzle, flash, star, eject, materials: M, reticle: ret };
 }

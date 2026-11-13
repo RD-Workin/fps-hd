@@ -40,6 +40,31 @@ function rifleShot(sr, rng, o = {}) {
   return finish(out, sr, 0.97, 1.6);
 }
 
+// heavy bolt-action shot: deeper body, sharper supersonic crack, long rolling tail, no auto mechanism
+function sniperShot(sr, rng, o = {}) {
+  const dur = 1.4, L = N(sr, dur), out = new Float32Array(L);
+  mix(out, hp(envExp(noise(L, rng), sr, 0.0022, 0.0001), sr, 1500), 1.3);
+  mix(out, bp(envExp(noise(L, rng), sr, 0.03 * rng.range(0.9, 1.15), 0.0002), sr, (o.crack || 3300) * rng.range(0.92, 1.08), 0.8), 1.9);
+  const body = new Float32Array(L), f0 = (o.body || 105) * rng.range(0.94, 1.06);
+  addTone(body, sr, 0, 0.6, t => f0 * Math.exp(-t / 0.04) + 38, 1, 0.13, { att: 0.0015 });
+  saturate(body, 2.6); mix(out, body, 1.25);
+  mix(out, lp(envExp(noise(L, rng), sr, 0.09, 0.001), sr, 800, 0.9), 1.6);
+  mix(out, biquad(envExp(noise(L, rng), sr, 0.45 * rng.range(0.9, 1.15), 0.008), sr, 'lowpass', t => 2000 * Math.exp(-t / 0.25) + 220, 0.7), 0.7);
+  addEchoes(out, sr, [[0.07 + rng() * 0.02, 0.3, 1400], [0.2 + rng() * 0.05, 0.22, 800], [0.5 + rng() * 0.1, 0.14, 500]], rng);
+  return finish(out, sr, 0.98, 1.8);
+}
+// bolt: lift (click), pull back (scrape + ejector ping), push forward (scrape), lock down (heavy click)
+function boltCycle(sr, rng) {
+  const L = N(sr, 0.8), out = new Float32Array(L);
+  click(out, sr, rng, 0.0, 2600, 0.6, 0.01);
+  scrape(L, sr, rng, 0.08, 0.13, 1800, 3000, 0.6, out);
+  addRing(out, sr, 0.2, [[5200, 0.6, 0.02], [7400, 0.4, 0.015]], 0.25, rng);
+  scrape(L, sr, rng, 0.33, 0.12, 3000, 1900, 0.55, out);
+  click(out, sr, rng, 0.47, 1700, 1.0, 0.025);
+  thump(out, sr, 0.47, 130, 0.7, 0.04);
+  click(out, sr, rng, 0.56, 2300, 0.8, 0.012);
+  return finish(out, sr, 0.9, 1.2);
+}
 function rifleFar(sr, rng) {
   const dur = 1.8, L = N(sr, dur), out = new Float32Array(L);
   addTone(out, sr, 0, 0.9, t => 85 * Math.exp(-t / 0.05) + 42, 1, 0.16, { att: 0.004 });
@@ -341,6 +366,9 @@ export function buildSfx(sr) {
     rifle: v(5, () => rifleShot(sr, rng)),
     rifleEnemy: v(4, () => rifleShot(sr, rng, { crack: 1900, body: 125 })),
     rifleFar: v(3, () => rifleFar(sr, rng)),
+    sniper: v(3, () => sniperShot(sr, rng)),
+    sniperEnemy: v(3, () => sniperShot(sr, rng, { crack: 2500, body: 92 })),
+    bolt: v(2, () => boltCycle(sr, rng)),
     dryFire: v(2, () => dryFire(sr, rng)),
     magOut: v(2, () => magOut(sr, rng)),
     magIn: v(2, () => magIn(sr, rng)),

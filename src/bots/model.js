@@ -193,6 +193,20 @@ function buildGeometries() {
     part(rbox(0.03, 0.03, 0.05, 0.005), 'metal', 0x151515, { p: [0, 0.085, -0.1] }),
     part(rbox(0.03, 0.05, 0.03, 0.006), 'gear', C.furn, { p: [0, -0.02, -0.33] }), // fore grip
   ]);
+  // Sniper: long heavy barrel, big scope, skeleton stock (barrel along -Z, grip at origin)
+  G.sniper = merge([
+    part(rbox(0.05, 0.06, 0.3, 0.008), 'metal', C.rifle, { p: [0, 0.04, -0.08] }), // action / chassis
+    part(rbox(0.055, 0.055, 0.32, 0.012), 'gear', C.furn, { p: [0, 0.03, -0.38] }), // fore-end
+    part(cyl(0.013, 0.011, 0.42, 8), 'metal', 0x1c1c1c, { p: [0, 0.045, -0.72], r: [Math.PI / 2, 0, 0] }), // barrel
+    part(cyl(0.02, 0.02, 0.07, 8), 'metal', 0x151515, { p: [0, 0.045, -0.95], r: [Math.PI / 2, 0, 0] }), // brake
+    part(rbox(0.035, 0.1, 0.045, 0.01), 'gear', C.furn, { p: [0, -0.04, 0.01], r: [0.3, 0, 0] }), // grip
+    part(rbox(0.04, 0.05, 0.24, 0.01), 'gear', C.furn, { p: [0, 0.03, 0.16] }), // stock
+    part(rbox(0.05, 0.11, 0.03, 0.01), 'gear', 0x222222, { p: [0, 0.0, 0.29] }),
+    part(cyl(0.02, 0.02, 0.26, 12), 'metal', 0x121212, { p: [0, 0.12, -0.08], r: [Math.PI / 2, 0, 0] }), // scope tube
+    part(cyl(0.028, 0.028, 0.06, 12), 'metal', 0x121212, { p: [0, 0.12, -0.24], r: [Math.PI / 2, 0, 0] }), // objective
+    part(rbox(0.03, 0.04, 0.03, 0.005), 'metal', 0x151515, { p: [0, 0.09, -0.02] }),
+    part(rbox(0.03, 0.04, 0.03, 0.005), 'metal', 0x151515, { p: [0, 0.09, -0.15] }),
+  ]);
   G.mag = merge([part(rbox(0.032, 0.14, 0.06, 0.008), 'metal', 0x303030, { p: [0, -0.06, 0], r: [0.22, 0, 0] })]);
   return G;
 }
@@ -236,14 +250,21 @@ export class SoldierModel {
       const kn = bone(th, [0, -D.thighLen, 0]); mk(g.shin, kn);
       return { th, kn, side: s };
     });
-    this.gun = bone(this.spine); mk(g.rifle, this.gun);
+    this.gun = bone(this.spine); this.rifleMesh = mk(g.rifle, this.gun);
+    this.sniperMesh = mk(g.sniper, this.gun); this.sniperMesh.visible = false;
     this.mag = mk(g.mag, this.gun, [0, 0.0, -0.06]);
     this.muzzle = bone(this.gun, [0, 0.04, -0.74]);
+    this.weapon = 'rifle';
     // anim state
     this.phase = 0; this.walkBlend = 0; this.crouch = 0; this.ready = 1; this.recoil = 0;
     this.deadT = -1; this.fallAngle = 0; this.fallVel = 0; this.limp = 0;
     this.feet = [new THREE.Vector3(-0.11, 0, -0.02), new THREE.Vector3(0.11, 0, -0.02)];
     this.tmpT = new THREE.Vector3(); this.tmpP = new THREE.Vector3();
+  }
+  setWeapon(id) {
+    this.weapon = id; const sn = id === 'sniper';
+    this.rifleMesh.visible = !sn; this.sniperMesh.visible = sn; this.mag.visible = true; this.mag.scale.set(1, sn ? 0.6 : 1, 1);
+    this.muzzle.position.set(0, sn ? 0.045 : 0.04, sn ? -0.99 : -0.74);
   }
   setTeam(team) { const m = getMaterial(team); for (const x of this.meshes) x.material = m; }
   reset() {
