@@ -24,7 +24,7 @@ function arcPath() {
 
 function markup() {
   const keys = [
-    ['Z Q S D', 'Se déplacer', 'wide'], ['Souris', 'Regarder', 'wide'], ['Clic G', 'Tirer', 'wide'], ['Clic D', 'Viser (ADS)', 'wide'], ['R', 'Recharger'],
+    ['Z Q S D', 'Se déplacer', 'wide'], ['Souris', 'Regarder', 'wide'], ['Clic G', 'Tirer', 'wide'], ['Clic D', 'Viser (ADS)', 'wide'], ['R', 'Recharger'], ['1 / 2', 'Arme (préparation)'],
     ['E', 'Poser / désamorcer'], ['Cadavre', 'Munitions', 'wide'], ['Espace', 'Sauter', 'wide'], ['C', 'S\'accroupir'], ['Maj', 'Marcher'],
     ['Tab', 'Scores'], ['M', 'Couper le son'], ['Échap', 'Pause'],
   ].map(([k, l, w]) => `<div class="nv-key"><kbd class="${w || ''}">${k}</kbd>${l}</div>`).join('');
@@ -523,7 +523,7 @@ export function createHud(ctx) {
     let pr = '', warn = false;
     if (w && alive) {
       if (w.mag === 0 && w.reserve === 0) { pr = 'PLUS DE MUNITIONS'; warn = true; }
-      else if (w.mag === 0 && !w.reloading) pr = '<kbd>CLIC D</kbd>RECHARGER';
+      else if (w.mag === 0 && !w.reloading) pr = '<kbd>R</kbd>RECHARGER';
       else if (!w.reloading && w.mag <= (w.magSize || 30) * 0.2) { pr = 'MUNITIONS FAIBLES'; warn = true; }
     }
     html(E.prompt, pr); cls(E.prompt, 'on', !!pr); cls(E.prompt, 'warn', warn);
