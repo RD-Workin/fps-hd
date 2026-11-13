@@ -2,8 +2,9 @@
 // The map is authored as a 2 m cell grid carved out of solid buildings. See docs/decisions/world.md.
 export const CELL = 2, GX0 = -80, GZ0 = -64, GW = 80, GH = 64; // x[-80,80] z[-64,64]
 // Cell codes: '#' building, '.' floor 0, ',' floor +3, ':' floor +6, 'c' covered floor 0 (passage under a building),
-// 'C' covered floor +3, '^' 'v' '>' '<' stairs rising toward -z / +z / +x / -x, 'w' sea.
-export const LEVEL = { '.': 0, 'c': 0, ',': 3, 'C': 3, ':': 6 };
+// 'C' covered floor +3, ';' floor +1.5, '=' floor +4.5, '^' 'v' '>' '<' stairs rising toward -z / +z / +x / -x, 'w' sea.
+// A 1.5 m drop between two floors has no railing: players can jump up it (jump apex ~1.2 m + 0.45 step-up), bots can't.
+export const LEVEL = { '.': 0, 'c': 0, ';': 1.5, ',': 3, 'C': 3, '=': 4.5, ':': 6 };
 export const BOUNDS = { minX: -80, maxX: 80, minZ: -64, maxZ: 56 };
 
 const CARVES = [
@@ -33,6 +34,18 @@ const CARVES = [
   [',', -66, -42, -50, -30], [',', -60, -52, -30, -24],
   // Citadelle (+6) — DEF spawn
   [':', -34, 34, -58, -34], [':', -28, 28, -62, -58],
+  // Elevation inside each lane: mid floors +1.5 / +4.5 with short stairs; their 1.5 m edges are jump-up ledges
+  // LEFT: landing -> steps -> +1.5 balcony; jump from the balcony straight onto Place Haute (+3) beside the stairs
+  ['^', -66, -56, 16, 18], [';', -66, -56, 14, 16], [';', -60, -56, 10, 14],
+  // CENTER: raised fountain terrace on Place Ronde; the alley climbs to +1.5, drops into the Tunnel, rises to the Médina
+  [';', -16, -8, 18, 26], ['<', -8, -6, 20, 24],
+  [';', -4, 2, 12, 16], ['^', -4, 2, 16, 18], [';', -2, 10, 8, 12], ['<', 10, 12, 8, 12],
+  // RIGHT: raised loading dock in the shipyard (overlooks B), hump bridge on Quai Est
+  [';', 44, 54, 10, 24], ['^', 44, 48, 24, 26], ['v', 50, 54, 8, 10],
+  ['^', 64, 72, 36, 38], [';', 64, 72, 30, 36], ['v', 64, 72, 28, 30],
+  // Médina rooftop perch (jump-only), sunken plaza in the Citadelle
+  ['=', -6, -2, -18, -14],
+  ['=', -10, 10, -46, -38], ['^', -4, 4, -48, -46], ['v', -4, 4, -38, -36],
   // stairs (after floors so they override)
   ['<', 44, 50, -14, -8], ['^', 54, 60, -26, -20], ['^', 0, 6, -34, -28], ['>', -42, -34, -46, -40], ['<', 34, 42, -46, -40],
 ];
@@ -47,8 +60,9 @@ export function buildGrid() {
 
 const ry = (x, z, tx, tz) => Math.atan2(-(tx - x), -(tz - z)); // yaw looking from (x,z) to (tx,tz); 0 looks -z
 export const SPAWNS = {
-  ATK: [-9, -7, -5, -3, -1, 1, 3, 5, 7, 9].map(x => ({ x, z: 50, yaw: 0 })),
-  DEF: [-9, -7, -5, -3, -1, 1, 3, 5, 7, 9].map(x => ({ x, z: -50, yaw: Math.PI })),
+  // 20 per side (supports up to 20v20): two staggered rows
+  ATK: [50, 53].flatMap((z, r) => [-19, -17, -15, -13, -11, -9, -7, -5, -3, -1].map(x => ({ x: x + 10 * r + r, z, yaw: 0 }))).map(s => s),
+  DEF: [-50, -54].flatMap((z, r) => [-19, -17, -15, -13, -11, -9, -7, -5, -3, -1].map(x => ({ x: x + 10 * r + r, z, yaw: Math.PI }))),
 };
 export const SITES = [{ name: 'A', x: -58, z: -12, radius: 7 }, { name: 'B', x: 60, z: 2, radius: 7 }];
 
@@ -74,8 +88,10 @@ export const NAV = {
     ],
   },
   holds: {
-    A: [[-66, -18, -63, 4], [-48, -20, -63, 4], [-50, -4, -42, -12], [-70, -6, -63, 6], [-56, -22, -46, -12]],
-    B: [[52, -16, 50, 26], [73, -8, 68, 22], [49, -3, 44, 8], [66, 12, 52, 28], [57, -8, 47, -11]],
+    A: [[-66, -18, -63, 4], [-48, -20, -63, 4], [-50, -4, -42, -12], [-70, -6, -63, 6], [-56, -22, -46, -12],
+      [-70, -22, -58, -12], [-50, -3, -58, -12], [-30, -12, -44, -12], [-20, -9, -42, -12]],
+    B: [[52, -16, 50, 26], [73, -8, 68, 22], [49, -3, 44, 8], [66, 12, 52, 28], [57, -8, 47, -11],
+      [48, 18, 60, 2], [74, 20, 60, 2], [66, -17, 60, 2], [56, 22, 60, 4]],
   },
   chokes: [[-52, 40], [-61, 26], [-63, 12], [0, 38], [6, 5], [-42, -12], [3, -24], [44, 38], [68, 30], [39, 8], [47, -11], [57, -23], [-38, -43], [38, -43]],
 };

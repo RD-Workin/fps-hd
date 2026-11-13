@@ -42,7 +42,7 @@ export function createWorld(ctx) {
   const T = createTerrain();
   const navColliders = [];
   function addSolid(box, material, o = {}) {
-    physics.add(box, material, null);
+    if (!o.navOnly) physics.add(box, material, null);
     if (o.floor) return;
     const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
     const f = T.floorAt(cx, cz);

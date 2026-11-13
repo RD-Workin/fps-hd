@@ -6,6 +6,7 @@ import { col } from './build.js';
 
 const STAIR = { '^': [0, -1], 'v': [0, 1], '>': [1, 0], '<': [-1, 0] };
 const RISE = 0.3;
+const LEDGE = 1.6; // max floor drop players can jump up (apex 1.18 m + 0.45 step-up)
 
 // Greedy rectangle merge of cells matching pred -> [{i0,i1,j0,j1}] (i1/j1 exclusive)
 export function rects(g, pred) {
@@ -61,8 +62,9 @@ export function buildTerrain(T, G, addSolid) {
   const { g, at, stairs, stairId } = T;
   const stoneC = col(0xd9c8a8), capC = col(0xe8dcc6);
   // terraces: merged per level, solid from 0 to level (retaining walls = stone sides, top = ground material)
-  for (const [lv, pred] of [[3, c => c === ',' || c === 'C'], [6, c => c === ':']]) {
-    for (const r of rects(g, pred)) {
+  const lvls = [...new Set(Object.values(LEVEL))].filter(v => v > 0);
+  for (const lv of lvls) {
+    for (const r of rects(g, c => LEVEL[c] === lv)) {
       const [x0, x1, z0, z1] = rx(r);
       G.stone.box(x0, 0, z0, x1, lv, z1, stoneC, 'py ny', 2);
       G.groundTop.quad([x0, lv, z1], [x1, lv, z1], [x1, lv, z0], [x0, lv, z0], [0, 1, 0], [x0 / 2.4, -z1 / 2.4, x1 / 2.4, -z0 / 2.4], [1, 1, 1]);
@@ -84,6 +86,7 @@ export function buildTerrain(T, G, addSolid) {
   }
   // walls on every walkable edge with a height jump (parapets / stair cheeks). Edges merged along their line.
   const segs = new Map(); // key -> [{a,b}] along line
+  const ledges = []; // [x|t, t|z, drop], axis flag pushed after each entry
   const level = (i, j) => { const c = at(i, j); return c in LEVEL ? LEVEL[c] : null; };
   const pushSeg = (key, a, b, data) => { if (!segs.has(key)) segs.set(key, { data, list: [] }); segs.get(key).list.push([a, b]); };
   for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
@@ -94,7 +97,14 @@ export function buildTerrain(T, G, addSolid) {
       const sa = stairId[j][i], sb = stairId[j + dj]?.[i + di] ?? -1;
       const la = level(i, j), lb = level(i + di, j + dj);
       let side = 0, top = 0, bottom = 0; // side: +1 wall inside B cell, -1 inside A cell
-      if (sa < 0 && sb < 0) { if (Math.abs(la - lb) < 0.45) continue; side = la > lb ? -1 : 1; top = Math.max(la, lb) + 1.0; bottom = Math.min(la, lb); }
+      if (sa < 0 && sb < 0) {
+        const d = Math.abs(la - lb); if (d < 0.45) continue;
+        if (d <= LEDGE) { // jump-up ledge: no railing; nav-only wall so bots path around it
+          const line = di ? GX0 + (i + 1) * CELL : GZ0 + (j + 1) * CELL, t0 = (di ? GZ0 + j * CELL : GX0 + i * CELL);
+          ledges.push(di ? [line, t0, d] : [t0, line, d], di); continue;
+        }
+        side = la > lb ? -1 : 1; top = Math.max(la, lb) + 1.0; bottom = Math.min(la, lb);
+      }
       else if (sa >= 0 && sb >= 0) { if (sa === sb) continue; side = 1; top = Math.max(stairs[sa].high, stairs[sb].high) + 1; }
       else {
         const s = stairs[sa >= 0 ? sa : sb], lf = sa >= 0 ? lb : la, sIsA = sa >= 0;
@@ -121,6 +131,12 @@ export function buildTerrain(T, G, addSolid) {
       G.stone.box(box[0] - 0.05, box[4], box[2] - 0.05, box[3] + 0.05, box[4] + 0.1, box[5] + 0.05, capC, 'ny', 2);
       addSolid(new THREE.Box3(new THREE.Vector3(box[0], 0, box[2]), new THREE.Vector3(box[3], box[4] + 0.1, box[5])), 'concrete', {});
     }
+  }
+  // ledges: nav-only blockers + a worn stone lip on the upper edge (visual only)
+  for (let k = 0; k < ledges.length; k += 2) {
+    const [a, b] = ledges[k], dx = ledges[k + 1];
+    const box = dx ? [a - 0.2, b, a + 0.2, b + CELL] : [a, b - 0.2, a + CELL, b + 0.2];
+    addSolid(new THREE.Box3(new THREE.Vector3(box[0], 0, box[1]), new THREE.Vector3(box[2], 1.5, box[3])), 'concrete', { navOnly: true, navH: 1.5 });
   }
   // quay edge + invisible sea wall
   G.stone.box(-82, -2.5, 56, 82, 0.18, 57.4, col(0xcbbb9c), '', 2);
