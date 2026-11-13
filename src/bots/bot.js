@@ -8,6 +8,11 @@ export const DIFFICULTY = {
   fov: 110 * Math.PI / 180, view: 70, hearing: 38, stepHearing: 11, burst: [3, 6], shotInterval: 0.1, pause: [0.25, 0.6],
   mag: 30, reload: 2.4, run: 5.0, walk: 2.6, crouch: 1.7, turnRate: 7.5, falloffStart: 30,
 };
+// Sniper bots: single aimed shots, slow bolt, deadly at range, weak up close (hits: 85 body / 150 head)
+export const SNIPER = {
+  ...DIFFICULTY, accuracy: 0.6, damage: 85, headDamage: 150, headshotChance: 0.16, burst: [1, 1], shotInterval: 1.45, pause: [0.15, 0.5],
+  mag: 5, reload: 3.0, falloffStart: 999, reaction: [0.35, 0.7],
+};
 const UP = new THREE.Vector3(0, 1, 0);
 const rand = (a, b) => a + Math.random() * (b - a);
 const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
@@ -27,11 +32,13 @@ export class Bot {
     for (let i = 0; i < 9; i++) this.hb.segs.push({ a: new THREE.Vector3(), b: new THREE.Vector3(), r: 0.08 });
     this.percT = Math.random() * 0.12; this.resetAI();
   }
+  get wstats() { return this.weapon === 'sniper' ? SNIPER : DIFFICULTY; }
+  setWeapon(id) { this.weapon = id === 'sniper' ? 'sniper' : 'rifle'; this.model.setWeapon?.(this.weapon); this.mag = this.wstats.mag; this.reloadT = -1; }
   get eyeHeight() { return this.height - 0.15; }
   getEyePosition(out = new THREE.Vector3()) { return out.copy(this.position).setY(this.position.y + this.eyeHeight); }
 
   resetAI() {
-    this.mag = DIFFICULTY.mag; this.reloadT = -1; this.target = null; this.targetSeenAt = -100; this.reactUntil = 0; this.trackStart = 0;
+    this.mag = this.wstats.mag; this.reloadT = -1; this.target = null; this.targetSeenAt = -100; this.reactUntil = 0; this.trackStart = 0;
     this.lastKnown = null; this.lastKnownT = -100; this.alertT = -100; this.seen = new Map();
     this.burstLeft = 0; this.shotIdx = 0; this.nextShot = 0; this.aimHead = false;
     this.path = null; this.pathI = 0; this.pathGoal = null; this.repathT = 0; this.stuckT = 0; this.stuckPos = this.position.clone();
@@ -108,7 +115,7 @@ export class Bot {
 
   // ------------------------------------------------------------ main update
   update(dt) {
-    const { ctx } = this, t = ctx.time, game = ctx.game, D = DIFFICULTY;
+    const { ctx } = this, t = ctx.time, game = ctx.game, D = this.wstats;
     this.fired = false;
     if (!this.alive) { this.model.pose(this.poseState(dt)); this.updateHitboxes(); return; }
     const phase = game?.phase ?? 'live';
@@ -132,7 +139,7 @@ export class Bot {
     } else { this.using = false; this.useProgress = 0; }
 
     const locked = !live || (this.frozen && !this.using) || this.using;
-    if (!this.using && this.mag < D.mag && this.reloadT < 0 && (this.mag === 0 || (!engaged && this.mag < 15 && t - this.targetSeenAt > 2))) this.reloadT = 0;
+    if (!this.using && this.mag < D.mag && this.reloadT < 0 && (this.mag === 0 || (!engaged && this.mag < D.mag / 2 && t - this.targetSeenAt > 2))) this.reloadT = 0;
 
     if (!locked) {
       if (engaged) {
@@ -248,14 +255,14 @@ export class Bot {
   }
 
   tryFire(aimErr, eye) {
-    const D = DIFFICULTY, t = this.ctx.time, tg = this.target;
+    const D = this.wstats, t = this.ctx.time, tg = this.target, sniper = this.weapon === 'sniper';
     if (t < this.reactUntil || t < this.nextShot || this.mag <= 0) return;
     const dist = tg.position.distanceTo(this.position);
     if (aimErr > 0.1 + 0.6 / Math.max(2, dist)) return; // still turning onto the target
-    if (this.burstLeft <= 0) { this.burstLeft = Math.round(rand(...D.burst) + (dist < 10 ? 3 : 0)); this.shotIdx = 0; this.aimHead = Math.random() < D.headshotChance * 2.5; }
+    if (this.burstLeft <= 0) { this.burstLeft = Math.round(rand(...D.burst) + (dist < 10 && !sniper ? 3 : 0)); this.shotIdx = 0; this.aimHead = Math.random() < D.headshotChance * 2.5; }
     // probability-based hit model
     const track = D.trackMin + (1 - D.trackMin) * THREE.MathUtils.clamp((t - this.trackStart) / D.trackTime, 0, 1);
-    const distF = THREE.MathUtils.clamp(1.15 - dist / 55, 0.3, 1.1);
+    const distF = sniper ? THREE.MathUtils.clamp(1.1 - dist / 120, 0.5, 1.05) * (dist < 8 ? 0.7 : 1) : THREE.MathUtils.clamp(1.15 - dist / 55, 0.3, 1.1);
     const moveF = this.moveSpeed > 3 ? 0.55 : this.moveSpeed > 1 ? 0.8 : this.crouching ? 1.15 : 1;
     const ts = tg.moveSpeed ?? 0; const tMoveF = ts > 4 ? 0.75 : ts > 2 ? 0.88 : 1;
     const burstF = Math.max(0.6, 1 - this.shotIdx * 0.07);
@@ -322,7 +329,7 @@ export class Bot {
     _d.copy(this.velocity).setY(0).applyAxisAngle(UP, -this.yaw); const l = _d.length() || 1;
     return {
       dt, pos: this.position, yaw: this.yaw, pitch: this.pitch, speed: this.moveSpeed, moveX: _d.x / l, moveZ: _d.z / l,
-      crouch: this.crouching ? 1 : 0, ready: this.ready, reload: this.reloadT >= 0 ? this.reloadT / DIFFICULTY.reload : -1,
+      crouch: this.crouching ? 1 : 0, ready: this.ready, reload: this.reloadT >= 0 ? this.reloadT / this.wstats.reload : -1,
       headYaw: 0, fired: this.fired,
     };
   }

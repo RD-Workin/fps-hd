@@ -59,7 +59,7 @@ export class Player {
   update(dt) {
     const { input, physics, camera } = this.ctx;
     if (this.alive) {
-      const sens = input.sensitivity * (1 - 0.3 * (this.ctx.weapon?.adsK || 0)); // ADS: x0.7
+      const sens = input.sensitivity * (this.ctx.weapon?.sensScale ?? (1 - 0.3 * (this.ctx.weapon?.adsK || 0))); // ADS x0.7, sniper scope x0.24
       this.yaw -= input.mouseDX * sens;
       this.pitch -= input.mouseDY * sens;
       this.pitch = THREE.MathUtils.clamp(this.pitch, -1.5, 1.5);

@@ -6,6 +6,15 @@ import { Brain } from './brain.js';
 export { DIFFICULTY };
 
 const _oc = new THREE.Vector3();
+// hitbox segment index -> body part (see Bot.updateHitboxes: torso, 2x(thigh, shin), 2x(upper arm, forearm))
+const SEG_PART = ['torso', 'thigh', 'shin', 'thigh', 'shin', 'upperArm', 'foreArm', 'upperArm', 'foreArm'];
+// weapon mix: each team usually fields one sniper (sometimes two), the rest carry rifles
+function assignWeapons(list) {
+  for (const team of ['ATK', 'DEF']) {
+    const tb = list.filter(b => b.team === team).sort(() => Math.random() - 0.5);
+    tb.forEach((b, i) => b.setWeapon?.(i === 0 && Math.random() < 0.85 ? 'sniper' : i === 1 && Math.random() < 0.2 ? 'sniper' : 'rifle'));
+  }
+}
 
 // ray (o + t d, t in [0,max]) vs capsule segment [a,b] radius r -> t or -1 (approximate entry point)
 function rayCapsule(o, d, max, a, b, r) {
@@ -56,7 +65,7 @@ export function createBots(ctx) {
     brain.spotCache.clear();
   }
 
-  ctx.events?.on?.('round:start', () => { ensureNav(); brain.roundStart(); mgr.intel.ATK.clear(); mgr.intel.DEF.clear(); });
+  ctx.events?.on?.('round:start', () => { ensureNav(); assignWeapons(mgr.list); brain.roundStart(); mgr.intel.ATK.clear(); mgr.intel.DEF.clear(); });
   ctx.events?.on?.('weapon:hit', e => e?.actor?.isBot && e.actor.onHit(ctx.player));
   ctx.events?.on?.('sides:swap', () => { brain.spotCache.clear(); });
 
@@ -68,6 +77,7 @@ export function createBots(ctx) {
       for (const b of mgr.list) b.dispose();
       mgr.list.length = 0;
       for (const r of roster || []) mgr.list.push(new Bot(ctx, mgr, r));
+      assignWeapons(mgr.list);
       brain.roundStart();
     },
     update(dt) {
@@ -85,10 +95,10 @@ export function createBots(ctx) {
         // broad phase: sphere around the body
         _oc.copy(b.position); _oc.y += 0.9;
         if (raySphere(origin, dir, bt, _oc.clone(), 1.3) < 0) continue;
-        let t = raySphere(origin, dir, bt, hb.head, 0.14), head = t >= 0;
+        let t = raySphere(origin, dir, bt, hb.head, 0.14), head = t >= 0, part = 'head';
         if (!head) t = Infinity;
-        for (const s of hb.segs) { const ts = rayCapsule(origin, dir, bt, s.a, s.b, s.r); if (ts >= 0 && ts < t - 0.02) { t = ts; head = false; } }
-        if (t < bt) { bt = t; best = { actor: b, distance: t, point: origin.clone().addScaledVector(dir, t), headshot: head }; }
+        hb.segs.forEach((s, i) => { const ts = rayCapsule(origin, dir, bt, s.a, s.b, s.r); if (ts >= 0 && ts < t - 0.02) { t = ts; head = false; part = SEG_PART[i]; } });
+        if (t < bt) { bt = t; best = { actor: b, distance: t, point: origin.clone().addScaledVector(dir, t), headshot: head, part }; }
       }
       return best;
     },
