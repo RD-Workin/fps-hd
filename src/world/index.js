@@ -25,6 +25,7 @@ export function createWorld(ctx) {
     roof: pbr(Tx.roof),
     metal: pbr(Tx.metal, { metalness: 0.55 }),
     paint: pbr(Tx.metal, { metalness: 0.3 }),
+    hull: grime(pbr(Tx.metal, { metalness: 0.45 }), { amount: 0.3, ground: 0.01, streak: 0.3, rust: 0.85 }),
     wood: pbr(Tx.crate),
     bark: pbr(Tx.bark),
     cloth: sway(std({ map: Tx.cloth, side: THREE.DoubleSide, roughness: 0.9 }), uTime, { amp: 0.06, key: 'cloth' }),
@@ -34,7 +35,7 @@ export function createWorld(ctx) {
     glass: std({ roughness: 0.08, metalness: 0.6 }),
     glow: std({ color: 0xffffff, emissive: 0xffb860, emissiveIntensity: 3.0, roughness: 0.4 }),
   };
-  const TILE = { plaster: 4, stone: 2, concrete: 4, corr: 2.4, roof: 2, metal: 1, paint: 1.5, wood: 1.2, bark: 1, cloth: 1, frond: 1, facade: 1, decal: 1, glow: 1, glass: 1 };
+  const TILE = { plaster: 4, stone: 2, concrete: 4, corr: 2.4, roof: 2, metal: 1, paint: 1.5, hull: 3, wood: 1.2, bark: 1, cloth: 1, frond: 1, facade: 1, decal: 1, glow: 1, glass: 1 };
   const G = {}; for (const k in MAT) G[k] = new Geo(TILE[k]);
   G.groundTop = new Geo(2.4);
 
