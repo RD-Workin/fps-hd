@@ -422,3 +422,6 @@
   .nv-emblem { display: none; }
   .nv-foot { display: none; }
 }
+
+.nv-perfwarn { grid-column: 1 / -1; font-size: 12px; letter-spacing: .08em; color: var(--dim); margin: -4px 0 4px; }
+.nv-perfwarn.warn { color: #ffcf6b; }

@@ -8,9 +8,12 @@ export const RULES = {
   ROUNDS_TO_WIN: 4, SWAP_AFTER: 3,
 };
 
-export const TEAM_SIZE = 10; // 10v10: player + 9 allies vs 10 enemies
-export const ALLY_NAMES = ['Faucon', 'Vipère', 'Loup', 'Corbeau', 'Aigle', 'Renard', 'Panthère', 'Bison', 'Héron'].slice(0, TEAM_SIZE - 1);
-export const ENEMY_NAMES = ['Spectre', 'Cobra', 'Orage', 'Lynx', 'Mistral', 'Scorpion', 'Chacal', 'Tonnerre', 'Fantôme', 'Vautour'].slice(0, TEAM_SIZE);
+export const TEAM_SIZE = 10; // default 10v10: player + 9 allies vs 10 enemies (menu: 0-19 allies, 1-20 enemies)
+export const MAX_ALLIES = 19, MAX_ENEMIES = 20;
+export const ALLY_NAMES = ['Faucon', 'Vipère', 'Loup', 'Corbeau', 'Aigle', 'Renard', 'Panthère', 'Bison', 'Héron', 'Cerf',
+  'Milan', 'Ours', 'Castor', 'Lièvre', 'Hibou', 'Martin', 'Sanglier', 'Busard', 'Chamois'];
+export const ENEMY_NAMES = ['Spectre', 'Cobra', 'Orage', 'Lynx', 'Mistral', 'Scorpion', 'Chacal', 'Tonnerre', 'Fantôme', 'Vautour',
+  'Mamba', 'Typhon', 'Hyène', 'Furie', 'Brasier', 'Crotale', 'Sirocco', 'Goule', 'Cyclone', 'Kraken'];
 
 const other = t => (t === 'ATK' ? 'DEF' : 'ATK');
 const hdist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -47,8 +50,18 @@ export function createGame(ctx, options = {}) {
     bomb, useProgress: 0, useLabel: '', useAction: null,
     lastResult: null, halftimeDone: false, history: [],
     siteAt,
+    allyCount: TEAM_SIZE - 1, enemyCount: TEAM_SIZE,
+    // menu: bots per side. Rebuilds the roster right away in the menu, otherwise at the next restart.
+    setTeamSizes(allies, enemies) {
+      const a = Math.max(0, Math.min(MAX_ALLIES, allies | 0)), e = Math.max(1, Math.min(MAX_ENEMIES, enemies | 0));
+      if (a === this.allyCount && e === this.enemyCount) return;
+      this.allyCount = a; this.enemyCount = e;
+      if (!this.started) this.init();
+    },
     preferredSide: 'ATK', // chosen in the menu; the player's squad starts on this side
-    setPreferredSide(side) { this.preferredSide = side === 'DEF' ? 'DEF' : 'ATK'; if (!this.started) applySide(this.preferredSide); },
+    setPreferredSide(side) { this.preferredSide = side === 'DEF' || side === 'RND' ? side : 'ATK'; if (!this.started && side !== 'RND') applySide(this.preferredSide); },
+    // 'RND' (Aléatoire) is drawn at each match start
+    resolveSide() { return this.preferredSide === 'RND' ? (Math.random() < 0.5 ? 'ATK' : 'DEF') : this.preferredSide; },
     get playerTeam() { return ctx.player?.team || 'ATK'; },
     get freezeTimeLeft() { return this.phase === 'freeze' ? this.phaseTimeLeft : 0; },
     get isMatchPoint() { return this.score.us === this.roundsToWin - 1 || this.score.them === this.roundsToWin - 1; },
@@ -57,15 +70,15 @@ export function createGame(ctx, options = {}) {
 
     init() {
       const roster = [
-        ...ALLY_NAMES.map(name => ({ name, team: 'ATK', ally: true })),
-        ...ENEMY_NAMES.map(name => ({ name, team: 'DEF', ally: false })),
+        ...ALLY_NAMES.slice(0, this.allyCount).map(name => ({ name, team: 'ATK', ally: true })),
+        ...ENEMY_NAMES.slice(0, this.enemyCount).map(name => ({ name, team: 'DEF', ally: false })),
       ];
       ctx.player.team = 'ATK';
       ctx.bots?.setup?.(roster);
       ctx.refreshActors?.();
       for (const a of actors()) ensureStats(a);
       this.phase = 'menu';
-      if (this.preferredSide !== 'ATK') for (const a of actors()) a.team = other(a.team);
+      if (this.preferredSide === 'DEF') for (const a of actors()) a.team = other(a.team);
       // place everyone for the menu background
       spawnAll(false);
       for (const a of actors()) a.frozen = true;
@@ -77,12 +90,14 @@ export function createGame(ctx, options = {}) {
       this.started = true;
       this.score = { us: 0, them: 0 }; this.round = 0; matchWinner = null; this.halftimeDone = false; this.history = [];
       for (const a of actors()) { a.stats = null; ensureStats(a); }
-      applySide(this.preferredSide);
+      applySide(this.resolveSide());
       nextRound();
     },
 
     restart() {
       this.started = false; // start() puts the squad back on the preferred side
+      const want = this.allyCount + this.enemyCount;
+      if ((ctx.bots?.list?.length ?? want) !== want) this.init(); // team sizes changed in the pause menu
       this.start();
     },
 
