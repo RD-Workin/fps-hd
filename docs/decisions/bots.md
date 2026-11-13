@@ -44,3 +44,8 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
   avec ≥ 3 escouades la dernière met la pression sur l'autre site. Départs échelonnés : 1,1 s par escouade + 0,5 s par membre.
 - DEF : ~20 % de rôdeurs sur les `world.nav.chokes` du milieu, le reste alterné A/B sur les `world.nav.holds` (9 par site).
 - `spreadGoals` garde ≥ 2,2 m entre objectifs. Mesure 20c20 : bots 1,37 ms/image, 0,4 % du temps « bloqué en trajet ».
+
+## Balance bench (bench2, bots only, player killed each round)
+- Fixed 105/40 s: 10v10 88 % ATK, 20v20 63 %. Auto timers alone: 75 % / 69 %. Rounds end by elimination ~45 s: timers are not the cause.
+- Fix: holder's advantage (holdCone/holdReact/holdPreAim), last ATK squad to other site, DEF threat radius site+24 m / 20 s window → full rotation.
+- Result: 10v10 50 % ATK (60 rounds), 20v20 56 % (32 rounds, before the rotation change).

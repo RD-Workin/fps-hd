@@ -57,7 +57,7 @@ export class Brain {
     const now = this.ctx.time;
     for (const [e, info] of this.mgr.intel.DEF) {
       if (now - info.t > 4 || !e.alive) continue;
-      for (const s of this.sites()) if (hd(info.pos, s.center) < s.radius + 16) this.threat[s.name] = Math.max(this.threat[s.name] ?? -100, info.t + (e.hasBomb ? 8 : 0));
+      for (const s of this.sites()) if (hd(info.pos, s.center) < s.radius + 24) this.threat[s.name] = Math.max(this.threat[s.name] ?? -100, info.t + (e.hasBomb ? 8 : 0));
     }
   }
 
@@ -168,7 +168,7 @@ export class Brain {
       P.anchors = new Set(['A', 'B'].map(r => sorted.find(b => roles.get(b) === r)).filter(Boolean));
     }
     // rotation toward a threatened site
-    let hot = null; for (const s of this.sites()) if (now - this.threat[s.name] < 12 && (!hot || this.threat[s.name] > this.threat[hot])) hot = s.name;
+    let hot = null; for (const s of this.sites()) if (now - this.threat[s.name] < 20 && (!hot || this.threat[s.name] > this.threat[hot])) hot = s.name;
     const counters = {};
     list.forEach((b, i) => {
       let role = P.roles.get(b) || 'mid';
