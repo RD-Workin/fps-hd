@@ -12,6 +12,7 @@ export class Brain {
     this.threat = { A: -100, B: -100 }; this.guardCache = new Map();
   }
   sites() { return this.ctx.world?.bombSites || []; }
+  fy(x, z) { return this.ctx.world?.nav?.floorAt?.(x, z) ?? 0; }
   site(name) { return this.sites().find(s => s.name === name) || this.sites()[0]; }
   spawnCenter(team) {
     const sp = this.ctx.world?.spawns?.[team] || []; if (!sp.length) return { x: 0, z: team === 'ATK' ? 38 : -38 };
@@ -184,8 +185,8 @@ export class Brain {
     const entries = this.entries(site), cands = [];
     for (let k = 0; k < 90; k++) {
       const p = nav.randomPointNear(site.center.x, site.center.z, site.radius + 6, Math.random, 1); if (!p) continue;
-      const eye = new V(p.x, 1.5, p.z); let vis = 0, look = null;
-      for (const e of entries) if (hd(e, p) > 4 && phys.lineOfSight(eye, new V(e.x, 1.3, e.z))) { vis++; look ||= e; }
+      const eye = new V(p.x, this.fy(p.x, p.z) + 1.5, p.z); let vis = 0, look = null;
+      for (const e of entries) if (hd(e, p) > 4 && phys.lineOfSight(eye, new V(e.x, this.fy(e.x, e.z) + 1.3, e.z))) { vis++; look ||= e; }
       const nearCover = nav.clearance(p.x, p.z) <= 3;
       cands.push({ x: p.x, z: p.z, look: look || { x: site.center.x, z: site.center.z }, score: vis * 2 + (nearCover ? 1.5 : 0) - (hd(p, site.center) > site.radius + 3 ? 0.5 : 0) + Math.random() * 0.3 });
     }
@@ -197,11 +198,11 @@ export class Brain {
     const key = side + Math.round(pos.x) + ',' + Math.round(pos.z);
     if (this.guardCache.has(key)) return this.guardCache.get(key);
     const nav = this.mgr.nav, phys = this.ctx.physics, V = this.ctx.THREE.Vector3, cands = [];
-    const target = new V(pos.x, 0.5, pos.z);
+    const target = new V(pos.x, (pos.y ?? this.fy(pos.x, pos.z)) + 0.5, pos.z);
     for (let k = 0; k < 70; k++) {
       const p = nav.randomPointNear(pos.x, pos.z, 12, Math.random, 1); if (!p) continue;
       const d = hd(p, pos); if (d < (side === 'def' ? 2.5 : 4)) continue;
-      if (!phys.lineOfSight(new V(p.x, 1.2, p.z), target)) continue;
+      if (!phys.lineOfSight(new V(p.x, this.fy(p.x, p.z) + 1.2, p.z), target)) continue;
       cands.push({ x: p.x, z: p.z, score: (nav.clearance(p.x, p.z) <= 3 ? 1.5 : 0) + (d > 6 && d < 11 ? 1 : 0) + Math.random() * 0.5 });
     }
     const s = pickSpread(cands, 10, 2.5);

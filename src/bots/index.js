@@ -32,12 +32,12 @@ export function createBots(ctx) {
     // nearest walkable point (≤ 10 m) hidden from the threat, preferably hugging cover
     findCover(bot, threat) {
       const nav = this.nav; if (!nav) return null;
-      const T = new THREE.Vector3(threat.x, (threat.y || 0) + 1.5, threat.z), P = new THREE.Vector3();
+      const T = new THREE.Vector3(threat.x, (threat.y || 0) + 1.5, threat.z), P = new THREE.Vector3(), fy = (x, z) => ctx.world?.nav?.floorAt?.(x, z) ?? 0;
       let best = null, bs = Infinity;
       for (let k = 0; k < 18; k++) {
         const p = nav.randomPointNear(bot.position.x, bot.position.z, 10, Math.random, 1); if (!p) continue;
         const dThreat = Math.hypot(p.x - threat.x, p.z - threat.z); if (dThreat < 5) continue;
-        if (ctx.physics.lineOfSight(P.set(p.x, 1.1, p.z), T)) continue;
+        if (ctx.physics.lineOfSight(P.set(p.x, fy(p.x, p.z) + 1.1, p.z), T)) continue;
         const s = Math.hypot(p.x - bot.position.x, p.z - bot.position.z) + (nav.clearance(p.x, p.z) <= 2 ? -2 : 0);
         if (s < bs) { bs = s; best = p; }
       }
@@ -47,7 +47,8 @@ export function createBots(ctx) {
   const brain = new Brain(ctx, mgr);
 
   function ensureNav() {
-    const cols = ctx.physics.colliders;
+    // multi-level maps export obstacles relative to the local floor (world.nav.colliders); flat maps use physics
+    const cols = ctx.world?.nav?.colliders ?? ctx.physics.colliders;
     if (mgr.nav && cols.length === mgr.navCount) return;
     let b = ctx.world?.bounds;
     if (!b) { b = { minX: -60, maxX: 60, minZ: -50, maxZ: 50 }; }

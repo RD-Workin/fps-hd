@@ -13,7 +13,7 @@ export function createMinimap(ctx, canvas, zoneEl) {
   const C = SIZE / 2, R = SIZE / 2;
 
   function signature() {
-    const cols = ctx.physics?.colliders || [];
+    const cols = ctx.world?.minimap?.colliders || ctx.physics?.colliders || [];
     return cols.length + ':' + (ctx.world?.bombSites?.length || 0);
   }
 
@@ -26,7 +26,7 @@ export function createMinimap(ctx, canvas, zoneEl) {
   }
 
   function buildStatic() {
-    const cols = ctx.physics?.colliders || [];
+    const cols = ctx.world?.minimap?.colliders || ctx.physics?.colliders || [];
     const bb = computeBounds(cols);
     offOrigin = { x: bb.minX, z: bb.minZ };
     offW = Math.ceil((bb.maxX - bb.minX) * S); offH = Math.ceil((bb.maxZ - bb.minZ) * S);
