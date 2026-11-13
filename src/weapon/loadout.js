@@ -16,12 +16,12 @@ export function createLoadout(ctx, defs, onPick) {
   el.className = 'nv-loadout';
   el.innerHTML = `
   <style>
-    .nv-loadout { position: fixed; left: 50%; bottom: 150px; transform: translate(-50%, 12px); z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    .nv-loadout { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 12px); z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 8px;
       font-family: var(--f-ui, 'Barlow Condensed', 'Arial Narrow', sans-serif); color: #e9eef3; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
     .nv-loadout.on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
     .nv-loadout .t { font-size: 12px; letter-spacing: .4em; color: rgba(233,238,243,.7); font-weight: 600; text-shadow: 0 1px 3px #000; }
     .nv-loadout .row { display: flex; gap: 10px; }
-    .nv-loadout .c { position: relative; width: 190px; padding: 10px 14px 10px; background: rgba(7,12,19,.62); cursor: pointer; backdrop-filter: blur(6px);
+    .nv-loadout .c { position: relative; width: 168px; padding: 10px 14px 10px; background: rgba(7,12,19,.62); cursor: pointer; backdrop-filter: blur(6px);
       clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); border: 1px solid rgba(255,255,255,.08);
       transition: background .15s, box-shadow .15s; }
     .nv-loadout .c:hover { background: rgba(20,32,46,.75); }
@@ -34,12 +34,13 @@ export function createLoadout(ctx, defs, onPick) {
     .nv-loadout .n { font-size: 18px; font-weight: 700; letter-spacing: .06em; line-height: 1; }
     .nv-loadout .d { font-size: 12px; color: rgba(233,238,243,.65); letter-spacing: .04em; margin-top: 3px; }
     .nv-loadout .h { font-size: 11px; letter-spacing: .12em; color: rgba(233,238,243,.55); text-shadow: 0 1px 3px #000; }
-    @media (max-width: 560px) { .nv-loadout .c { width: 150px; } .nv-loadout svg { width: 96px; } }
+    @media (max-width: 1000px) { .nv-loadout { bottom: 128px; } }
+    @media (max-width: 560px) { .nv-loadout .c { width: 140px; } .nv-loadout svg { width: 96px; } }
   </style>
   <div class="t">CHOIX DE L'ARME</div>
   <div class="row">${defs.map((d, i) => `<div class="c" data-id="${d.id}" data-sfx><span class="k">${i + 1}</span>${ICON[d.id] || ''}<div class="n">${d.label}</div><div class="d">${d.blurb}</div></div>`).join('')}</div>
   <div class="h">1 / 2, MOLETTE OU CLIC</div>`;
-  (document.getElementById('hud') || document.body).appendChild(el);
+  document.body.appendChild(el); // not #hud: the HUD rewrites its own markup after we are created
   const cards = [...el.querySelectorAll('.c')];
   const ids = defs.map(d => d.id);
   let open = false;
