@@ -62,7 +62,7 @@ const WP_VERT = (s) => s.replace('#include <common>', '#include <common>\nvaryin
     vWP = (modelMatrix * wp4).xyz; }`);
 
 // Wall grime: contact darkening + dirt tint near the ground, macro world-space noise, roof rain streaks.
-export function grime(mat, { amount = 0.32, ground = 1.6, streak = 0.25 } = {}) {
+export function grime(mat, { amount = 0.32, ground = 1.6, streak = 0.25, rust = 0 } = {}) {
   mat.onBeforeCompile = (sh) => {
     sh.vertexShader = WP_VERT(sh.vertexShader);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + NOISE)
@@ -71,9 +71,13 @@ export function grime(mat, { amount = 0.32, ground = 1.6, streak = 0.25 } = {}) 
     float g = smoothstep(0.0, ${ground.toFixed(2)}, vWP.y);
     float st = wn(vec3(vWP.x * 3.0 + vWP.z * 3.0, vWP.y * 0.15, 0.0));
     diffuseColor.rgb *= mix(1.0 - ${amount.toFixed(2)}, 1.0 + ${(amount * 0.35).toFixed(2)}, n) * mix(0.62, 1.0, g) * (1.0 - ${streak.toFixed(2)} * smoothstep(0.55, 0.95, st) * smoothstep(1.5, 5.0, vWP.y));
-    diffuseColor.rgb = mix(diffuseColor.rgb * vec3(0.86, 0.74, 0.6), diffuseColor.rgb, mix(0.45, 1.0, g)); }`);
+    diffuseColor.rgb = mix(diffuseColor.rgb * vec3(0.86, 0.74, 0.6), diffuseColor.rgb, mix(0.45, 1.0, g));
+    ${rust > 0 ? `{ float rs = smoothstep(0.62, 0.92, st) * smoothstep(0.0, 2.5, vWP.y) * (0.6 + 0.4 * wn(vWP * vec3(0.4, 2.0, 0.4)));
+      float rp = smoothstep(0.66, 0.86, wn(vWP * 0.9 + 7.0)) * 0.8 + smoothstep(0.5, 0.0, abs(vWP.y - 0.2)) * 0.6;
+      float r = clamp(max(rs, rp) * ${rust.toFixed(2)}, 0.0, 1.0);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.36, 0.17, 0.08) * (0.7 + 0.6 * n), r); }` : ''} }`);
   };
-  mat.customProgramCacheKey = () => 'grime' + amount + ground + streak;
+  mat.customProgramCacheKey = () => 'grime' + amount + ground + streak + rust;
   return mat;
 }
 
