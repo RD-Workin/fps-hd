@@ -1,7 +1,7 @@
 // Bot actor: implements the Actor interface + combat AI (perception, human-like aim, bursts, strafing, cover,
 // hunting) and executes the objective goal given by the team brain (brain.js).
 import * as THREE from 'three';
-import { SoldierModel, DIM } from './model.js';
+import { SoldierModel, DIM } from '../soldiers/index.js';
 
 export const DIFFICULTY = {
   reaction: [0.25, 0.55], accuracy: 0.55, trackMin: 0.35, trackTime: 1.4, damage: 25, headDamage: 60, headshotChance: 0.1,
@@ -22,7 +22,7 @@ export class Bot {
     this.alive = true; this.health = 100; this.position = new THREE.Vector3(); this.velocity = new THREE.Vector3();
     this.radius = 0.35; this.height = 1.8; this.hasBomb = false; this.lastShotTime = -100; this.frozen = false;
     this.yaw = 0; this.pitch = 0; this.moveSpeed = 0; this.onGround = true;
-    this.model = new SoldierModel(team); ctx.scene.add(this.model.root);
+    this.model = new SoldierModel(team, ctx); ctx.scene.add(this.model.root);
     this.hb = { head: new THREE.Vector3(), hips: new THREE.Vector3(), neck: new THREE.Vector3(), segs: [] };
     for (let i = 0; i < 9; i++) this.hb.segs.push({ a: new THREE.Vector3(), b: new THREE.Vector3(), r: 0.08 });
     this.percT = Math.random() * 0.12; this.resetAI();
