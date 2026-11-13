@@ -17,7 +17,7 @@ export const WEAPONS = {
   sniper: {
     id: 'sniper', name: 'SR-8', label: 'FUSIL DE PRÉCISION', blurb: 'Verrou · 5 coups · 1 balle', magSize: 5, reserve: 20, maxReserve: 30, loot: 5,
     interval: 1.0, auto: false, reloadTac: 2.6, reloadEmpty: 3.3, bolt: 0.82,
-    base: [0.16, -0.135, -0.4], brot: [0, 0.035, 0], ads: [0, -0.078, -0.2], adsFov: 40, magHand: [-0.012, -0.11, 0.335], palm: [0, -0.045, -0.38],
+    base: [0.17, -0.155, -0.43], brot: [0, 0.03, 0], ads: [0, -0.078, -0.2], adsFov: 40, magHand: [-0.012, -0.11, 0.335], palm: [0, -0.045, -0.38],
   },
 };
 // sniper damage by body part (one shot on head / chest / upper arm)
@@ -233,6 +233,7 @@ export function createWeapon(ctx) {
         if (prev < 0 && boltT >= 0) events.emit('weapon:bolt');
         if (!boltEjected && boltT >= 0.42) { boltEjected = true; ejectCasing(); }
         if (boltT >= 1) { boltT = -1; this.cycling = false; }
+        this._dbgBolt = boltT;
       }
       // spread
       const moving = Math.min(1, player.moveSpeed / 5.6);

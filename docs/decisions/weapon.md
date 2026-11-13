@@ -1,35 +1,36 @@
-# Weapon module — decisions (status: DONE, build green; tuning welcome)
+# Weapon module — decisions (status: DONE, 2 weapons + loadout picker, build green)
 ## Files
-- index.js — createWeapon(ctx): fire/reload/spread/recoil + spring-driven viewmodel animation; creates ctx.effects.
-- effects.js — createEffects(ctx): particles, tracers, decals, casings, dropped mags, lights, explosion, camera shake.
-- viewmodel.js — procedural NV-4 rifle + gloved hands (~12 draw calls). textures.js — procedural textures + FX atlases.
-## Decisions
-- Viewmodel = child of ctx.camera, own projection (VM_FOV 56° via shared uniform VM_PROJ) + NDC z squeezed to [-1,-0.92]
-  => never clips walls, less fisheye. vmWorld(obj) maps a viewmodel point to where it appears in the world (tracer/casing/smoke start).
-- Pose: BASE (0.15,-0.13,-0.36), yaw 0.04. Debug hooks: weapon._base / weapon._brot (Vector3) live-editable.
-- Springs (pos, rot, sway, land): recoil impulses per shot (stronger first 3), mouse sway lag, figure-8 bob synced to
-  player.headBob, land dip from fall speed, strafe roll, crouch cant, breathing idle, draw anim (0.55 s) on resetForRound.
-- Reload = choreography on reloadProgress (audio cues 0.10 magOut / 0.52 magIn / 0.78 charge): tilt to show magwell, left hand
-  grabs mag, old mag dropped as world mesh (lies on floor 10 s), fresh mag (vm.magFresh) rides with hand, seat jolt,
-  cant + left hand racks the side charger, return. Tactical 2.1 s, empty 2.5 s. Left hand rotates around PALM.
-- Muzzle flash: randomized scale/rotation, star skipped 15 %, shown >= 1 rendered frame; point light; muzzle smoke after bursts.
-- Tracer every other round (420 m/s streak). Casing per shot (instanced brass, bounce at y=0, fade after 6 s).
+- index.js — createWeapon(ctx): WEAPONS defs, fire/reload/ADS/scope/bolt logic, spring-driven viewmodel anim; creates ctx.effects.
+- viewmodel.js — NV-4 rifle + hands; exports Builder, getMaterials, makeMuzzle, addRightHand/addLeftHand, VM_PROJ.
+- sniper.js — SR-8 bolt-action (bolt group + separate right hand that works it). scope.js — full-screen DOM/SVG scope overlay.
+- loadout.js — freeze-time picker. effects.js — particles/tracers/decals/casings/mags/lights/explosion/shake. textures.js.
+## Weapons (WEAPONS in index.js)
+- rifle NV-4: auto 600 rpm, 30/90 (max 180, corpse +30), dmg 30, HS x3.34, falloff >25 m to 73 %, reload 2.1 / 2.5 s, ADS FOV 55.
+- sniper SR-8: semi, bolt 0.82 s after 0.14 s settle (unscoped while cycling, rescopes if right click still held), 5/20 (max 30,
+  corpse +5), dmg by bots.raycast part: head 300, torso/arms 150 (one shot), thigh 90, shin 70. Reload 2.6 / 3.3 s (+bolt if empty).
+  Spread: hip 0.05 (+move), scoped 0.0005 (+move 0.03, air 0.08). Recoil 0.05 rad. Every shot is a tracer.
+- Scope: ADS ramps FOV 75->40 (adsK<0.6) then overlay fades in and FOV -> 13 (scopeK = smooth(0.55,0.95,adsK)); viewmodel hidden
+  when scopeK > 0.97; weapon.scoped when scopeK > 0.9. Thin black duplex reticle, 2 px dark-red centre dot, no glow.
+- weapon.sensScale (read by core/player.js): rifle 1-0.3*adsK, sniper scoped 0.24.
+## Loadout
+- Shown during game.phase 'freeze' (player alive): keys 1/2 (event.code), mouse wheel, left click cycles, click on card if cursor free.
+  Choice saved in localStorage 'nova.weapon'; resetForRound() equips the saved choice (full ammo + draw anim).
+- Bots (bots/index.js assignWeapons on setup + round:start): per team 1 sniper (85 %), sometimes a 2nd (20 %). Bot.setWeapon(id),
+  Bot.wstats = SNIPER | DIFFICULTY (SNIPER: 85 body / 150 head, 1 shot ~1.8 s, mag 5, reload 3 s, accurate at range, x0.7 < 8 m).
+  Bot model shows a long-barrel scoped rifle (model.setWeapon). bots.raycast now returns `part`.
+## Viewmodel
+- Child of ctx.camera, own projection (VM_FOV 56° via VM_PROJ) + NDC z squeezed => never clips walls. vmWorld(obj) maps a
+  viewmodel point into the world (tracer/casing/smoke start). Debug: weapon._base / _brot (current kit, Vector3).
+- Springs: recoil, mouse sway, figure-8 bob, land dip, strafe roll, crouch cant, breathing, draw (0.55 s) on equip.
+- Reload choreography on reloadProgress (audio cues 0.10 magOut / 0.52 magIn / 0.78 charge, skipped for sniper); old mag
+  dropped as a world mesh. Sniper bolt: lift, back (casing ejected at 0.42), forward, lock; gun cants, right hand rides the knob.
 ## API (contract + extras)
-- name 'NV-4', mag, magSize 30, reserve 90, reloading, reloadProgress, spread, aiming(false), resetForRound(), update(dt)
-- extras: startReload(), canFire(), fire(), bloom, shotIndex, emptyReload, viewmodel, effects
-- Events: 'weapon:fire' {origin, dir}; 'weapon:hit' {actor, headshot, killed, point}; 'weapon:reload' {empty}; 'weapon:dryfire'.
-- No fire when dead / frozen / game.phase !== 'live' / during the first 60 % of the draw.
+- name, current ('rifle'|'sniper'), mag, magSize, reserve, reloading, reloadProgress, spread, aiming, adsK, scoped, cycling,
+  sensScale, equip(id, switched), resetForRound(), startReload(), canFire(), fire(), defs, viewmodel, effects.
+- Events: 'weapon:fire' {origin, dir, weapon}; 'weapon:hit' {actor, headshot, killed, point, weapon}; 'weapon:reload' {empty, weapon};
+  'weapon:bolt'; 'weapon:dryfire'; 'weapon:equip' {id, name, switched}; 'weapon:ammo' {amount, from}.
+- Audio (audio/): 'sniper' / 'sniperEnemy' shots, 'bolt' cycle; bot shots pick the sound from actor.weapon.
 ## ctx.effects
-- impact(point, normal, material) — decal (atlas tile per material) + dust + chips/splinters + sparks (metal) / glints (glass).
-- blood(point, dir) — mist + droplets + splatter decal on the wall/floor behind (raycast 2.5 m).
-- tracer(from, to), muzzleFlash(pos, dir, {player}) (bots: glow + spike + light), explosion(pos) (fireball, smoke column
-  ~6 s, dust ring, embers, 900-intensity light, distance-based shake).
-- extras: smoke(pos,{size,alpha}), casing(pos,vel,quat), dropMag(src, at, vel), shake(amount, dur), clear() (auto on 'round:start').
-- Particles: 2 instanced pools (additive 900 + alpha 900), atlas tiles 0 glow / 1-2 smoke / 3 streak, fog-aware, frozen when paused.
-- Decals: 4 InstancedMesh x72 (concrete/metal+glass/wood/dirt) + blood x24, ring buffers. 3 PointLights always in scene (no recompiles).
-## Constants
-- 600 rpm, dmg 30, headshot x3.34, falloff after 25 m to 73 %; recoil via player.addRecoil (pitch ~0.011-0.015/shot, sin yaw drift);
-  spread 0.004 + bloom(<=0.045) + move 0.02 + air 0.04, crouch x0.6.
+- impact, blood, tracer, muzzleFlash(pos, dir, {player}), explosion; extras smoke, casing, dropMag, shake, clear (on 'round:start').
 ## TODO / ideas
-- Optic/gun look dark under the stub world (hemi light only): re-check with the real world lighting.
-- Viewmodel is not in shadow passes; depth-based post (SSAO) sees it at true depth.
+- HUD prompt still says "CLIC D RECHARGER" (reload is R now) — HUD owner.
