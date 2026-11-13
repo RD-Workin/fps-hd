@@ -38,3 +38,9 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
 
 ## TODO / ideas
 - Tune DIFFICULTY once the real map lands (hit rate ~15 % in sim); nav rebuilds when colliders.length changes. Optional: HUD ally callouts.
+
+## 20 par équipe (intégrateur, itération 3)
+- ATK : escouades de ≤ 5 (hors porteur + 2 escortes), une voie `world.nav.routes[site]` par escouade (décalage aléatoire par manche) ;
+  avec ≥ 3 escouades la dernière met la pression sur l'autre site. Départs échelonnés : 1,1 s par escouade + 0,5 s par membre.
+- DEF : ~20 % de rôdeurs sur les `world.nav.chokes` du milieu, le reste alterné A/B sur les `world.nav.holds` (9 par site).
+- `spreadGoals` garde ≥ 2,2 m entre objectifs. Mesure 20c20 : bots 1,37 ms/image, 0,4 % du temps « bloqué en trajet ».
