@@ -25,7 +25,7 @@ function arcPath() {
 function markup() {
   const keys = [
     ['Z Q S D', 'Se déplacer', 'wide'], ['Souris', 'Regarder', 'wide'], ['Clic G', 'Tirer', 'wide'], ['Clic D', 'Viser (ADS)', 'wide'], ['R', 'Recharger'],
-    ['E', 'Poser / désamorcer'], ['Espace', 'Sauter', 'wide'], ['C', 'S\'accroupir'], ['Maj', 'Marcher'],
+    ['E', 'Poser / désamorcer'], ['Cadavre', 'Munitions', 'wide'], ['Espace', 'Sauter', 'wide'], ['C', 'S\'accroupir'], ['Maj', 'Marcher'],
     ['Tab', 'Scores'], ['M', 'Couper le son'], ['Échap', 'Pause'],
   ].map(([k, l, w]) => `<div class="nv-key"><kbd class="${w || ''}">${k}</kbd>${l}</div>`).join('');
   const arcs = Array.from({ length: ARC_N }, () =>
@@ -89,6 +89,7 @@ function markup() {
       <div class="nv-card nv-stats"><h3>VOTRE MATCH <small>JOUEUR</small></h3><div class="nv-statgrid"></div></div>
       <div class="nv-card nv-c-keys"><h3>COMMANDES <small>AZERTY</small></h3><div class="nv-keys">${keys}</div></div>
       <div class="nv-card"><h3>RÉGLAGES</h3><div class="nv-set">
+        <label>Camp de départ</label><div class="nv-seg" data-set="side"><button data-v="ATK">ATTAQUE</button><button data-v="DEF">DÉFENSE</button></div>
         <label>Qualité graphique</label><div class="nv-seg" data-set="quality"><button data-v="low">BASSE</button><button data-v="high">HAUTE</button></div>
         <label>Sensibilité souris</label><div class="nv-range"><input type="range" data-set="sens" min="0.4" max="6" step="0.1"><output></output></div>
         <label>Volume</label><div class="nv-range"><input type="range" data-set="vol" min="0" max="100" step="1"><output></output><button class="nv-mute" data-sfx title="Couper le son (M)">${ICONS.speaker}</button></div>
@@ -122,7 +123,7 @@ export function createHud(ctx) {
     useBar: $('.nv-use .bar'), useFill: $('.nv-use .bar i'), usePct: $('.nv-use .pct'), deathT: $('.nv-death .t'), deathH: $('.nv-death .h'),
     sb: $('.nv-sb'), sbMeta: $('.nv-sb .meta'), sbTb: $('.nv-sb .tb'), menu: $('.nv-menu'), note: $('.nv-note'), pinfo: $('.nv-pinfo'),
     result: $('.nv-result'), statgrid: $('.nv-statgrid'), playBtn: $('[data-act="play"]'), restartBtn: $('[data-act="restart"]'),
-    mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'),
+    mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), side: $('[data-set="side"]'),
   };
   const RC = 2 * Math.PI * 26;
   E.reloadFg.style.strokeDasharray = RC;
@@ -137,7 +138,7 @@ export function createHud(ctx) {
   const op = (el, v) => { v = Math.round(v * 100) / 100; if (memo(el, 'op', v)) el.style.opacity = v; };
 
   // ---------------------------------------------------------------- state
-  const settings = { quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
+  const settings = { side: 'ATK', quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
   let lastSpec = '';
   const tally = new Map(); // actor -> {kills, deaths}  (fallback when actor.stats missing)
   const me = { shots: 0, hits: 0, hs: 0, kills: 0, deaths: 0, roundKills: 0 };
@@ -153,6 +154,8 @@ export function createHud(ctx) {
     if (input) input.sensitivity = settings.sens * 0.001;
     try { ctx.world?.setQuality?.(settings.quality); } catch (e) { console.warn('[hud] setQuality', e); }
     for (const b of E.quality.children) b.classList.toggle('on', b.dataset.v === settings.quality);
+    try { ctx.game?.setPreferredSide?.(settings.side); } catch (e) { console.warn('[hud] side', e); }
+    for (const b of E.side.children) b.classList.toggle('on', b.dataset.v === settings.side);
     E.sens.value = settings.sens; E.sens.nextElementSibling.value = settings.sens.toFixed(1);
     E.sens.style.setProperty('--p', ((settings.sens - 0.4) / 5.6 * 100) + '%');
   }
@@ -163,6 +166,7 @@ export function createHud(ctx) {
     E.vol.value = v; E.vol.nextElementSibling.value = v; E.vol.style.setProperty('--p', v + '%');
   }
   E.quality.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.quality = v; save(settings); applySettings(); } });
+  E.side.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.side = v; save(settings); applySettings(); if (ctx.game?.started) toast('Camp appliqué à la prochaine partie'); } });
   E.sens.addEventListener('input', () => { settings.sens = +E.sens.value; save(settings); applySettings(); });
   E.vol.addEventListener('input', () => { ctx.audio?.setVolume?.(E.vol.value / 100); reflectAudio(); });
   for (const b of E.mutes) b.addEventListener('click', () => { ctx.audio?.toggleMute?.(); reflectAudio(); });

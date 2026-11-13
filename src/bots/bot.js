@@ -40,7 +40,7 @@ export class Bot {
     this.aimYaw = this.yaw; this.aimPitch = 0; this.lookYaw = this.yaw; this.ready = 0.3;
   }
   spawn(pos, yaw, team) {
-    if (team && team !== this.team) { this.team = team; this.model.setTeam(team); }
+    if (team) this.team = team; this.model.setTeam(this.team); // always: teams flip at half-time / side choice
     this.position.copy(pos); this.velocity.set(0, 0, 0); this.yaw = this.aimYaw = this.lookYaw = yaw; this.pitch = this.aimPitch = 0;
     this.health = 100; this.alive = true; this.height = 1.8; this.hasBomb = false;
     this.resetAI(); this.model.reset(); this.model.root.visible = true;
@@ -235,6 +235,18 @@ export class Bot {
     return out;
   }
 
+  // true if a living teammate stands between `from` and `to` (within ~0.55 m of the line)
+  allyInLine(from, to) {
+    const dx = to.x - from.x, dz = to.z - from.z, len2 = dx * dx + dz * dz; if (len2 < 1e-4) return false;
+    for (const a of this.ctx.actors) {
+      if (a === this || a === this.target || !a.alive || a.team !== this.team) continue;
+      const px = a.position.x - from.x, pz = a.position.z - from.z;
+      const u = (px * dx + pz * dz) / len2; if (u <= 0.02 || u >= 0.98) continue;
+      const ex = px - u * dx, ez = pz - u * dz; if (ex * ex + ez * ez < 0.3) return true;
+    }
+    return false;
+  }
+
   tryFire(aimErr, eye) {
     const D = DIFFICULTY, t = this.ctx.time, tg = this.target;
     if (t < this.reactUntil || t < this.nextShot || this.mag <= 0) return;
@@ -252,6 +264,7 @@ export class Bot {
     const head = hit && this.aimHead && Math.random() < 0.5 + track * 0.3 && Math.random() < 0.45;
     const muzzle = this.model.muzzle.getWorldPosition(_d);
     const aimP = this.aimPoint(_b);
+    if (this.allyInLine(eye, aimP)) { this.nextShot = t + 0.25; return; } // friendly fire is on: don't shoot through teammates
     const fx = this.ctx.effects;
     let end;
     if (hit) {

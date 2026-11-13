@@ -89,6 +89,8 @@ export function createWeapon(ctx) {
     return out.applyMatrix4(camera.matrixWorld);
   };
 
+  const looted = new Set(); const CORPSE_AMMO = 30, MAX_RESERVE = 180;
+  events.on('round:start', () => looted.clear());
   const effects = createEffects(ctx);
   ctx.effects = effects;
 
@@ -165,6 +167,19 @@ export function createWeapon(ctx) {
       if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
       this.spread = (0.004 + this.bloom + moving * 0.02 + (player.onGround ? 0 : 0.04)) * (inp.crouch ? 0.6 : 1) * (1 - 0.6 * this.adsK);
       if (!inp.fireDown) this.shotIndex = 0;
+      // ammo from corpses: walk over a dead soldier to take his spare magazine
+      if (player.alive && this.reserve < MAX_RESERVE) {
+        for (const a of ctx.actors) {
+          if (a.alive || a.isPlayer || looted.has(a)) continue;
+          const dx = a.position.x - player.position.x, dz = a.position.z - player.position.z;
+          if (dx * dx + dz * dz > 1.6 * 1.6 || Math.abs(a.position.y - player.position.y) > 1.2) continue;
+          looted.add(a);
+          const n = Math.min(CORPSE_AMMO, MAX_RESERVE - this.reserve); this.reserve += n;
+          events.emit('weapon:ammo', { amount: n, from: a });
+          events.emit('hud:toast', { text: `+${n} munitions (${a.name})` });
+          break;
+        }
+      }
       // reload
       if (inp.reloadPressed) this.startReload();
       if (this.reloading) {

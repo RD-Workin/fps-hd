@@ -8,8 +8,9 @@ export const RULES = {
   ROUNDS_TO_WIN: 4, SWAP_AFTER: 3,
 };
 
-export const ALLY_NAMES = ['Faucon', 'Vipère', 'Loup', 'Corbeau'];
-export const ENEMY_NAMES = ['Spectre', 'Cobra', 'Orage', 'Lynx', 'Mistral'];
+export const TEAM_SIZE = 10; // 10v10: player + 9 allies vs 10 enemies
+export const ALLY_NAMES = ['Faucon', 'Vipère', 'Loup', 'Corbeau', 'Aigle', 'Renard', 'Panthère', 'Bison', 'Héron'].slice(0, TEAM_SIZE - 1);
+export const ENEMY_NAMES = ['Spectre', 'Cobra', 'Orage', 'Lynx', 'Mistral', 'Scorpion', 'Chacal', 'Tonnerre', 'Fantôme', 'Vautour'].slice(0, TEAM_SIZE);
 
 const other = t => (t === 'ATK' ? 'DEF' : 'ATK');
 const hdist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -46,6 +47,8 @@ export function createGame(ctx, options = {}) {
     bomb, useProgress: 0, useLabel: '', useAction: null,
     lastResult: null, halftimeDone: false, history: [],
     siteAt,
+    preferredSide: 'ATK', // chosen in the menu; the player's squad starts on this side
+    setPreferredSide(side) { this.preferredSide = side === 'DEF' ? 'DEF' : 'ATK'; if (!this.started) applySide(this.preferredSide); },
     get playerTeam() { return ctx.player?.team || 'ATK'; },
     get freezeTimeLeft() { return this.phase === 'freeze' ? this.phaseTimeLeft : 0; },
     get isMatchPoint() { return this.score.us === this.roundsToWin - 1 || this.score.them === this.roundsToWin - 1; },
@@ -62,6 +65,7 @@ export function createGame(ctx, options = {}) {
       ctx.refreshActors?.();
       for (const a of actors()) ensureStats(a);
       this.phase = 'menu';
+      if (this.preferredSide !== 'ATK') for (const a of actors()) a.team = other(a.team);
       // place everyone for the menu background
       spawnAll(false);
       for (const a of actors()) a.frozen = true;
@@ -73,14 +77,12 @@ export function createGame(ctx, options = {}) {
       this.started = true;
       this.score = { us: 0, them: 0 }; this.round = 0; matchWinner = null; this.halftimeDone = false; this.history = [];
       for (const a of actors()) { a.stats = null; ensureStats(a); }
+      applySide(this.preferredSide);
       nextRound();
     },
 
     restart() {
-      // Bring sides back to the original layout: the player's allies on ATK.
-      const pTeam = ctx.player.team;
-      for (const a of actors()) a.team = a.team === pTeam ? 'ATK' : 'DEF';
-      this.started = false;
+      this.started = false; // start() puts the squad back on the preferred side
       this.start();
     },
 
@@ -141,6 +143,14 @@ export function createGame(ctx, options = {}) {
     },
   };
 
+  // Put the player's squad on `side` (swaps every actor's team if needed).
+  function applySide(side) {
+    if (ctx.player.team === side) return;
+    for (const a of actors()) a.team = other(a.team);
+    ctx.bots?.list?.forEach(b => b.model?.setTeam?.(b.team));
+    if (game.phase === 'menu') { spawnAll(false); for (const a of actors()) a.frozen = true; }
+  }
+
   // ---------------------------------------------------------------- round flow
   function spawnAll(resetState = true) {
     const sp = world().spawns || {};
@@ -150,7 +160,13 @@ export function createGame(ctx, options = {}) {
       members.forEach((a, i) => {
         const s = list.length ? list[i % list.length] : { pos: new THREE.Vector3(), yaw: 0 };
         const pos = s.pos.clone();
-        if (list.length && i >= list.length) pos.x += 1.2 * Math.floor(i / list.length); // more actors than spawns
+        if (list.length && i >= list.length) { // more actors than spawn points: nearest free spot around it
+          const ring = Math.floor(i / list.length), ph = ctx.physics;
+          for (let k = 0; k < 8; k++) {
+            const ang = k * Math.PI / 4 + ring, x = s.pos.x + Math.cos(ang) * 1.3 * ring, z = s.pos.z + Math.sin(ang) * 1.3 * ring;
+            if (!ph?._free || ph._free(x, s.pos.y + 0.05, z, 0.4, 1.7, null)) { pos.x = x; pos.z = z; break; }
+          }
+        }
         a.spawn?.(pos, s.yaw ?? 0, team);
         a.hasBomb = false;
         if (resetState) a.frozen = true;
@@ -374,6 +390,8 @@ export function createGame(ctx, options = {}) {
     if (killer && victim && killer !== victim && killer.team !== victim.team) {
       ensureStats(killer); killer.stats.kills++; killer.stats.score += 100;
       roundKills.set(killer, (roundKills.get(killer) || 0) + 1);
+    } else if (killer && victim && killer !== victim) { // friendly fire
+      ensureStats(killer); killer.stats.score -= 100; killer.stats.teamkills = (killer.stats.teamkills || 0) + 1;
     }
   });
 
