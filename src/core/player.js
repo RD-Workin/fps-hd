@@ -59,8 +59,9 @@ export class Player {
   update(dt) {
     const { input, physics, camera } = this.ctx;
     if (this.alive) {
-      this.yaw -= input.mouseDX * input.sensitivity;
-      this.pitch -= input.mouseDY * input.sensitivity;
+      const sens = input.sensitivity * (1 - 0.3 * (this.ctx.weapon?.adsK || 0)); // ADS: x0.7
+      this.yaw -= input.mouseDX * sens;
+      this.pitch -= input.mouseDY * sens;
       this.pitch = THREE.MathUtils.clamp(this.pitch, -1.5, 1.5);
       // recoil recovery
       const rec = Math.min(1, dt * 7);

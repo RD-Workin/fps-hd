@@ -1,6 +1,6 @@
 // Input: physical key codes (event.code) so ZQSD on AZERTY == WASD on QWERTY.
 // Z/W = forward, S = back, Q/A = left, D = right, Shift = walk slowly, Space = jump, C/Ctrl = crouch,
-// E (hold) = plant / defuse. Left click = fire, right click = reload. Pointer lock on click.
+// E (hold) = plant / defuse. Left click = fire, right click (hold) = aim down sights, R = reload. Pointer lock on click.
 export class Input {
   constructor(dom) {
     this.dom = dom;
@@ -8,21 +8,22 @@ export class Input {
     this.mouseDX = 0; this.mouseDY = 0;
     this.fireDown = false;         // left button held
     this.firePressed = false;      // left button pressed this frame
-    this.reloadPressed = false;    // right button pressed this frame
+    this.reloadPressed = false;    // R pressed this frame
+    this.aimDown = false;          // right button held (ADS)
     this.locked = false;
     this.sensitivity = 0.0022;
-    addEventListener('keydown', e => { this.keys.add(e.code); if (e.code === 'Space' || e.code === 'Tab') e.preventDefault(); });
+    addEventListener('keydown', e => { this.keys.add(e.code); if (e.code === 'KeyR' && !e.repeat && this.locked) this.reloadPressed = true; if (e.code === 'Space' || e.code === 'Tab') e.preventDefault(); });
     addEventListener('keyup', e => this.keys.delete(e.code));
-    addEventListener('blur', () => { this.keys.clear(); this.fireDown = false; });
+    addEventListener('blur', () => { this.keys.clear(); this.fireDown = false; this.aimDown = false; });
     addEventListener('contextmenu', e => e.preventDefault());
     addEventListener('mousedown', e => {
       if (!this.locked) return;
       if (e.button === 0) { this.fireDown = true; this.firePressed = true; }
-      if (e.button === 2) this.reloadPressed = true;
+      if (e.button === 2) this.aimDown = true;
     });
-    addEventListener('mouseup', e => { if (e.button === 0) this.fireDown = false; });
+    addEventListener('mouseup', e => { if (e.button === 0) this.fireDown = false; if (e.button === 2) this.aimDown = false; });
     addEventListener('mousemove', e => { if (this.locked) { this.mouseDX += e.movementX; this.mouseDY += e.movementY; } });
-    document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === this.dom; if (!this.locked) this.fireDown = false; });
+    document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === this.dom; if (!this.locked) { this.fireDown = false; this.aimDown = false; } });
   }
   requestLock() { try { const p = this.dom.requestPointerLock({ unadjustedMovement: true }); p?.catch?.(() => this.dom.requestPointerLock()); } catch { this.dom.requestPointerLock(); } }
   down(...codes) { return codes.some(c => this.keys.has(c)); }

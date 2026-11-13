@@ -65,6 +65,8 @@ export function createWeapon(ctx) {
   const vm = buildViewmodel();
   const root = new THREE.Group(); root.add(vm.rifle); camera.add(root);
   const BASE = new THREE.Vector3(0.15, -0.13, -0.36), BROT = new THREE.Vector3(0, 0.04, 0);
+  // ADS: optic centre (rifle space y=0.068) on the view axis, rear lens ~11 cm from the eye
+  const ADS = new THREE.Vector3(0, -0.068, -0.135), FOV_HIP = camera.fov, FOV_ADS = 55;
   root.position.copy(BASE);
   // fresh mag rides with the left hand during the reload
   vm.rifle.add(vm.magFresh); vm.magFresh.visible = false;
@@ -97,7 +99,7 @@ export function createWeapon(ctx) {
   const pose = {};
 
   const w = {
-    name: 'NV-4', mag: MAG, magSize: MAG, reserve: RESERVE, reloading: false, reloadProgress: 0, spread: 0.004, aiming: false, bloom: 0, shotIndex: 0,
+    name: 'NV-4', mag: MAG, magSize: MAG, reserve: RESERVE, reloading: false, reloadProgress: 0, spread: 0.004, aiming: false, adsK: 0, bloom: 0, shotIndex: 0,
     viewmodel: vm, effects, emptyReload: false, _base: BASE, _brot: BROT,
     resetForRound() {
       this.mag = MAG; this.reserve = RESERVE; this.reloading = false; this.reloadProgress = 0; this.bloom = 0; this.shotIndex = 0;
@@ -130,7 +132,7 @@ export function createWeapon(ctx) {
         ctx.effects?.impact?.(wh.point, wh.normal, wh.collider.material); if (tracer) ctx.effects?.tracer?.(_mz, wh.point);
       } else if (tracer) ctx.effects?.tracer?.(_mz, _end.copy(_o).addScaledVector(_d, 300));
       const i = this.shotIndex; const pitch = 0.011 + (i < 10 ? 0.004 : 0), yaw = (i < 12 ? 0.002 : Math.sin(i * 0.45) * 0.006) + (Math.random() - 0.5) * 0.003;
-      player.addRecoil(pitch, yaw);
+      player.addRecoil(pitch * (1 - 0.25 * this.adsK), yaw * (1 - 0.35 * this.adsK));
       events.emit('weapon:fire', { origin: _o.clone(), dir: _d.clone() });
       // viewmodel kick: back + up, random roll/yaw, stronger on the first shots
       const f = i < 3 ? 1.25 : 1;
@@ -155,7 +157,13 @@ export function createWeapon(ctx) {
       // spread
       const moving = Math.min(1, player.moveSpeed / 5.6);
       this.bloom = Math.max(0, this.bloom - dt * (inp.fireDown ? 0.01 : 0.08));
-      this.spread = (0.004 + this.bloom + moving * 0.02 + (player.onGround ? 0 : 0.04)) * (inp.crouch ? 0.6 : 1);
+      // aim down sights (right click held)
+      this.aiming = !!inp.aimDown && player.alive && !this.reloading && drawT > 0.6;
+      this.adsK += ((this.aiming ? 1 : 0) - this.adsK) * Math.min(1, dt * 14);
+      if (this.adsK < 0.001) this.adsK = 0;
+      const fov = FOV_HIP + (FOV_ADS - FOV_HIP) * this.adsK;
+      if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+      this.spread = (0.004 + this.bloom + moving * 0.02 + (player.onGround ? 0 : 0.04)) * (inp.crouch ? 0.6 : 1) * (1 - 0.6 * this.adsK);
       if (!inp.fireDown) this.shotIndex = 0;
       // reload
       if (inp.reloadPressed) this.startReload();
@@ -230,6 +238,15 @@ export function createWeapon(ctx) {
       } else {
         vm.leftHand.position.set(0, 0, 0); vm.leftHand.rotation.set(0, 0, 0);
         vm.mag.visible = true; vm.magFresh.visible = false; vm.mag.position.copy(MAG_REST);
+      }
+      if (this.adsK > 0) { // blend toward the sight picture, keep a little of the motion
+        const k = this.adsK, m = 1 - 0.8 * k;
+        root.position.x = ADS.x + (root.position.x - BASE.x) * m + (BASE.x - ADS.x) * (1 - k);
+        root.position.y = ADS.y + (root.position.y - BASE.y) * m + (BASE.y - ADS.y) * (1 - k);
+        root.position.z = ADS.z + (root.position.z - BASE.z) * m + (BASE.z - ADS.z) * (1 - k);
+        root.rotation.x = (root.rotation.x - BROT.x) * m + BROT.x * (1 - k);
+        root.rotation.y = (root.rotation.y - BROT.y) * m + BROT.y * (1 - k);
+        root.rotation.z = (root.rotation.z - BROT.z) * m + BROT.z * (1 - k);
       }
       root.visible = player.alive;
     },
