@@ -9,6 +9,9 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { getWeaponTextures, getFxTextures } from './textures.js';
 
 const NOWEAR = 500, BIG = 1000;
+// Viewmodel projection (own FOV, less fisheye than the 75° world camera). Shared uniform, updated by index.js.
+export const VM_PROJ = { value: new THREE.Matrix4() };
+const VM_POS = '#include <project_vertex>\ngl_Position = uVmProj * mvPosition;\ngl_Position.z = gl_Position.z * 0.04 - 0.96 * gl_Position.w;';
 const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
 const _s = new THREE.Vector3(), _p = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 
@@ -128,9 +131,10 @@ function taper(ra, rb, len) {
 export function patchViewmodel(mat, wear = null) {
   mat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec4 aEdge;\nvarying vec4 vEdge;')
+      .replace('#include <common>', '#include <common>\nattribute vec4 aEdge;\nvarying vec4 vEdge;\nuniform mat4 uVmProj;')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvEdge = aEdge;')
-      .replace('#include <project_vertex>', '#include <project_vertex>\ngl_Position.z = gl_Position.z * 0.04 - 0.96 * gl_Position.w;');
+      .replace('#include <project_vertex>', VM_POS);
+    sh.uniforms.uVmProj = VM_PROJ;
     if (wear) {
       sh.uniforms.uWearColor = { value: new THREE.Color(wear.color) };
       sh.uniforms.uWear = { value: wear.amount };
@@ -159,7 +163,8 @@ export function patchViewmodel(mat, wear = null) {
 // simple depth patch for non-standard (basic / additive) materials
 export function patchDepthOnly(mat) {
   mat.onBeforeCompile = (sh) => {
-    sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\ngl_Position.z = gl_Position.z * 0.04 - 0.96 * gl_Position.w;');
+    sh.uniforms.uVmProj = VM_PROJ;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform mat4 uVmProj;').replace('#include <project_vertex>', VM_POS);
   };
   mat.customProgramCacheKey = () => 'vmd';
   return mat;
