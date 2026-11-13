@@ -68,7 +68,7 @@
 @keyframes nv-blink { 50% { opacity: .55; } }
 
 /* kill confirmations */
-.nv-kills { position: absolute; left: 50%; top: calc(50% + 74px); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.nv-kills { position: absolute; left: 50%; top: calc(50% + 84px); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .nv-kill-name { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; letter-spacing: .14em; opacity: 0; white-space: nowrap; }
 .nv-kill-name .lbl { color: var(--dim); font-weight: 500; }
 .nv-kill-name .who { color: var(--enemy); font-weight: 700; }
@@ -163,6 +163,7 @@
 
 .nv-freeze { position: absolute; left: 50%; top: calc(50% - 150px); transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .25s; }
 .nv-freeze.on { opacity: 1; }
+.nv-hud.is-freeze .nv-banner { top: 12%; }
 .nv-freeze .l { font-size: 13px; letter-spacing: .45em; color: var(--dim); font-weight: 600; }
 .nv-freeze .n { font-size: 64px; line-height: 1; color: #fff; text-shadow: 0 0 22px rgba(64, 217, 255, .7); }
 
@@ -260,7 +261,8 @@
 .nv-sb th.team { font-size: 15px; letter-spacing: .26em; }
 .nv-sb .us th.team { color: var(--ally); } .nv-sb .them th.team { color: var(--enemy); }
 .nv-sb td { padding: 6px 12px; font-size: 17px; font-weight: 600; text-align: right; background: rgba(255, 255, 255, .045); }
-.nv-sb td.n { text-align: left; width: 52%; display: flex; align-items: center; gap: 10px; background: none; }
+.nv-sb td.n { text-align: left; width: 52%; }
+.nv-sb td.n .nm { display: flex; align-items: center; gap: 10px; }
 .nv-sb tr td:first-child { border-left: 3px solid var(--tc); }
 .nv-sb td.n { background: rgba(255, 255, 255, .045); }
 .nv-sb .us { --tc: var(--ally); } .nv-sb .them { --tc: var(--enemy); }

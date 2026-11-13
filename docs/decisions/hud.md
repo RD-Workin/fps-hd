@@ -1,16 +1,26 @@
-# HUD (src/hud/) — status: IN PROGRESS
-- Entry: `createHud(ctx)` in src/hud/index.js -> `{ update(dt) }`. index.js is STILL THE ORIGINAL STUB (click-to-play menu only).
-- Done (not yet wired): `hud.css` (full design system + all HUD element styles), `icons.js` (original SVGs: bomb, skull, rifle, cross, person, speaker w/ mute X, play, restart, emblem), `minimap.js`.
-- Design: glass panels rgba(7,12,19,.56) + chamfered corners; allies cyan #40d9ff, enemies ember #ff6a3c, gold #ffcf4d, danger #ff3b4a.
-- Fonts: 'Barlow Condensed' (UI) + 'Rajdhani' (numbers) via Google Fonts <link> injected from JS; system fallback (CSS vars --f-ui/--f-num).
-- All CSS classes prefixed `nv-`; root `#hud` gets class `nv-hud`; state classes on root: `is-mainmenu`, `is-dead`.
-- minimap.js: `createMinimap(ctx, canvas, zoneEl)` -> `{update(dt), rebuild()}`; 220px, PPM 3.3 (~33 m radius), rotates by player.yaw (ctx.rotate(yaw)), static layer pre-rendered offscreen (rebuilt when colliders.length/bombSites change, checked 1 Hz), draw 30 Hz. Walls = boxes max.y>=2.3, props 0.9..2.3, skips floors/slabs. Enemies shown 2 s after lastShotTime, allies always (clamped to edge), dead allies X, bomb when dropped/planted/carried by ally, zone name from sites / world.minimap.labels.
-- Expected markup (see class names in hud.css): .nv-game > .nv-vignette .nv-flash .nv-dead-tint .nv-center(.nv-xh i.v/.h/.dot, .nv-hm x4 i + .sk, svg.nv-reload circle.bg/.fg) .nv-prompt .nv-kills(.nv-kill-name,.nv-kill-streak) .nv-points .nv-dmg(.nv-arc svg) .nv-top(.nv-tm.us/.them > .row(.side,.sc,.nv-wins i) + .nv-alive span; .nv-clock .rd/.tm/.ph/.bt) .nv-kf .nv-toasts .nv-banner(.band .k/.t/.s; win/lose/alert/gold/atk/def) .nv-freeze(.l,.n) .nv-mm(.nv-mm-wrap canvas, .nv-mm-n span, .nv-mm-zone) .nv-hp(.num,.lbl,.bar .ghost/.fill/.ticks; low/mid) .nv-bombpill .nv-sound .nv-am(.top,.main .mag/.res,.nv-pips i(.e); low/reloading) .nv-use(.lab kbd,.bar(.def) i,.pct) .nv-death(.band .k/.t/.h); .nv-sb scoreboard table; .nv-menu(.on, modes .pause/.end) .nv-menu-bg .nv-menu-grid .nv-menu-in .nv-menu-l/.nv-menu-r .nv-card .nv-keys .nv-set .nv-seg .nv-range .nv-mute(.muted) .nv-btn(.sec) .nv-result(.win/.lose) .nv-stats.
-## TODO for next owner (write src/hud/index.js, import './hud.css', ICONS, createMinimap)
-- Menu modes main/pause/end: JOUER -> input.requestLock() (+game.start() if !started); 'game:paused' -> pause (or end if match over); 'game:resumed' -> hide; Recommencer/Rejouer -> game.restart?.() else location.reload(); 'match:end' -> exitPointerLock + end screen (score, K/D, HS, précision).
-- Settings: quality seg -> world.setQuality?.('low'|'high'); sensitivity slider 0.4..6.0 (x0.001) -> input.sensitivity; volume -> audio.setVolume?.(v); mute button -> audio.toggleMute?.(), reflect 'audio:muted'{muted} + audio.muted; toast "Son coupé"/"Son activé"; persist in localStorage (try/catch).
-- Controls card incl. "M Couper le son". All text French.
-- Crosshair gap = 4 + tan(weapon.spread)*(innerHeight/2)/tan(fov/2) + fire kick; hitmarkers via el.animate (WAAPI), kill red, HS-kill gold+skull; "+100" + "ÉLIMINÉ: nom".
-- Damage arcs from 'player:damaged'.fromPos: angle = atan2(dx*cos(yaw)-dz*sin(yaw), -dx*sin(yaw)-dz*cos(yaw)); vignette from health; hit flash.
-- Ammo/health/top clock (red <10 s, bomb timer when planted), killfeed 5 s, banners queue (round:start/end, sides:swap, bomb:planted), freeze countdown, death screen, Tab scoreboard (actor.stats or own tally from 'actor:killed'), use bar (game.useProgress/useLabel), bomb pill (player.hasBomb).
-- Perf: cache last values per element (only write DOM on change), transforms only.
+# HUD (src/hud/) — status: DONE (build green, tested headless with stub bots)
+- Entry: `createHud(ctx)` (index.js) -> `{update(dt), toast(text, kind), banner(kind,k,t,s,dur,urgent), showMenu(mode|null)}`.
+- Files: index.js (markup + logic), hud.css (all styles, `nv-` prefix), icons.js (original SVGs), minimap.js.
+- Fonts: Barlow Condensed / Barlow / Rajdhani from Google Fonts (free), system fallback. All text French.
+- Design: glass panels + chamfers; allies cyan #40d9ff, enemies ember #ff6a3c, gold #ffcf4d, danger #ff3b4a.
+- Root `#hud.nv-hud` state classes: is-mainmenu, is-dead, is-freeze. DOM writes cached per element (write on change only).
+## Menus
+- Modes main / pause / end on `.nv-menu`. JOUER -> input.requestLock() + game.start() if !started. 'game:paused' -> pause
+  (end if phase 'over', main if !started); 'game:resumed' -> hide. RECOMMENCER / REJOUER -> game.restart() + lock (else reload).
+- 'match:end' -> banner VICTOIRE/DÉFAITE, exitPointerLock after 3.4 s -> end screen (score, É/M, ratio, % tête, précision, score).
+  Fallback: if phase 'over' while locked, unlock after 3.6 s. pointerlockerror -> "cliquez à nouveau" note.
+- Settings (localStorage `nova.hud` {quality, sens}): quality BASSE/HAUTE -> world.setQuality?.('low'|'high');
+  sensitivity 0.4..6 -> input.sensitivity = v*0.001; volume -> audio.setVolume; mute buttons -> audio.toggleMute.
+  Reflects 'audio:muted'/'audio:volume'; in-game toast "Son coupé/activé" + red speaker badge. Key M handled by audio module.
+## In-game
+- Crosshair gap = 4 + tan(spread)*(innerHeight/2)/tan(fov/2) + kick (+5 per weapon:fire, decays 60 px/s); hidden when dead/reloading.
+- Hitmarker (WAAPI): white; kill red & bigger; headshot gold; HS kill + skull. Kill: "ÉLIMINÉ/TIR À LA TÊTE nom", "+100"/"+150 TÊTE",
+  round streak DOUBLE/TRIPLE/QUADRUPLE/AS.
+- 4 damage arcs from player:damaged.fromPos, re-oriented every frame with player yaw, fade 1.8 s; red hit flash; vignette < 60 HP, pulse < 30.
+- Top: side names, score, win pips (roundsToWin), alive icons per team, clock (red < 10 s), planted -> bomb timer (1 decimal < 10 s).
+- Killfeed 5 s (max 6, own kills highlighted, bomb icon for explosion), toasts, banner queue (round:start/end, sides:swap, bomb:planted,
+  match:end), freeze countdown, death screen (killer + remaining HP), Tab scoreboard (actor.stats else own tally), use bar (game.useProgress/useLabel/useAction),
+  bomb pill (player.hasBomb), ammo pips + low/empty prompts + reload ring.
+## Notes for others
+- round:end reason string is shown as-is (uppercased). Hit points shown are cosmetic (+150 HS), real score comes from game stats.
+- TODO: spectator label when dead (if game adds spectator cam); bots' names only from actor.name.
