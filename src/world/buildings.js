@@ -2,7 +2,9 @@
 // balconies, awnings, shop signs, drainpipes. One AABB collider per block.
 import * as THREE from 'three';
 import { FACADE, DECAL, rng } from './textures.js';
-import { BLOCKS, BOUNDS } from './layout.js';
+import { CELL, GX0, GZ0, LEVEL } from './layout.js';
+import { rects } from './terrain.js';
+const STAIRS = { '^': 1, 'v': 1, '>': 1, '<': 1 };
 import { col } from './build.js';
 
 const PLASTER = [0xe9d3a8, 0xf1e4c8, 0xdcae7e, 0xe8c9a6, 0xf3ece0, 0xd59a6f, 0xe6d9b8, 0xc9b49a, 0xe7b98f, 0xd8c4a4];
@@ -36,47 +38,46 @@ function faceSlope(geo, f, t0, t1, y0, y1, dep, uv, c) {
   if ((f.ax === 'x') === flip) geo.quad(B, A, D, C, n, [u1, v0, u0, v1], c); else geo.quad(A, B, C, D, n, uv, c);
 }
 
-export function buildBuildings(G, physics) {
-  const blocked = (x, z) => {
-    if (x < BOUNDS.minX + 0.2 || x > BOUNDS.maxX - 0.2 || z < BOUNDS.minZ + 0.2 || z > BOUNDS.maxZ - 0.2) return true;
-    for (const b of BLOCKS) if (x > b[0] && x < b[1] && z > b[2] && z < b[3]) return true;
-    return false;
-  };
+// '#' cells -> merged rects -> segmented buildings (height from the highest neighbouring floor). Covered passages ('c'/'C')
+// get a building mass above head height. Facade columns sit on the floor level found in front of them.
+export function buildBuildings(G, T, addSolid) {
   const shopSigns = [DECAL.S_MARCHE, DECAL.S_CAFE, DECAL.S_PHARMA, DECAL.S_HOTEL, DECAL.S_BOULANG];
   const white = [1, 1, 1];
-
-  BLOCKS.forEach((B, bi) => {
-    const [x0, x1, z0, z1, hMin, hMax, style] = B;
-    const r = rng(1000 + bi * 17);
-    const alongX = (x1 - x0) >= (z1 - z0);
-    const L0 = alongX ? x0 : z0, L1 = alongX ? x1 : z1;
+  const outF = (x, z) => T.levelCell(x, z);
+  const ringMax = (r) => { let m = 0; for (let j = r.j0 - 1; j <= r.j1; j++) for (let i = r.i0 - 1; i <= r.i1; i++) { const c = T.at(i, j); if (c in LEVEL) m = Math.max(m, LEVEL[c]); else if (c in STAIRS) m = Math.max(m, 3); } return m; };
+  const styleAt = (x, z) => (x > 36 && z > -24 ? 'warehouse' : z < -30 && Math.abs(x) < 40 ? 'stone' : 'plaster');
+  let bi = 0;
+  const one = (r, y0, base) => {
+    const [x0, x1, z0, z1] = [GX0 + r.i0 * CELL, GX0 + r.i1 * CELL, GZ0 + r.j0 * CELL, GZ0 + r.j1 * CELL];
+    const rr = rng(1000 + (bi++) * 17), style = styleAt((x0 + x1) / 2, (z0 + z1) / 2);
+    const hMin = base + (y0 > 0 ? 3 : 5.5), hMax = base + (y0 > 0 ? 6 : 9.5);
+    const alongX = (x1 - x0) >= (z1 - z0), L0 = alongX ? x0 : z0, L1 = alongX ? x1 : z1;
     let hTop = 0;
     for (let s = L0; s < L1 - 0.01;) {
-      let len = 6 + Math.floor(r() * 5); if (L1 - (s + len) < 5) len = L1 - s;
+      let len = 6 + Math.floor(rr() * 5); if (L1 - (s + len) < 5) len = L1 - s;
       const e = Math.min(L1, s + len);
-      const sx0 = alongX ? s : x0, sx1 = alongX ? e : x1, sz0 = alongX ? z0 : s, sz1 = alongX ? z1 : e;
-      const h = Math.round((hMin + r() * (hMax - hMin)) * 2) / 2; hTop = Math.max(hTop, h);
-      buildSegment(G, r, style, sx0, sx1, sz0, sz1, h, alongX, blocked, shopSigns, white);
+      const h = Math.round((hMin + rr() * (hMax - hMin)) * 2) / 2; hTop = Math.max(hTop, h);
+      buildSegment(G, rr, style, alongX ? s : x0, alongX ? e : x1, alongX ? z0 : s, alongX ? z1 : e, h, alongX, outF, shopSigns, white, y0);
       s = e;
     }
-    physics.add(new THREE.Box3(new THREE.Vector3(x0, 0, z0), new THREE.Vector3(x1, hTop + 0.6, z1)), style === 'warehouse' ? 'metal' : 'concrete', null);
-  });
+    addSolid(new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, hTop + 0.6, z1)), style === 'warehouse' ? 'metal' : 'concrete', { navH: y0 > 0 ? 0 : 12 });
+  };
+  for (const r of rects(T.g, c => c === '#')) one(r, 0, ringMax(r));
+  for (const r of rects(T.g, c => c === 'c')) one(r, 3.6, 3.6);
+  for (const r of rects(T.g, c => c === 'C')) one(r, 6.6, 6.6);
 }
 
-function buildSegment(G, r, style, x0, x1, z0, z1, h, alongX, blocked, shopSigns, white) {
+function buildSegment(G, r, style, x0, x1, z0, z1, h, alongX, outF, shopSigns, white, y0 = 0) {
   const tint = style === 'warehouse' ? col(WARE[(r() * WARE.length) | 0]) : style === 'stone' ? col(0xf0e2c8) : col(PLASTER[(r() * PLASTER.length) | 0]);
   const stoneC = col(0xe6d6bb, 0.9 + r() * 0.15), trim = col(0xd8cbb4);
   const wallGeo = style === 'warehouse' ? G.corr : style === 'stone' ? G.stone : G.plaster;
   const pitched = style === 'plaster' && r() < 0.4 && Math.min(x1 - x0, z1 - z0) <= 14;
   // walls
-  wallGeo.box(x0, style === 'warehouse' ? 1.2 : 0.8, z0, x1, h, z1, tint, 'ny py');
-  // plinth / base
-  if (style === 'warehouse') G.concrete.box(x0 - 0.04, 0, z0 - 0.04, x1 + 0.04, 1.2, z1 + 0.04, col(0xbdb5a8), 'ny');
-  else G.stone.box(x0 - 0.06, 0, z0 - 0.06, x1 + 0.06, 0.8, z1 + 0.06, col(0xcfc0a5), 'ny');
+  wallGeo.box(x0, y0, z0, x1, h, z1, tint, y0 > 0 ? 'py' : 'ny py');
+  if (y0 > 0) G.stone.box(x0 - 0.12, y0 - 0.05, z0 - 0.12, x1 + 0.12, y0 + 0.3, z1 + 0.12, col(0xd8cbb4), ''); // lintel band over passages
   // cornice + roof
   if (style !== 'warehouse') {
     G.stone.box(x0 - 0.16, h - 0.38, z0 - 0.16, x1 + 0.16, h - 0.1, z1 + 0.16, trim, 'py');
-    if (style === 'stone') G.stone.box(x0 - 0.08, 3.05, z0 - 0.08, x1 + 0.08, 3.3, z1 + 0.08, trim, '');
   } else G.metal.box(x0 - 0.1, h - 0.3, z0 - 0.1, x1 + 0.1, h, z1 + 0.1, col(0x6b6f70), 'py');
   if (pitched) roofPrism(G, x0 - 0.3, x1 + 0.3, z0 - 0.3, z1 + 0.3, h - 0.1, alongX, tint);
   else {
@@ -91,33 +92,35 @@ function buildSegment(G, r, style, x0, x1, z0, z1, h, alongX, blocked, shopSigns
   const faces = [{ ax: 'x', s: 1, p: x1, t0: z0, t1: z1 }, { ax: 'x', s: -1, p: x0, t0: z0, t1: z1 }, { ax: 'z', s: 1, p: z1, t0: x0, t1: x1 }, { ax: 'z', s: -1, p: z0, t0: x0, t1: x1 }];
   const upperKinds = style === 'stone' ? [FACADE.GLASS_WOOD, FACADE.GLASS_WOOD, FACADE.GLASS_W] : style === 'warehouse' ? [FACADE.VENT, FACADE.GLASS_W] :
     [[FACADE.SHUT_GREEN, FACADE.SHUT_BLUE, FACADE.SHUT_BROWN][(r() * 3) | 0], FACADE.GLASS_WOOD, FACADE.GLASS_W];
-  const floors = Math.max(1, Math.floor((h - 1.0) / 3.2));
   for (const f of faces) {
     const W = f.t1 - f.t0; if (W < 2.4) continue;
     const n = Math.max(1, Math.floor((W - 1.2) / 2.8)), step = W / n;
-    const out = (t, d = 1.6) => (f.ax === 'x' ? blocked(f.p + f.s * d, t) : blocked(t, f.p + f.s * d));
+    const out = (t, d = 1.0) => (f.ax === 'x' ? outF(f.p + f.s * d, t) : outF(t, f.p + f.s * d));
     let pipeDone = false;
     for (let i = 0; i < n; i++) {
       const t = f.t0 + step * (i + 0.5);
-      if (out(t)) continue;
-      // ground floor
-      const g = r();
+      const fy = out(t); if (fy == null) continue;
+      const Y = fy, ground = y0 <= fy + 0.5;
+      const fq = (geo, a, b, ya, yb, d, uv) => faceQuad(geo, f, a, b, ya + Y, yb + Y, d, uv, white);
+      if (ground) { if (style === 'warehouse') faceBox(G.concrete, f, t - step / 2, t + step / 2, Y - 0.3, Y + 1.2, 0, 0.04, col(0xbdb5a8), 'ny'); else faceBox(G.stone, f, t - step / 2, t + step / 2, Y - 0.3, Y + 0.8, 0, 0.06, col(0xcfc0a5), 'ny'); }
+      const g = ground ? r() : 2;
       if (style === 'warehouse') {
         const k = g < 0.45 ? FACADE.ROLLER : g < 0.7 ? FACADE.DOOR_METAL : g < 0.85 ? FACADE.EBOX : -1;
-        if (k >= 0) { const w = k === FACADE.ROLLER ? 1.6 : 1.2, hh = k === FACADE.EBOX ? 1.6 : w * 2, y = k === FACADE.EBOX ? 0.9 : 0; faceQuad(G.facade, f, t - w / 2, t + w / 2, y, y + hh, 0.03, cellUV(k), white); }
+        if (g < 1 && k >= 0) { const w = k === FACADE.ROLLER ? 1.6 : 1.2, hh = k === FACADE.EBOX ? 1.6 : w * 2, y = k === FACADE.EBOX ? 0.9 : 0; fq(G.facade, t - w / 2, t + w / 2, y, y + hh, 0.03, cellUV(k)); }
       } else if (g < 0.22) { // shop + awning + sign
-        faceQuad(G.facade, f, t - 0.8, t + 0.8, 0, 3.2, 0.03, cellUV(r() < 0.5 ? FACADE.SHOP : FACADE.ROLLER), white);
-        if (r() < 0.7) { const v = (r() * 4) | 0; faceSlope(G.cloth, f, t - 1.05, t + 1.05, 3.25, 2.75, 1.3, [v / 4 + 0.01, 0, (v + 1) / 4 - 0.01, 1], white); }
-        faceQuad(G.decal, f, t - 1.0, t + 1.0, 3.32, 3.82, 0.035, decalUV(shopSigns[(r() * shopSigns.length) | 0]), white);
-      } else if (g < 0.45) faceQuad(G.facade, f, t - 0.65, t + 0.65, 0, 2.6, 0.03, cellUV([FACADE.DOOR_WOOD, FACADE.DOOR_BLUE, FACADE.DOOR_METAL][(r() * 3) | 0]), white);
-      else if (g < 0.75) faceQuad(G.facade, f, t - 0.5, t + 0.5, 0.9, 2.9, 0.03, cellUV(style === 'stone' ? FACADE.GLASS_WOOD : FACADE.BARRED), white);
-      else if (g < 0.85) faceQuad(G.facade, f, t - 0.55, t + 0.55, 0.85, 3.05, 0.03, cellUV(FACADE.POSTERS), white);
-      else if (g < 0.92 && style !== 'stone') faceQuad(G.facade, f, t - 0.4, t + 0.4, 1.0, 2.6, 0.03, cellUV(FACADE.EBOX), white);
+        fq(G.facade, t - 0.8, t + 0.8, 0, 3.2, 0.03, cellUV(r() < 0.5 ? FACADE.SHOP : FACADE.ROLLER));
+        if (r() < 0.7) { const v = (r() * 4) | 0; faceSlope(G.cloth, f, t - 1.05, t + 1.05, 3.25 + Y, 2.75 + Y, 1.3, [v / 4 + 0.01, 0, (v + 1) / 4 - 0.01, 1], white); }
+        fq(G.decal, t - 1.0, t + 1.0, 3.32, 3.82, 0.035, decalUV(shopSigns[(r() * shopSigns.length) | 0]));
+      } else if (g < 0.45) fq(G.facade, t - 0.65, t + 0.65, 0, 2.6, 0.03, cellUV([FACADE.DOOR_WOOD, FACADE.DOOR_BLUE, FACADE.DOOR_METAL][(r() * 3) | 0]));
+      else if (g < 0.75) fq(G.facade, t - 0.5, t + 0.5, 0.9, 2.9, 0.03, cellUV(style === 'stone' ? FACADE.GLASS_WOOD : FACADE.BARRED));
+      else if (g < 0.85) fq(G.facade, t - 0.55, t + 0.55, 0.85, 3.05, 0.03, cellUV(FACADE.POSTERS));
+      else if (g < 0.92 && style !== 'stone') fq(G.facade, t - 0.4, t + 0.4, 1.0, 2.6, 0.03, cellUV(FACADE.EBOX));
       // upper floors
-      for (let fl = 1; fl < floors; fl++) {
-        const y = fl * 3.2;
+      for (let fl = 1; fl < 8; fl++) {
+        const y = fl * 3.2 + Y;
         if (y + 2.9 > h - 0.4) break;
-        if (style === 'warehouse') { if (fl === floors - 1 || r() < 0.5) faceQuad(G.facade, f, t - 0.5, t + 0.5, y + 0.6, y + 2.6, 0.03, cellUV(upperKinds[(r() * 2) | 0]), white); continue; }
+        if (y + 0.3 < y0) continue;
+        if (style === 'warehouse') { if (y + 6.1 > h - 0.4 || r() < 0.5) faceQuad(G.facade, f, t - 0.5, t + 0.5, y + 0.6, y + 2.6, 0.03, cellUV(upperKinds[(r() * 2) | 0]), white); continue; }
         if (r() < 0.08) continue;
         const k = upperKinds[(r() * upperKinds.length) | 0];
         const w = style === 'stone' ? 0.65 : 0.55;
@@ -133,7 +136,7 @@ function buildSegment(G, r, style, x0, x1, z0, z1, h, alongX, blocked, shopSigns
       }
       if (!pipeDone && i === n - 1 && style !== 'stone' && r() < 0.6) { // drainpipe at face end
         pipeDone = true; const tp = f.t0 + W - 0.35;
-        if (!out(tp)) faceBox(G.metal, f, tp - 0.06, tp + 0.06, 0, h - 0.2, 0.02, 0.14, col(0x7c7468));
+        if (out(tp) != null) faceBox(G.metal, f, tp - 0.06, tp + 0.06, Math.max(Y, y0), h - 0.2, 0.02, 0.14, col(0x7c7468));
       }
     }
   }
