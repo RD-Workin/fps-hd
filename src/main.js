@@ -10,6 +10,7 @@ import { createBots } from './bots/index.js';
 import { createGame } from './game/index.js';
 import { createHud } from './hud/index.js';
 import { createAudio } from './audio/index.js';
+import { preloadSoldiers } from './soldiers/index.js';
 
 // ---- renderer / scene / camera (shared) ----
 const app = document.getElementById('app');
@@ -41,6 +42,7 @@ const ctx = {
 ctx.combat = new Combat(ctx);
 ctx.player = new Player(ctx);
 
+preloadSoldiers(renderer);        // start fetching the HD soldier glb right away
 ctx.world = createWorld(ctx);     // map, lights, sky, post-processing, colliders, spawns, sites
 ctx.weapon = createWeapon(ctx);   // viewmodel, shooting, recoil, reload, effects
 ctx.bots = createBots(ctx);       // AI actors

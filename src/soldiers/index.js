@@ -14,7 +14,7 @@ import { SoldierModel as ProceduralSoldier, DIM } from '../bots/model.js';
 export { DIM };
 export const TEAM_COLORS = { ATK: 0xc8372d, DEF: 0x2f7fe0 };
 // subtle team-coloured fresnel rim (readability pass, same idea as the procedural model); 0 disables
-export const RIM_STRENGTH = 0.22;
+export const RIM_STRENGTH = 0.45; // integrator: raised for readability (user feedback "on identifie mal")
 const RIM = { ATK: [0.95, 0.42, 0.16], DEF: [0.18, 0.42, 0.95] };
 export const LOD_DIST = [14, 38]; // m: LOD0 < 14 < LOD1 < 38 < LOD2
 

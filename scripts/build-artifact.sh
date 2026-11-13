@@ -12,3 +12,11 @@ cp dist/assets/world/venice_sunset_1k.hdr dist-artifact/assets/world/venice_suns
 sed -i 's#venice_sunset_1k\.hdr#venice_sunset_1k.hdr.wasm#g' dist-artifact/assets/game.js
 sed -e "s#\./assets/index-[^\"]*\.js#./assets/game.js#" -e "s#\./assets/index-[^\"]*\.css#./assets/game.css#" dist/index.html > dist-artifact/index.html
 ls -la dist-artifact dist-artifact/assets
+# HD soldiers: .glb is not a served type -> same .wasm trick; basis transcoder .js/.wasm are served as-is
+if [ -d dist/assets/soldiers ]; then
+  mkdir -p dist-artifact/assets/soldiers/basis
+  cp dist/assets/soldiers/soldier.glb dist-artifact/assets/soldiers/soldier.glb.wasm
+  cp dist/assets/soldiers/basis/* dist-artifact/assets/soldiers/basis/
+  sed -i "s#'soldier\.glb'#'soldier.glb.wasm'#g; s#\"soldier\.glb\"#\"soldier.glb.wasm\"#g" dist-artifact/assets/game.js
+  grep -c "soldier.glb.wasm" dist-artifact/assets/game.js
+fi
