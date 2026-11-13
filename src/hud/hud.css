@@ -80,6 +80,17 @@
   text-shadow: 0 0 10px rgba(255, 190, 40, .55), 0 1px 2px rgba(0, 0, 0, .8); }
 .nv-pt small { font-size: 13px; letter-spacing: .12em; margin-left: 6px; color: #fff; }
 
+/* ally name tags (positioned by JS, origin = bottom-center) */
+.nv-tags { position: absolute; inset: 0; overflow: hidden; }
+.nv-tag-n { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; opacity: 0; transform-origin: 50% 100%;
+  will-change: transform, opacity; white-space: nowrap; }
+.nv-tag-n .nm { font-size: 17px; font-weight: 700; letter-spacing: .1em; color: var(--ally); padding: 1px 8px 2px; background: rgba(4, 18, 30, .45);
+  border-bottom: 2px solid var(--ally); text-shadow: 0 0 8px rgba(64, 217, 255, .65), 0 1px 2px rgba(0, 0, 0, .9); }
+.nv-tag-n i { width: 0; height: 0; margin-top: 3px; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid var(--ally);
+  filter: drop-shadow(0 0 4px rgba(64, 217, 255, .8)); }
+.nv-tag-n.bomb .nm::before { content: '◆ '; color: var(--gold); }
+.nv-tag-n.hid .nm { background: none; border-bottom-style: dashed; }
+
 /* damage direction */
 .nv-dmg { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
 .nv-arc { position: absolute; left: -170px; top: -170px; width: 340px; height: 340px; opacity: 0; will-change: transform, opacity; }

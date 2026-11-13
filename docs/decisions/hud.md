@@ -21,6 +21,8 @@
 - Killfeed 5 s (max 6, own kills highlighted, bomb icon for explosion), toasts, banner queue (round:start/end, sides:swap, bomb:planted,
   match:end), freeze countdown, death screen (killer + remaining HP), Tab scoreboard (actor.stats else own tally), use bar (game.useProgress/useLabel/useAction),
   bomb pill (player.hasBomb), ammo pips + low/empty prompts + reload ring.
+- Ally name tags: DOM labels projected from actor.position + height + 0.32 m (camera.project), allies alive only, cyan,
+  gold ◆ if carrying the bomb, LOS check 5 Hz (dimmed/dashed when behind walls), scale by distance, fade 60–80 m.
 ## Notes for others
 - round:end reason string is shown as-is (uppercased). Hit points shown are cosmetic (+150 HS), real score comes from game stats.
 - TODO: spectator label when dead (if game adds spectator cam); bots' names only from actor.name.

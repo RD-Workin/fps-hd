@@ -34,6 +34,7 @@ function markup() {
   return `
 <div class="nv-game">
   <div class="nv-vignette"></div><div class="nv-flash"></div><div class="nv-dead-tint"></div>
+  <div class="nv-tags"></div>
   <div class="nv-dmg nv-alive-only">${arcs}</div>
   <div class="nv-center nv-alive-only">
     <div class="nv-xh"><i class="v"></i><i class="v"></i><i class="h"></i><i class="h"></i><i class="dot"></i></div>
@@ -405,6 +406,39 @@ export function createHud(ctx) {
     text(E.ph, ph);
   }
 
+  // ---------------------------------------------------------------- ally name tags (projected above heads)
+  const tagsEl = $('.nv-tags'), tags = new Map(); // actor -> {el, name, bomb, los, losT}
+  const tv = ctx.THREE ? new ctx.THREE.Vector3() : null, eye = ctx.THREE ? new ctx.THREE.Vector3() : null;
+  function updateTags(dt) {
+    const cam = ctx.camera, p = ctx.player;
+    if (!tv || !cam || !p) return;
+    cam.updateMatrixWorld();
+    cam.getWorldPosition(eye);
+    const W = innerWidth, H = innerHeight, seen = new Set();
+    for (const a of ctx.actors || []) {
+      if (a.isPlayer || !a.alive || !isAlly(a) || !a.position) continue;
+      seen.add(a);
+      let t = tags.get(a);
+      if (!t) {
+        const el = document.createElement('div'); el.className = 'nv-tag-n';
+        el.innerHTML = `<span class="nm"></span><i></i>`; tagsEl.appendChild(el);
+        tags.set(a, t = { el, nm: el.firstChild, los: true, losT: Math.random() * 0.2 });
+      }
+      text(t.nm, a.name || 'Allié'); cls(t.el, 'bomb', !!a.hasBomb);
+      tv.set(a.position.x, a.position.y + (a.height || 1.8) + 0.32, a.position.z);
+      const d = tv.distanceTo(eye);
+      if ((t.losT -= dt) <= 0) { t.losT = 0.2; t.los = ctx.physics?.lineOfSight ? !!ctx.physics.lineOfSight(eye, tv) : true; }
+      tv.project(cam);
+      if (tv.z > 1 || tv.z < -1 || Math.abs(tv.x) > 1.2 || Math.abs(tv.y) > 1.2) { op(t.el, 0); continue; }
+      const x = (tv.x * 0.5 + 0.5) * W, y = (-tv.y * 0.5 + 0.5) * H;
+      const sc = Math.max(0.62, Math.min(1, 14 / Math.max(d, 1)) * 0.38 + 0.62);
+      tf(t.el, `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%) scale(${sc.toFixed(2)})`);
+      op(t.el, (t.los ? 1 : 0.5) * (d > 60 ? Math.max(0, 1 - (d - 60) / 20) : 1));
+      cls(t.el, 'hid', !t.los);
+    }
+    for (const [a, t] of tags) if (!seen.has(a)) { t.el.remove(); tags.delete(a); }
+  }
+
   // ---------------------------------------------------------------- frame
   let tAcc = 0;
   function update(dt) {
@@ -483,6 +517,7 @@ export function createHud(ctx) {
     if (showSb && (sbTimer -= dt) <= 0) { sbTimer = 0.25; buildScoreboard(); }
 
     updateArcs(dt);
+    updateTags(dt);
     if (!ctx.paused || menuMode !== 'main') minimap?.update?.(dt);
   }
   let matchExitScheduled = false;
