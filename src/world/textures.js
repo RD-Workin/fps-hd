@@ -90,15 +90,15 @@ function genPlaster(n = 1024) {
     let shade = 0.86 + big * 0.16 + (mid - 0.5) * 0.1 + (fine - 0.5) * 0.05;
     let h = 0.55 + (mid - 0.5) * 0.3 + (fine - 0.5) * 0.25;
     let rough = 0.88 + (fine - 0.5) * 0.1;
-    if (patch > 0.68) {
+    if (patch > 0.75) {
       // brick: 0.25 x 0.065 m bricks (texture = 2.5 m)
       const bw = n / 10, bh = n / 38;
       const row = Math.floor(y / bh), off = (row % 2) * bw * 0.5;
       const bx = (x + off) % bw, by = y % bh;
       const mortar = bx < 3 || by < 3;
-      const edge = clamp01((patch - 0.68) * 30);
+      const edge = clamp01((patch - 0.75) * 30);
       const bseed = vnoise((Math.floor((x + off) / bw) + 0.5) / 10, (row + 0.5) / 38, 64, 1);
-      const br = mortar ? [0.72, 0.68, 0.62] : [0.62 + bseed * 0.15, 0.36 + bseed * 0.08, 0.24];
+      const br = mortar ? [0.72, 0.68, 0.62] : [0.6 + bseed * 0.12, 0.43 + bseed * 0.08, 0.32];
       r = r * (1 - edge) + br[0] * edge; g = g * (1 - edge) + br[1] * edge; b = b * (1 - edge) + br[2] * edge;
       h = h * (1 - edge) + (mortar ? 0.1 : 0.3) * edge; rough = 0.95;
       if (edge > 0 && edge < 1) shade *= 0.8; // dark broken edge
