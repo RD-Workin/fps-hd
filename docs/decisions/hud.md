@@ -23,6 +23,8 @@
   bomb pill (player.hasBomb), ammo pips + low/empty prompts + reload ring.
 - Ally name tags: DOM labels projected from actor.position + height + 0.32 m (camera.project), allies alive only, cyan,
   gold ◆ if carrying the bomb, LOS check 5 Hz (dimmed/dashed when behind walls), scale by distance, fade 60–80 m.
+- Scoreboard (Tab + end screen « TABLEAU DES SCORES » button / Tab held / Échap closes): both teams side by side, cols É A M TÊTE OBJ MVP SCORE.
+  Assists & HS tracked in HUD (weapon:hit + bot:fire hit -> damagers per victim; assist = damaged enemy, not killer). Match MVP = top score, gold row.
 ## Notes for others
 - round:end reason string is shown as-is (uppercased). Hit points shown are cosmetic (+150 HS), real score comes from game stats.
 - TODO: spectator label when dead (if game adds spectator cam); bots' names only from actor.name.
