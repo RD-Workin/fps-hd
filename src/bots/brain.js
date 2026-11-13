@@ -8,8 +8,9 @@ export class Brain {
 
   roundStart() {
     const sites = this.sites();
-    this.plan = { site: sites.length ? sites[Math.random() < 0.5 ? 0 : sites.length - 1].name : null, via: new Map(), viaDone: new Set(), plantPt: null, roles: null, crouch: new Map() };
+    this.plan = { liveAt: null, squads: null, member: new Map(), site: sites.length ? sites[Math.random() < 0.5 ? 0 : sites.length - 1].name : null, via: new Map(), viaDone: new Set(), plantPt: null, roles: null, crouch: new Map() };
     this.threat = { A: -100, B: -100 }; this.guardCache = new Map();
+    for (const b of this.mgr?.list || []) b.squad = undefined;
   }
   sites() { return this.ctx.world?.bombSites || []; }
   fy(x, z) { return this.ctx.world?.nav?.floorAt?.(x, z) ?? 0; }
@@ -98,15 +99,46 @@ export class Brain {
         rest.delete(b);
       });
     }
-    // others: own route (via point) then take the site
+    // others: squads of <= 5, each on its own lane (world.nav.routes), departures staggered so stairs and
+    // chokes don't jam. With 3+ squads the last one pressures the other site.
+    if (game.phase === 'live' && P.liveAt == null) P.liveAt = this.ctx.time;
+    if (!P.squads || P.squadSite !== site.name) this.buildSquads([...rest], site);
+    const now = this.ctx.time;
     for (const b of rest) {
-      if (!P.via.has(b)) P.via.set(b, this.viaPoint(this.spawnCenter('ATK'), site.center));
-      const via = P.via.get(b);
-      if (!P.viaDone.has(b) && hd(b.position, via) < 3.5) P.viaDone.add(b);
-      if (!P.viaDone.has(b) && hd(b.position, site.center) > hd(via, site.center)) { b.goal = { x: via.x, z: via.z, tol: 2, speed: 'run' }; continue; }
-      if (!b._sitePt || b._sitePtSite !== site.name) { b._sitePt = nav.randomPointNear(site.center.x, site.center.z, site.radius + 2, Math.random, 2) || site.center; b._sitePtSite = site.name; }
-      b.goal = { x: b._sitePt.x, z: b._sitePt.z, tol: 1.5, speed: hd(b.position, site.center) < 20 ? 'walk' : 'run', anchor: site.center, huntRange: 25, look: site.center };
+      const m = P.member.get(b);
+      if (!m) { this.directToSite(b, site); continue; }
+      if (P.liveAt == null || now < P.liveAt + m.delay) { b.goal = null; continue; } // wait for its turn to leave
+      const route = m.route, tgt = m.site;
+      while (m.i < route.length && (hd(b.position, { x: route[m.i][0], z: route[m.i][1] }) < 3.5 ||
+        hd(b.position, tgt.center) < hd({ x: route[m.i][0], z: route[m.i][1] }, tgt.center) - 2)) m.i++;
+      if (m.i < route.length) { const [x, z] = route[m.i]; b.goal = { x, z, tol: 2.5, speed: 'run', huntRange: 16 }; continue; }
+      this.directToSite(b, tgt);
     }
+  }
+
+  directToSite(b, site) {
+    const nav = this.mgr.nav;
+    if (!b._sitePt || b._sitePtSite !== site.name) { b._sitePt = nav.randomPointNear(site.center.x, site.center.z, site.radius + 2, Math.random, 2) || site.center; b._sitePtSite = site.name; }
+    b.goal = { x: b._sitePt.x, z: b._sitePt.z, tol: 1.5, speed: hd(b.position, site.center) < 20 ? 'walk' : 'run', anchor: site.center, huntRange: 25, look: site.center };
+  }
+
+  buildSquads(list, site) {
+    const P = this.plan, routes = this.ctx.world?.nav?.routes || {};
+    list.sort((a, b) => (a.id < b.id ? -1 : 1));
+    const nSq = Math.max(1, Math.ceil(list.length / 5)), other = this.sites().find(s => s.name !== site.name) || site;
+    P.squads = []; P.member = new Map(); P.squadSite = site.name;
+    for (let k = 0; k < nSq; k++) {
+      const tgt = nSq >= 3 && k === nSq - 1 ? other : site;
+      const lanes = routes[tgt.name] || [];
+      const lane = lanes.length ? lanes[(k + (P.laneShift ??= Math.floor(Math.random() * 4))) % lanes.length] : null;
+      const via = lane ? null : this.viaPoint(this.spawnCenter('ATK'), tgt.center);
+      P.squads.push({ site: tgt, route: lane || [[via.x, via.z]] });
+    }
+    list.forEach((b, i) => {
+      const k = i % nSq, sq = P.squads[k], mi = Math.floor(i / nSq);
+      P.member.set(b, { route: sq.route, site: sq.site, i: 0, delay: k * 1.1 + mi * 0.5 });
+      b.squad = k;
+    });
   }
 
   viaPoint(from, to) {
@@ -128,9 +160,10 @@ export class Brain {
       return;
     }
     if (bomb.state !== 'carried' && bomb.state !== 'dropped') { list.forEach(b => { b.goal = null; }); return; }
-    if (!P.roles) {
-      const order = ['A', 'B', 'mid', 'A', 'B', 'A', 'B', 'mid', 'A', 'B'], roles = new Map();
-      [...list].sort((a, b) => a.id < b.id ? -1 : 1).forEach((b, i) => roles.set(b, order[i % order.length]));
+    if (!P.roles) { // ~20% roamers on mid chokes, the rest split between A and B holds
+      const roles = new Map(), sorted = [...list].sort((a, b) => a.id < b.id ? -1 : 1);
+      const nRoam = list.length >= 4 ? Math.max(1, Math.round(list.length * 0.2)) : 0;
+      sorted.forEach((b, i) => roles.set(b, i < nRoam ? 'mid' : ((i - nRoam) % 2 ? 'B' : 'A')));
       P.roles = roles;
     }
     // rotation toward a threatened site
@@ -152,6 +185,13 @@ export class Brain {
 
   midSpots() {
     if (this.spotCache.has('mids')) return this.spotCache.get('mids');
+    const ch = this.ctx.world?.nav?.chokes;
+    if (ch?.length) { // map chokes between the spawns, ordered by distance to the defenders' spawn
+      const d = this.spawnCenter('DEF'), a = this.spawnCenter('ATK'), zmin = Math.min(a.z, d.z) + 12, zmax = Math.max(a.z, d.z) - 12;
+      const res = ch.filter(([x, z]) => z > zmin && z < zmax).map(([x, z]) => ({ x, z, look: { x: a.x, z: a.z } }))
+        .sort((p, q) => hd(p, d) - hd(q, d)).slice(0, 6);
+      if (res.length) { this.spotCache.set('mids', res); return res; }
+    }
     const nav = this.mgr.nav, base = this.midSpot(), res = [base];
     for (let k = 0; k < 30 && res.length < 4; k++) {
       const p = nav.randomPointNear(base.x, base.z, 7, Math.random, 1);
@@ -181,6 +221,11 @@ export class Brain {
   }
   holdSpots(name) {
     const key = 'hold' + name; if (this.spotCache.has(key)) return this.spotCache.get(key);
+    const wh = this.ctx.world?.nav?.holds?.[name];
+    if (wh?.length) { // hand-placed holds from the map (yaw 0 looks toward -z)
+      const res = wh.map(h => ({ x: h.x, z: h.z, look: { x: h.x - Math.sin(h.yaw ?? 0) * 10, z: h.z - Math.cos(h.yaw ?? 0) * 10 } }));
+      this.spotCache.set(key, res); return res;
+    }
     const site = this.site(name), nav = this.mgr.nav, phys = this.ctx.physics, V = this.ctx.THREE.Vector3;
     const entries = this.entries(site), cands = [];
     for (let k = 0; k < 90; k++) {

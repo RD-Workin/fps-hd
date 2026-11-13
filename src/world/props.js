@@ -158,6 +158,44 @@ export function buildProps(G, Tx, T, physics, addSolid, scene, uTime) {
 
   // PORT (level 0) — ATK spawn x[-9,9] z~50 kept clear
   slab(-72, 72, 42, 56);
+
+  { // LANDING SHIP moored bow-in at the quay, bow doors open, ramp down onto the port (ATK "arrived by sea").
+    // Hull x[-9,9] z[58,116] in the water, tank deck +0.9, stern superstructure. Outside nav bounds (bots stay on the quay).
+    const hullC = col(0x6b7680), darkC = col(0x3b4248), deckC = col(0x6f7a72), redC = col(0x7a2f26), whiteC = col(0xd8d2c4);
+    const Z0 = 58, Z1 = 116, D = 0.9, TOP = 7;
+    G.paint.box(-9, -1.1, Z0, -7, TOP, Z1, hullC, 'ny'); G.paint.box(7, -1.1, Z0, 9, TOP, Z1, hullC, 'ny');      // side walls
+    G.paint.box(-9.05, -1.1, Z0 + 0.2, 9.05, -0.4, Z1, redC, 'ny py');                                        // boot-top
+    G.paint.box(-9.1, TOP - 0.2, Z0, -6.9, TOP + 0.15, Z1, whiteC, 'ny'); G.paint.box(6.9, TOP - 0.2, Z0, 9.1, TOP + 0.15, Z1, whiteC, 'ny');
+    for (const sx of [-1, 1]) { const xo = sx * 9.06; // outer hull detail: plate seams, portholes, fenders
+      for (const y of [1.6, 4.2]) G.metal.box(Math.min(xo, sx * 9), y, Z0, Math.max(xo, sx * 9), y + 0.08, Z1, darkC, 'ny');
+      for (let z = Z0 + 6; z < Z1 - 2; z += 7) G.metal.box(Math.min(xo, sx * 9), -1.1, z, Math.max(xo, sx * 9), TOP - 0.2, z + 0.1, darkC, 'ny');
+      for (let z = 100; z < 114; z += 2.5) G.glass.box(Math.min(xo, sx * 9), 5.4, z, Math.max(xo, sx * 9), 6.0, z + 0.6, darkC, 'ny');
+      G.wood.box(sx > 0 ? 9 : -9.5, -0.6, Z0 + 4, sx > 0 ? 9.5 : -9, 1.0, Z0 + 4.8, col(0x2a2a2a), 'ny'); G.wood.box(sx > 0 ? 9 : -9.5, -0.6, Z0 + 30, sx > 0 ? 9.5 : -9, 1.0, Z0 + 30.8, col(0x2a2a2a), 'ny');
+    }
+    G.glass.box(-6.05, 11, 100.5, 6.05, 12, 113.5, darkC, 'ny py'); G.paint.box(-9.5, 16.2, 101, 9.5, 16.5, 104, whiteC, 'ny'); // window band, bridge wings
+    G.metal.box(-7, -1.1, Z0, 7, D, 96, deckC, 'ny', 2);                                                      // tank deck
+    for (let z = 62; z < 96; z += 4) G.metal.box(-7, D, z, 7, D + 0.04, z + 0.15, darkC, 'ny');              // deck tie-down rails
+    G.paint.box(-7, -1.1, 96, 7, TOP + 1, Z1, hullC, 'ny');                                                   // stern block
+    G.paint.box(-6, TOP + 1, 100, 6, 15, 114, whiteC, 'ny'); G.paint.box(-7.5, 15, 100, 7.5, 18, 105, whiteC, 'ny'); // superstructure + bridge
+    G.glass.box(-7.55, 16, 99.95, 7.55, 17.2, 104, darkC, 'ny py');
+    G.paint.box(-1.5, 15, 107, 1.5, 21, 111, darkC, 'ny'); G.metal.box(-0.2, 18, 102, 0.2, 27, 102.4, darkC, 'ny'); // funnel, mast
+    G.metal.box(-3, 25, 102, 3, 25.2, 102.4, darkC, 'ny');
+    // bow doors swung open to the sides (over the water)
+    G.paint.box(-15, -0.6, Z0 - 0.4, -9, TOP - 0.3, Z0, hullC, 'ny'); G.paint.box(9, -0.6, Z0 - 0.4, 15, TOP - 0.3, Z0, hullC, 'ny');
+    // ramp: one sloped plate (visual) over three 0.3 m steps (physics: no slopes)
+    const n = [0, 4, -0.9], L = Math.hypot(...n); n[0] /= L; n[1] /= L; n[2] /= L;
+    G.metal.quad([-7, D + 0.02, Z0], [7, D + 0.02, Z0], [7, 0.04, 54], [-7, 0.04, 54], n, [-7 / 1.5, 54 / 1.5, 7 / 1.5, Z0 / 1.5], [0.62, 0.66, 0.66]);
+    for (let z = 54.6; z < Z0; z += 0.6) { const y = (z - 54) / 4 * D; G.metal.box(-6.8, y, z, 6.8, y + 0.07, z + 0.08, darkC, 'ny'); } // anti-slip cleats
+    G.paint.box(-7.4, 0, 54, -7, 0.25, Z0, darkC, 'ny'); G.paint.box(7, 0, 54, 7.4, 0.25, Z0, darkC, 'ny');   // ramp edge beams
+    G.paint.box(-7.4, 0, 56, -7, 1.9, Z0, darkC, 'ny'); G.paint.box(7, 0, 56, 7.4, 1.9, Z0, darkC, 'ny');     // side guards over the water gap
+    for (let k = 0; k < 3; k++) addSolid(new THREE.Box3(new THREE.Vector3(-7, 0, 54 + k * 4 / 3), new THREE.Vector3(7, (k + 1) * 0.3, Z0 + (k === 2 ? 0 : 0))), 'metal', { floor: true });
+    addSolid(new THREE.Box3(new THREE.Vector3(-7, 0, Z0), new THREE.Vector3(7, D, 96)), 'metal', { floor: true });
+    for (const [x0, x1] of [[-9, -7], [7, 9]]) addSolid(new THREE.Box3(new THREE.Vector3(x0, 0, Z0), new THREE.Vector3(x1, TOP + 0.15, Z1)), 'metal');
+    for (const [x0, x1] of [[-7.4, -7], [7, 7.4]]) addSolid(new THREE.Box3(new THREE.Vector3(x0, 0, 56), new THREE.Vector3(x1, 1.9, Z0)), 'metal');
+    addSolid(new THREE.Box3(new THREE.Vector3(-7, 0, 96), new THREE.Vector3(7, TOP + 1, Z1)), 'metal');
+    // cargo left in the well deck: cover for whoever walks in
+    lift(D, () => { Truck(-3.5, 70); Stack(3.5, 66, 2); Crate(4, 78); Crate(4.9, 79, 1.0); Barrel(-5.5, 84, 0x3f6b8c); Barrel(-5, 84.8, 0x6d6f70); Stack(-3, 90, 3); Crate(4.5, 92, 1.2); });
+  }
   Container(-36, 46, true, 0xa2412f); Container(-36, 46, true, 0x2f5f8f, 2.6); Container(24, 47, true, 0x3d7a4a); Container(-60, 49, false, 0xc9852f);
   Crate(-24, 50); Crate(-22.8, 50); Crate(-23.4, 50, 1.2, 1); Stack(16, 45, 2); Crate(30, 52); Crate(-46, 52, 1.0);
   Barrel(-14, 54); Barrel(-13.3, 54.6, 0x9a4a2a); Barrel(35, 45.5, 0xc9852f); Barrel(56, 50, 0x3f6b8c); Barrel(56.7, 50.6, 0x3f6b8c);
@@ -184,9 +222,14 @@ export function buildProps(G, Tx, T, physics, addSolid, scene, uTime) {
     G.paint.box(hx - 1.2, 0.6, -10, hx + 1.2, 1.6, 6, c0); G.paint.box(hx - 2.2, 1.6, -10.5, hx + 2.2, 2.8, 6.5, c0);
     G.paint.box(hx - 2.6, 2.8, -10.8, hx + 2.6, 3.6, 6.8, c1); G.paint.box(hx - 1.6, 3.6, -6, hx + 1.6, 5.4, 0, c2);
     G.paint.box(hx - 0.9, 0.6, 6, hx + 0.9, 3.2, 8.2, c0); G.paint.box(hx - 0.5, 3.2, 6.8, hx + 0.5, 3.7, 8.6, c1);
-    solid(hx - 2.6, 0, -10.8, hx + 2.6, 3.6, 6.8, 'metal'); solid(hx - 1, 0, 6.8, hx + 1, 3.2, 8.2, 'metal');
+    // colliders follow the stepped hull exactly (no invisible margin under the flare, cabin and bow are solid)
+    solid(hx - 2.6, 0, -9, hx + 2.6, 0.6, -7.8); solid(hx - 2.6, 0, 3, hx + 2.6, 0.6, 4.2);
+    solid(hx - 1.2, 0, -10, hx + 1.2, 1.6, 6, 'metal'); solid(hx - 2.2, 1.6, -10.5, hx + 2.2, 2.8, 6.5, 'metal');
+    solid(hx - 2.6, 2.8, -10.8, hx + 2.6, 3.6, 6.8, 'metal'); solid(hx - 1.6, 3.6, -6, hx + 1.6, 5.4, 0, 'metal');
+    solid(hx - 0.9, 0.6, 6, hx + 0.9, 3.2, 8.2, 'metal'); solid(hx - 0.5, 3.2, 6.8, hx + 0.5, 3.7, 8.6, 'metal');
   }
-  Container(47, 0, false, 0xa2412f); Crate(50.2, 2, 1.2); // crate = jump-up onto the container (overlooks B) Container(50, -10, true, 0x3d7a4a); Container(50, -10, true, 0xc9852f, 2.6);
+  Container(47, 0, false, 0xa2412f); Crate(50.2, 2, 1.2); Container(50, -10, true, 0x3d7a4a); // crate = jump-up onto the container (overlooks B)
+  Container(50, -10, true, 0xc9852f, 2.6);
   Crate(59, 1.5); Crate(60.2, 1.5); Crate(59.6, 1.5, 1.2, 1); Crate(57.2, 3.2, 0.9); Jersey(56, 12, true, 3); Jersey(63, 14, true, 3);
   Sandbags(52, 18, 57, 18); Barrel(46, 20, 0x3f6b8c); Barrel(46.7, 20.6, 0xc9852f); Barrel(74, -12, 0x9a4a2a); Stack(74.6, 18, 2);
   for (const [x, z] of [[62, -18], [70, -18]]) { G.metal.box(x - 0.4, 0, z - 0.4, x + 0.4, 14, z + 0.4, col(0xd9a230)); solid(x - 0.4, 0, z - 0.4, x + 0.4, 14, z + 0.4, 'metal'); }
