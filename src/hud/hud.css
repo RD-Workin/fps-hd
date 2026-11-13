@@ -382,7 +382,7 @@
 .nv-seg button { font-family: var(--f-ui); font-size: 14px; font-weight: 700; letter-spacing: .2em; color: var(--dim); background: none; border: 0; padding: 6px 14px; cursor: pointer; }
 .nv-seg button.on { background: var(--ally); color: #04121c; }
 .nv-range { display: flex; align-items: center; gap: 10px; }
-.nv-range output { font-family: var(--f-num); font-weight: 700; font-size: 16px; min-width: 34px; text-align: right; color: #fff; }
+.nv-range output { font-family: var(--f-num); font-weight: 700; font-size: 16px; min-width: 34px; white-space: nowrap; text-align: right; color: #fff; }
 .nv-range input { -webkit-appearance: none; appearance: none; width: 170px; height: 4px; background: linear-gradient(90deg, var(--ally) var(--p, 50%), rgba(255, 255, 255, .18) var(--p, 50%)); outline: none; cursor: pointer; }
 .nv-range input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #fff; border: 3px solid var(--ally); transform: rotate(45deg); cursor: pointer; }
 .nv-range input::-moz-range-thumb { width: 12px; height: 12px; background: #fff; border: 3px solid var(--ally); border-radius: 0; transform: rotate(45deg); cursor: pointer; }
@@ -454,3 +454,7 @@
 .nv-hud.is-killcam .nv-death, .nv-hud.is-killcam .nv-dead-tint, .nv-hud.is-killcam .nv-tags, .nv-hud.is-killcam .nv-top, .nv-hud.is-killcam .nv-mm,
 .nv-hud.is-killcam .nv-freeze, .nv-hud.is-killcam .nv-banner, .nv-hud.is-killcam .nv-toasts, .nv-hud.is-killcam .nv-sound { opacity: 0 !important; transition: opacity .3s; }
 @media (max-width: 700px) { .nv-kc .info { min-width: 0; left: 3vw; right: 3vw; } .nv-kc .info .row { flex-wrap: wrap; gap: 8px 16px; } .nv-kc .skip { display: none; } }
+
+/* freeze declutter (Challenge 2): countdown lives in the clock, centre stays clear for the banner; picker sits at the bottom */
+.nv-freeze { display: none !important; }
+.nv-hud.is-freeze .nv-banner { top: max(14%, 96px); }

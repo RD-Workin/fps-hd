@@ -128,7 +128,7 @@ export class Brain {
     const nSq = Math.max(1, Math.ceil(list.length / 5)), other = this.sites().find(s => s.name !== site.name) || site;
     P.squads = []; P.member = new Map(); P.squadSite = site.name;
     for (let k = 0; k < nSq; k++) {
-      const tgt = nSq >= 3 && k === nSq - 1 ? other : site;
+      const tgt = nSq >= 2 && k === nSq - 1 ? other : site; // balance: the last squad always splits to the other site
       const lanes = routes[tgt.name] || [];
       const lane = lanes.length ? lanes[(k + (P.laneShift ??= Math.floor(Math.random() * 4))) % lanes.length] : null;
       const via = lane ? null : this.viaPoint(this.spawnCenter('ATK'), tgt.center);
@@ -165,20 +165,21 @@ export class Brain {
       const nRoam = list.length >= 4 ? Math.max(1, Math.round(list.length * 0.2)) : 0;
       sorted.forEach((b, i) => roles.set(b, i < nRoam ? 'mid' : ((i - nRoam) % 2 ? 'B' : 'A')));
       P.roles = roles;
+      P.anchors = new Set(['A', 'B'].map(r => sorted.find(b => roles.get(b) === r)).filter(Boolean));
     }
     // rotation toward a threatened site
     let hot = null; for (const s of this.sites()) if (now - this.threat[s.name] < 12 && (!hot || this.threat[s.name] > this.threat[hot])) hot = s.name;
     const counters = {};
     list.forEach((b, i) => {
       let role = P.roles.get(b) || 'mid';
-      if (hot && role !== hot && (role === 'mid' || i % 2 === 0)) role = hot;
+      if (hot && role !== hot && (role === 'mid' || !P.anchors?.has(b))) role = hot; // rotate everyone but one anchor per site
       if (role === 'mid') {
         const ms = this.midSpots(); const k = counters.mid = (counters.mid ?? -1) + 1; const s = ms[k % ms.length];
         b.goal = { x: s.x, z: s.z, tol: 0.8, speed: 'run', look: s.look, anchor: s, huntRange: 12, crouch: false };
         return;
       }
       const spots = this.holdSpots(role); const k = counters[role] = (counters[role] ?? -1) + 1; const s = spots[k % spots.length];
-      if (!P.crouch.has(b)) P.crouch.set(b, Math.random() < 0.5);
+      if (!P.crouch.has(b)) P.crouch.set(b, Math.random() < 0.7);
       b.goal = { x: s.x, z: s.z, tol: 0.7, speed: hot === role ? 'run' : 'run', look: s.look, crouch: P.crouch.get(b), anchor: s, huntRange: 10 };
     });
   }

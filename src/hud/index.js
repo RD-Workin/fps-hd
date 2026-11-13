@@ -94,6 +94,8 @@ function markup() {
         <label>Bots alliés</label><div class="nv-range"><input type="range" data-set="allies" min="0" max="19" step="1"><output></output></div>
         <label>Bots adverses</label><div class="nv-range"><input type="range" data-set="enemies" min="1" max="20" step="1"><output></output></div>
         <div class="nv-perfwarn"></div>
+        <label>Durée de manche</label><div class="nv-range"><input type="range" data-set="rtime" min="45" max="300" step="15"><output></output></div>
+        <label>Minuterie de la bombe</label><div class="nv-range"><input type="range" data-set="btime" min="20" max="90" step="5"><output></output></div>
         <label>Camp de départ</label><div class="nv-seg" data-set="side"><button data-v="ATK">ATTAQUE</button><button data-v="DEF">DÉFENSE</button><button data-v="RND">ALÉATOIRE</button></div>
         <label>Qualité graphique</label><div class="nv-seg" data-set="quality"><button data-v="low">BASSE</button><button data-v="high">HAUTE</button></div>
         <label>Sensibilité souris</label><div class="nv-range"><input type="range" data-set="sens" min="0.4" max="6" step="0.1"><output></output></div>
@@ -130,7 +132,7 @@ export function createHud(ctx) {
     sb: $('.nv-sb'), sbMeta: $('.nv-sb .meta'), sbTb: $('.nv-sb .tb'), menu: $('.nv-menu'), note: $('.nv-note'), pinfo: $('.nv-pinfo'),
     sbEnd: $('.nv-sb-end'), sbEndMeta: $('.nv-sb-end .meta'), sbEndTb: $('.nv-sb-end .tb'), scoresBtn: $('[data-act="scores"]'),
     result: $('.nv-result'), statgrid: $('.nv-statgrid'), playBtn: $('[data-act="play"]'), restartBtn: $('[data-act="restart"]'),
-    mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), side: $('[data-set="side"]'), allies: $('[data-set="allies"]'), enemies: $('[data-set="enemies"]'), perfwarn: $('.nv-perfwarn'),
+    mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), side: $('[data-set="side"]'), allies: $('[data-set="allies"]'), enemies: $('[data-set="enemies"]'), perfwarn: $('.nv-perfwarn'), rtime: $('[data-set="rtime"]'), btime: $('[data-set="btime"]'),
   };
   const RC = 2 * Math.PI * 26;
   E.reloadFg.style.strokeDasharray = RC;
@@ -145,7 +147,7 @@ export function createHud(ctx) {
   const op = (el, v) => { v = Math.round(v * 100) / 100; if (memo(el, 'op', v)) el.style.opacity = v; };
 
   // ---------------------------------------------------------------- state
-  const settings = { allies: 9, enemies: 10, side: 'ATK', quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
+  const settings = { rtime: 0, btime: 0, allies: 9, enemies: 10, side: 'ATK', quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
   let lastSpec = '';
   const tally = new Map(); // actor -> {kills, deaths}  (fallback when actor.stats missing)
   const me = { shots: 0, hits: 0, hs: 0, kills: 0, deaths: 0, roundKills: 0 };
@@ -176,6 +178,11 @@ export function createHud(ctx) {
     { const n = settings.allies + settings.enemies + 1; const t = `${settings.allies + 1} contre ${settings.enemies}`;
       E.perfwarn.textContent = n > 32 ? `${t} — très lourd : réservé aux PC puissants (qualité BASSE conseillée)` : n > 24 ? `${t} — peut ramer sur un PC modeste` : t;
       E.perfwarn.classList.toggle('warn', n > 24); }
+    try { ctx.game?.setTimings?.(settings.rtime || null, settings.btime || null); } catch (e) { console.warn('[hud] timings', e); }
+    { const auto = ctx.game?.autoTimings?.() || { round: 105, bomb: 40 }, mmss = v => `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
+      for (const [el, v, mn, mx, a, f] of [[E.rtime, settings.rtime, 45, 300, auto.round, mmss], [E.btime, settings.btime, 20, 90, auto.bomb, v => v + ' s']]) {
+        el.value = v || mn; el.nextElementSibling.value = v ? f(v) : `AUTO ${f(a)}`; el.style.setProperty('--p', (((v || mn) - mn) / (mx - mn) * 100) + '%');
+      } }
     try { ctx.game?.setPreferredSide?.(settings.side); } catch (e) { console.warn('[hud] side', e); }
     for (const b of E.side.children) b.classList.toggle('on', b.dataset.v === settings.side);
     E.sens.value = settings.sens; E.sens.nextElementSibling.value = settings.sens.toFixed(1);
@@ -192,6 +199,8 @@ export function createHud(ctx) {
   E.sens.addEventListener('input', () => { settings.sens = +E.sens.value; save(settings); applySettings(); });
   for (const k of ['allies', 'enemies']) E[k].addEventListener('change', () => { settings[k] = +E[k].value; save(settings); applySettings(); if (ctx.game?.started) toast('Effectifs appliqués à la prochaine partie (Recommencer)'); });
   for (const k of ['allies', 'enemies']) E[k].addEventListener('input', () => { E[k].nextElementSibling.value = E[k].value; });
+  for (const [k, auto] of [['rtime', 45], ['btime', 20]]) E[k].addEventListener('input', () => { const v = +E[k].value; settings[k] = v <= auto ? 0 : v; save(settings); applySettings(); });
+  for (const k of ['rtime', 'btime']) E[k].addEventListener('change', () => { if (ctx.game?.started) toast('Durées appliquées à la prochaine manche'); });
   E.vol.addEventListener('input', () => { ctx.audio?.setVolume?.(E.vol.value / 100); reflectAudio(); });
   for (const b of E.mutes) b.addEventListener('click', () => { ctx.audio?.toggleMute?.(); reflectAudio(); });
   ev.on('audio:muted', ({ muted } = {}) => { reflectAudio(); if (!ctx.paused) toast(muted ? 'Son coupé' : 'Son activé', muted ? 'warn' : ''); });
@@ -458,7 +467,7 @@ export function createHud(ctx) {
     const rt = g.roundTimeLeft ?? 0;
     text(E.tm, fmtTime(rt));
     cls(E.tm, 'low', g.phase === 'live' && !planted && rt < 10);
-    const ph = { freeze: 'PRÉPARATION', post: 'FIN DE MANCHE', over: 'FIN DU MATCH' }[g.phase] || (planted ? `SITE ${g.bomb.site || ''}` : (g.isMatchPoint ? 'BALLE DE MATCH' : ''));
+    const ph = { freeze: `PRÉPARATION · ${Math.max(1, Math.ceil(g.freezeTimeLeft ?? g.phaseTimeLeft ?? 0))}`, post: 'FIN DE MANCHE', over: 'FIN DU MATCH' }[g.phase] || (planted ? `SITE ${g.bomb.site || ''}` : (g.isMatchPoint ? 'BALLE DE MATCH' : ''));
     text(E.ph, ph);
   }
 
@@ -516,7 +525,7 @@ export function createHud(ctx) {
     const [vt, vb, hl, hr] = E.xhL;
     tf(vt, `translate(-1px, ${(-gap - 9).toFixed(1)}px)`); tf(vb, `translate(-1px, ${gp}px)`);
     tf(hl, `translate(${(-gap - 9).toFixed(1)}px, -1px)`); tf(hr, `translate(${gp}px, -1px)`);
-    cls(E.xh, 'hidden', !alive || !!w?.reloading || g?.phase === 'over');
+    cls(E.xh, 'hidden', !alive || !!w?.reloading || g?.phase === 'over' || g?.phase === 'freeze');
     cls(E.xh, 'aim', !!w?.aiming);
 
     // reload ring + prompts

@@ -7,6 +7,7 @@ export const DIFFICULTY = {
   reaction: [0.25, 0.55], accuracy: 0.55, trackMin: 0.35, trackTime: 1.4, damage: 25, headDamage: 60, headshotChance: 0.1,
   fov: 110 * Math.PI / 180, view: 70, hearing: 38, stepHearing: 11, burst: [3, 6], shotInterval: 0.1, pause: [0.25, 0.6],
   mag: 30, reload: 2.4, run: 5.0, walk: 2.6, crouch: 1.7, turnRate: 7.5, falloffStart: 30,
+  holdCone: 0.55, holdReact: 0.5, holdPreAim: 0.7, // holder's advantage (stationary + already facing): balance bench
 };
 // Sniper bots: single aimed shots, slow bolt, deadly at range, weak up close (hits: 85 body / 150 head)
 export const SNIPER = {
@@ -103,8 +104,12 @@ export class Bot {
     }
     if (best && best !== this.target) {
       const alerted = t - this.alertT < 4;
-      this.reactUntil = t + rand(...D.reaction) * (alerted ? 0.7 : 1) * (this.target ? 0.6 : 1);
-      this.trackStart = this.reactUntil; this.target = best; this.burstLeft = 0; this.shotIdx = 0;
+      // holder's advantage: a bot standing still that already faces the new target reacts faster and starts pre-aimed
+      const fy = Math.atan2(-(best.position.x - this.position.x), -(best.position.z - this.position.z));
+      let dAng = Math.abs(((fy - this.yaw) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI);
+      const holding = this.moveSpeed < 0.8 && dAng < D.holdCone;
+      this.reactUntil = t + rand(...D.reaction) * (alerted ? 0.7 : 1) * (this.target ? 0.6 : 1) * (holding ? D.holdReact : 1);
+      this.trackStart = this.reactUntil - (holding ? D.trackTime * D.holdPreAim : 0); this.target = best; this.burstLeft = 0; this.shotIdx = 0;
     }
     if (this.target) {
       if (!this.target.alive) { this.target = null; }

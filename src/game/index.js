@@ -51,11 +51,23 @@ export function createGame(ctx, options = {}) {
     lastResult: null, halftimeDone: false, history: [],
     siteAt,
     allyCount: TEAM_SIZE - 1, enemyCount: TEAM_SIZE,
+    // round / bomb timers in seconds; null = automatic, scaled with team size (see autoTimings)
+    roundTimeSetting: null, bombTimeSetting: null,
+    autoTimings() {
+      const n = Math.max(this.allyCount + 1, this.enemyCount);
+      return { round: Math.round((105 + Math.max(0, n - 5) * 3) / 5) * 5, bomb: Math.round((40 + Math.max(0, n - 5) * 1.5) / 5) * 5 };
+    },
+    setTimings(round, bomb) {
+      this.roundTimeSetting = round ? Math.max(60, Math.min(300, round)) : null;
+      this.bombTimeSetting = bomb ? Math.max(25, Math.min(90, bomb)) : null;
+      this.applyTimings();
+    },
+    applyTimings() { const a = this.autoTimings(); R.ROUND = this.roundTimeSetting ?? a.round; R.BOMB = this.bombTimeSetting ?? a.bomb; },
     // menu: bots per side. Rebuilds the roster right away in the menu, otherwise at the next restart.
     setTeamSizes(allies, enemies) {
       const a = Math.max(0, Math.min(MAX_ALLIES, allies | 0)), e = Math.max(1, Math.min(MAX_ENEMIES, enemies | 0));
       if (a === this.allyCount && e === this.enemyCount) return;
-      this.allyCount = a; this.enemyCount = e;
+      this.allyCount = a; this.enemyCount = e; this.applyTimings();
       if (!this.started) this.init();
     },
     preferredSide: 'ATK', // chosen in the menu; the player's squad starts on this side
@@ -91,6 +103,7 @@ export function createGame(ctx, options = {}) {
       this.score = { us: 0, them: 0 }; this.round = 0; matchWinner = null; this.halftimeDone = false; this.history = [];
       for (const a of actors()) { a.stats = null; ensureStats(a); }
       applySide(this.resolveSide());
+      this.applyTimings();
       nextRound();
     },
 
@@ -281,10 +294,22 @@ export function createGame(ctx, options = {}) {
     actor.hasBomb = false;
     stopUse(actor);
     bomb.state = 'dropped'; bomb.carrier = null;
-    bomb.position = actor.position.clone(); bomb.position.y = Math.max(0, bomb.position.y);
+    bomb.position = actor.position.clone();
+    snapToWalkable(bomb.position);
     visuals?.placeAt(bomb.position, Math.random() * 6.28);
     ev('bomb:dropped', { position: bomb.position.clone(), actor });
     if (ctx.player.team === 'ATK') toast('La bombe a été lâchée');
+  }
+
+  // A dropped bomb must lie on a floor bots can reach: floorAt(x,z) when the spot is walkable nav,
+  // otherwise the nearest walkable nav cell (dead on a crate, a jump spot, the ship, mid-air...).
+  function snapToWalkable(p) {
+    const nav = ctx.bots?.nav, floorAt = ctx.world?.nav?.floorAt;
+    let x = p.x, z = p.z;
+    const walkable = nav?.isWalkable ? nav.isWalkable(x, z) : true;
+    if (!walkable || floorAt?.(x, z) == null) { const q = nav?.snap?.(x, z); if (q) { x = q.x; z = q.z; } }
+    const fy = floorAt?.(x, z);
+    p.set(x, fy != null ? fy : Math.max(0, p.y), z);
   }
 
   function bombCarryLogic() {
