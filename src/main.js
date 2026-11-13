@@ -14,7 +14,7 @@ import { createAudio } from './audio/index.js';
 // ---- renderer / scene / camera (shared) ----
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); // budget: see docs/PERF.md
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -65,6 +65,20 @@ document.addEventListener('pointerlockchange', () => {
   ctx.events.emit(ctx.paused ? 'game:paused' : 'game:resumed');
 });
 
+// Perf overlay: F3 or ?fps — fps, frame ms, draw calls, triangles, bots ms (see docs/PERF.md)
+const perf = { on: /[?&]fps/.test(location.search), el: null, frames: 0, acc: 0, botsMs: 0, last: '' };
+addEventListener('keydown', e => { if (e.code === 'F3') { e.preventDefault(); perf.on = !perf.on; if (perf.el) perf.el.style.display = perf.on ? 'block' : 'none'; } });
+function perfTick(dt, botsMs) {
+  if (!perf.on) return;
+  if (!perf.el) { perf.el = Object.assign(document.createElement('div'), { style: 'position:fixed;right:8px;top:50%;z-index:99;font:12px/1.35 monospace;color:#9f9;background:#000a;padding:6px 8px;pointer-events:none;white-space:pre' }); document.body.appendChild(perf.el); }
+  perf.frames++; perf.acc += dt; perf.botsMs += botsMs;
+  if (perf.acc >= 0.5) {
+    const i = renderer.info.render;
+    perf.el.textContent = `${(perf.frames / perf.acc).toFixed(0)} i/s  ${(perf.acc / perf.frames * 1000).toFixed(1)} ms\ndraw ${i.calls}  tri ${(i.triangles / 1000).toFixed(0)}k\nbots ${(perf.botsMs / perf.frames).toFixed(2)} ms  px ${renderer.getPixelRatio().toFixed(2)}`;
+    perf.frames = 0; perf.acc = 0; perf.botsMs = 0;
+  }
+}
+
 const clock = new THREE.Clock();
 function frame() {
   requestAnimationFrame(frame);
@@ -72,7 +86,7 @@ function frame() {
   if (!ctx.paused) {
     ctx.time += dt;
     ctx.player.update(dt);
-    ctx.bots.update(dt);
+    const tb = performance.now(); ctx.bots.update(dt); var botsMs = performance.now() - tb;
     ctx.weapon.update(dt);
     ctx.game.update(dt);
   }
@@ -82,5 +96,6 @@ function frame() {
   ctx.hud.update(dt);
   ctx.input.endFrame();
   ctx.world.render(dt);
+  perfTick(dt, botsMs || 0);
 }
 frame();

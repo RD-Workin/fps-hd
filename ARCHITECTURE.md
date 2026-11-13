@@ -3,7 +3,7 @@
 Stack: Three.js 0.170 (`three` + `three/examples/jsm/*` addons), Vite 5, plain ES modules, no other npm deps.
 Run: `npm run dev` (http://localhost:5173) · build: `npx vite build` (must stay green).
 Original game: do NOT copy names, art, maps, logos, UI of Call of Duty / Counter-Strike. Same genre/mechanics only.
-No audio. All UI text in **French**. ZERO COST: only free/open-source code and free assets (CC0/MIT); no paid assets, APIs or generation services.
+Audio: see "Audio contract". All UI text in **French**. ZERO COST: only free/open-source code and free assets (CC0/MIT); no paid assets, APIs or generation services.
 
 ## Module ownership (each agent edits ONLY its own folder + may add files under `public/assets/<module>/`)
 | folder | entry | owner |

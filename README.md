@@ -1,6 +1,6 @@
 # Opération Nova — FPS Recherche & Destruction (navigateur)
 
-FPS original jouable dans le navigateur : une carte, un mode (Recherche & Destruction, 5v5 contre des bots).
+FPS original jouable dans le navigateur : une carte, un mode (Recherche & Destruction, 10c10 contre des bots).
 Three.js 0.170 + Vite 5, 100 % gratuit (code open source, assets procéduraux ou CC0/MIT).
 
 ```bash
@@ -9,8 +9,10 @@ npm run dev      # http://localhost:5173
 npm run build    # dist/ (hébergeable tel quel)
 ```
 
-Contrôles : ZQSD (AZERTY) se déplacer · souris viser · clic gauche tirer · clic droit recharger · E poser/désamorcer ·
-Espace sauter · C s'accroupir · Maj marcher · Tab scores · M couper le son · Échap pause.
+Contrôles : ZQSD (AZERTY) se déplacer · souris viser · clic gauche tirer · clic droit viser · R recharger · E poser/désamorcer · passer sur un cadavre = munitions ·
+Espace sauter · C s'accroupir · Maj marcher · Tab scores · M couper le son · F3 compteur de perfs · Échap pause.
+
+Mode : 10 contre 10, tir allié activé, camp de départ au choix dans le menu, changement de camp à la mi-temps.
 
 ## Architecture
 Contrat complet : [ARCHITECTURE.md](ARCHITECTURE.md). Chaque module expose `createX(ctx)` et ne lit les autres que via `ctx`.
