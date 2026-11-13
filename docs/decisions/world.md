@@ -4,7 +4,8 @@
 - Files: layout.js (cell grid, spawns, sites, labels, NAV), terrain.js (levels, stairs, parapets, floorAt), buildings.js,
   props.js, env.js (sky/sun/lights/post), build.js (Geo builder + shader patches), index.js (assembly + API).
 ## Layout
-- 3 levels: port 0 m (ATK spawn, south z=+50), town +3 m (sites), citadel +6 m (DEF spawn, north z=-50).
+- 3 levels: port 0 m (ATK spawn, south z=+50, in front of a landing ship moored bow-in, ramp down to the quay;
+  the ship x[-9,9] z[58,116] is outside nav bounds, walkable by players only), town +3 m (sites), citadel +6 m (DEF spawn, north z=-50).
 - 3 interleaved lanes, never straight: left = Montée/covered passage -> stairs -> Place Haute (A); centre = Halle ->
   Place Ronde -> stairs -> Médina, forks to A (abbey gallery) or B (Corniche); right = Hangar/Quai Est or Tunnel -> Shipyard (B).
 - Site A (-58,-12) r7, floor +3. Site B (60,2) r7, floor 0 (shipyard, overlooked by the Corniche +3).
@@ -13,7 +14,7 @@
 - No slopes: stairs = one AABB per step, 0.3 m risers (physics step-up 0.45). Every other drop has a parapet/cheek wall
   (0.4 thick, top = upper level +1 m) so nobody walks off a terrace; nav treats them as walls.
 - Drops <= 1.6 m (the +1.5 / +4.5 mid floors) have NO railing: players jump up (apex 1.18 m + 0.45 step-up), drop down
-  freely. They are nav-only walls (in nav.colliders, not in physics) so bots use the stairs. Jump spots: fountain terrace,
+  freely. They are nav-only walls (merged per line) (in nav.colliders, not in physics) so bots use the stairs. Jump spots: fountain terrace,
   balcony -> Place Haute, Médina perch, shipyard dock, sunken citadel plaza, crate -> container at B.
 - `world.nav.floorAt(x,z)` -> floor height (stairs interpolated per step), null inside buildings.
 ## API (ctx.world)

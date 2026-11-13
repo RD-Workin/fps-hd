@@ -133,12 +133,18 @@ export function buildTerrain(T, G, addSolid) {
     }
   }
   // ledges: nav-only blockers + a worn stone lip on the upper edge (visual only)
-  for (let k = 0; k < ledges.length; k += 2) {
-    const [a, b] = ledges[k], dx = ledges[k + 1];
-    const box = dx ? [a - 0.2, b, a + 0.2, b + CELL] : [a, b - 0.2, a + CELL, b + 0.2];
+  const runs = new Map(); // merge cell edges along each line -> few long nav walls (bot cost scales with collider count)
+  for (let k = 0; k < ledges.length; k += 2) { const [a, b] = ledges[k], dx = ledges[k + 1], key = dx + '|' + (dx ? a : b); if (!runs.has(key)) runs.set(key, []); runs.get(key).push(dx ? b : a); }
+  for (const [key, ts] of runs) {
+    const [dxs, ls] = key.split('|'), dx = dxs === '1', line = +ls; ts.sort((p, q) => p - q);
+    const segs2 = []; for (const t of ts) { const m = segs2[segs2.length - 1]; if (m && Math.abs(m[1] - t) < 1e-6) m[1] = t + CELL; else segs2.push([t, t + CELL]); }
+    for (const [t0, t1] of segs2) {
+    const box = dx ? [line - 0.2, t0, line + 0.2, t1] : [t0, line - 0.2, t1, line + 0.2];
     addSolid(new THREE.Box3(new THREE.Vector3(box[0], 0, box[1]), new THREE.Vector3(box[2], 1.5, box[3])), 'concrete', { navOnly: true, navH: 1.5 });
+    }
   }
   // quay edge + invisible sea wall
   G.stone.box(-82, -2.5, 56, 82, 0.18, 57.4, col(0xcbbb9c), '', 2);
-  addSolid(new THREE.Box3(new THREE.Vector3(-82, 0, 56.2), new THREE.Vector3(82, 8, 58)), 'concrete', { invisible: true, navH: 8 });
+  // (gap x[-7.4,7.4] = landing-ship ramp, see props.js)
+  for (const [x0, x1] of [[-82, -7.4], [7.4, 82]]) addSolid(new THREE.Box3(new THREE.Vector3(x0, 0, 56.2), new THREE.Vector3(x1, 8, 58)), 'concrete', { invisible: true, navH: 8 });
 }
