@@ -25,14 +25,14 @@ export function buildAtmosphere(ctx) {
   // Environment lighting from the sky
   const pm = new THREE.PMREMGenerator(renderer);
   const envScene = new THREE.Scene(); const sky2 = new Sky(); sky2.scale.setScalar(900); sky2.material.uniforms = THREE.UniformsUtils.clone(u); sky2.material.uniforms.sunPosition.value.copy(sunDir); envScene.add(sky2);
-  scene.environment = pm.fromScene(envScene, 0.02, 1, 1000).texture; scene.environmentIntensity = 0.38;
+  scene.environment = pm.fromScene(envScene, 0.02, 1, 1000).texture; scene.environmentIntensity = 0.6; // readability pass: brighter shade
   // Real-world reflections: CC0 Poly Haven HDRI (vendored from the three.js repo). Falls back to the sky PMREM.
   new RGBELoader().load('./assets/world/venice_sunset_1k.hdr', (hdr) => {
     hdr.mapping = THREE.EquirectangularReflectionMapping;
     const env = pm.fromEquirectangular(hdr).texture; hdr.dispose(); pm.dispose();
     scene.environment = env; scene.environmentRotation = new THREE.Euler(0, THREE.MathUtils.degToRad(-SUN_AZ + 90), 0);
   }, undefined, () => pm.dispose());
-  scene.fog = new THREE.FogExp2(0xd8c0a0, 0.0042);
+  scene.fog = new THREE.FogExp2(0xd8c0a0, 0.0022); // lighter haze for readability
   // Sun
   const sun = new THREE.DirectionalLight(0xffdcb0, 4.2);
   sun.position.copy(sunDir).multiplyScalar(120); sun.castShadow = true;
@@ -48,7 +48,7 @@ export function buildAtmosphere(ctx) {
     sc.left = mnx; sc.right = mxx; sc.bottom = mny; sc.top = mxy; sc.near = Math.max(0.5, mnz - 5); sc.far = mxz + 5; sc.updateProjectionMatrix();
   }
   sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.00025; sun.shadow.normalBias = 0.035; sun.shadow.radius = 2;
-  const hemi = new THREE.HemisphereLight(0xbfd6ff, 0x9a7a58, 0.35); scene.add(hemi);
+  const hemi = new THREE.HemisphereLight(0xcfe0ff, 0xb08a64, 0.95); scene.add(hemi);
   return { sky, sun, hemi, sunDir };
 }
 

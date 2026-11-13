@@ -11,7 +11,7 @@ export function createWorld(ctx) {
   const { scene, physics, renderer, camera } = ctx;
   const T = buildTextures(renderer);
   const uTime = { value: 0 };
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 1.22; // readability pass
 
   // ---------- materials (one merged mesh each) ----------
   const std = (o) => new THREE.MeshStandardMaterial({ vertexColors: true, ...o });

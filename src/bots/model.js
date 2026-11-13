@@ -93,8 +93,16 @@ export function getMaterial(team) {
   if (!shared.mats[team]) {
     shared.mats[team] = new THREE.MeshStandardMaterial({
       map: buildAtlas(team), roughnessMap: shared.orm, metalnessMap: shared.orm, normalMap: shared.normal,
-      normalScale: new THREE.Vector2(0.6, 0.6), vertexColors: true, roughness: 1, metalness: 1, envMapIntensity: 0.8,
+      normalScale: new THREE.Vector2(0.6, 0.6), vertexColors: true, roughness: 1, metalness: 1, envMapIntensity: 1.1,
     });
+    // readability: team-coloured fresnel rim so soldiers pop out of shaded streets
+    const rim = team === 'DEF' ? new THREE.Color(0.18, 0.42, 0.95) : new THREE.Color(0.95, 0.42, 0.16);
+    shared.mats[team].onBeforeCompile = (sh) => {
+      sh.uniforms.uRim = { value: rim };
+      sh.fragmentShader = 'uniform vec3 uRim;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n float rimF = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2);\n totalEmissiveRadiance += uRim * rimF * 0.9 + uRim * 0.04;');
+    };
+    shared.mats[team].customProgramCacheKey = () => 'botrim' + team;
   }
   return shared.mats[team];
 }

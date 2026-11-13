@@ -24,8 +24,31 @@ export class Brain {
     if (!game || !nav || !this.sites().length) return;
     const bots = this.mgr.list.filter(b => b.alive);
     this.updateThreat();
-    this.assignATK(bots.filter(b => b.team === 'ATK'), game);
-    this.assignDEF(bots.filter(b => b.team === 'DEF'), game);
+    const atk = bots.filter(b => b.team === 'ATK'), def = bots.filter(b => b.team === 'DEF');
+    this.assignATK(atk, game);
+    this.assignDEF(def, game);
+    this.spreadGoals(atk); this.spreadGoals(def);
+  }
+
+  // 10v10: several bots often get the same spot. Reserve each final position per bot: a goal closer than
+  // MIN_GAP to one already taken is moved to a nearby free nav point (cached per bot so it doesn't jitter).
+  spreadGoals(list) {
+    const MIN_GAP = 2.2, nav = this.mgr.nav, taken = [];
+    const sorted = [...list].sort((a, b) => (a.goal?.use || a.goal?.noHunt ? 0 : 1) - (b.goal?.use || b.goal?.noHunt ? 0 : 1) || (a.id < b.id ? -1 : 1));
+    for (const b of sorted) {
+      const g = b.goal; if (!g) continue;
+      if (g.use || g.noHunt || g.anchor === b.position) { taken.push(g); continue; } // plant/defuse/pickup/escort: exact
+      const free = p => taken.every(t => hd(t, p) >= MIN_GAP);
+      if (free(g)) { taken.push(g); b._spread = null; continue; }
+      const key = Math.round(g.x) + ',' + Math.round(g.z);
+      let p = b._spread && b._spread.key === key && free(b._spread) ? b._spread : null;
+      for (let k = 0; !p && k < 12; k++) {
+        const c = nav.randomPointNear(g.x, g.z, 2.5 + k * 0.5, Math.random, 1);
+        if (c && free(c)) p = { x: c.x, z: c.z, key };
+      }
+      if (p) { b._spread = p; b.goal = { ...g, x: p.x, z: p.z }; }
+      taken.push(b.goal);
+    }
   }
 
   updateThreat() {
@@ -105,7 +128,7 @@ export class Brain {
     }
     if (bomb.state !== 'carried' && bomb.state !== 'dropped') { list.forEach(b => { b.goal = null; }); return; }
     if (!P.roles) {
-      const order = ['A', 'B', 'mid', 'A', 'B'], roles = new Map();
+      const order = ['A', 'B', 'mid', 'A', 'B', 'A', 'B', 'mid', 'A', 'B'], roles = new Map();
       [...list].sort((a, b) => a.id < b.id ? -1 : 1).forEach((b, i) => roles.set(b, order[i % order.length]));
       P.roles = roles;
     }
@@ -116,7 +139,7 @@ export class Brain {
       let role = P.roles.get(b) || 'mid';
       if (hot && role !== hot && (role === 'mid' || i % 2 === 0)) role = hot;
       if (role === 'mid') {
-        const s = this.midSpot();
+        const ms = this.midSpots(); const k = counters.mid = (counters.mid ?? -1) + 1; const s = ms[k % ms.length];
         b.goal = { x: s.x, z: s.z, tol: 0.8, speed: 'run', look: s.look, anchor: s, huntRange: 12, crouch: false };
         return;
       }
@@ -126,6 +149,15 @@ export class Brain {
     });
   }
 
+  midSpots() {
+    if (this.spotCache.has('mids')) return this.spotCache.get('mids');
+    const nav = this.mgr.nav, base = this.midSpot(), res = [base];
+    for (let k = 0; k < 30 && res.length < 4; k++) {
+      const p = nav.randomPointNear(base.x, base.z, 7, Math.random, 1);
+      if (p && res.every(r => hd(r, p) >= 3)) res.push({ x: p.x, z: p.z, look: base.look });
+    }
+    this.spotCache.set('mids', res); return res;
+  }
   midSpot() {
     if (this.spotCache.has('mid')) return this.spotCache.get('mid');
     const nav = this.mgr.nav, a = this.spawnCenter('DEF'), b = this.spawnCenter('ATK');
@@ -150,14 +182,14 @@ export class Brain {
     const key = 'hold' + name; if (this.spotCache.has(key)) return this.spotCache.get(key);
     const site = this.site(name), nav = this.mgr.nav, phys = this.ctx.physics, V = this.ctx.THREE.Vector3;
     const entries = this.entries(site), cands = [];
-    for (let k = 0; k < 60; k++) {
+    for (let k = 0; k < 90; k++) {
       const p = nav.randomPointNear(site.center.x, site.center.z, site.radius + 6, Math.random, 1); if (!p) continue;
       const eye = new V(p.x, 1.5, p.z); let vis = 0, look = null;
       for (const e of entries) if (hd(e, p) > 4 && phys.lineOfSight(eye, new V(e.x, 1.3, e.z))) { vis++; look ||= e; }
       const nearCover = nav.clearance(p.x, p.z) <= 3;
       cands.push({ x: p.x, z: p.z, look: look || { x: site.center.x, z: site.center.z }, score: vis * 2 + (nearCover ? 1.5 : 0) - (hd(p, site.center) > site.radius + 3 ? 0.5 : 0) + Math.random() * 0.3 });
     }
-    const spots = pickSpread(cands, 4, 3.5);
+    const spots = pickSpread(cands, 8, 3);
     const res = spots.length ? spots : [{ x: site.center.x, z: site.center.z, look: entries[0] }];
     this.spotCache.set(key, res); return res;
   }
@@ -166,13 +198,13 @@ export class Brain {
     if (this.guardCache.has(key)) return this.guardCache.get(key);
     const nav = this.mgr.nav, phys = this.ctx.physics, V = this.ctx.THREE.Vector3, cands = [];
     const target = new V(pos.x, 0.5, pos.z);
-    for (let k = 0; k < 40; k++) {
+    for (let k = 0; k < 70; k++) {
       const p = nav.randomPointNear(pos.x, pos.z, 12, Math.random, 1); if (!p) continue;
       const d = hd(p, pos); if (d < (side === 'def' ? 2.5 : 4)) continue;
       if (!phys.lineOfSight(new V(p.x, 1.2, p.z), target)) continue;
       cands.push({ x: p.x, z: p.z, score: (nav.clearance(p.x, p.z) <= 3 ? 1.5 : 0) + (d > 6 && d < 11 ? 1 : 0) + Math.random() * 0.5 });
     }
-    const s = pickSpread(cands, 4, 3);
+    const s = pickSpread(cands, 10, 2.5);
     const res = s.length ? s : [{ x: pos.x, z: pos.z }];
     this.guardCache.set(key, res); return res;
   }
