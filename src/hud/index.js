@@ -82,6 +82,7 @@ function markup() {
       <div class="nv-btns">
         <button class="nv-btn" data-act="play">${ICONS.play}<span>JOUER</span></button>
         <button class="nv-btn sec" data-act="restart">${ICONS.restart}<span>RECOMMENCER</span></button>
+        <button class="nv-btn sec" data-act="scores"><span>TABLEAU DES SCORES</span></button>
       </div>
       <div class="nv-note"></div>
     </div>
@@ -96,6 +97,7 @@ function markup() {
       </div></div>
     </div>
   </div>
+  <div class="nv-sb nv-sb-end"><div class="hd"><h2>TABLEAU FINAL</h2><div class="meta"></div><button class="nv-sb-x" data-sfx title="Fermer (Échap)">✕</button></div><div class="tb"></div><div class="nv-sb-leg">É éliminations · A assistances · M morts · TÊTE éliminations à la tête · OBJ poses + désamorçages · MVP manches MVP</div></div>
   <div class="nv-foot">OPÉRATION NOVA · PROJET PERSONNEL · CODE ET VISUELS ORIGINAUX</div>
 </div>`;
 }
@@ -122,6 +124,7 @@ export function createHud(ctx) {
     wn: $('.nv-am .wn'), mag: $('.nv-am .mag'), res: $('.nv-am .res span'), pips: $('.nv-pips'), use: $('.nv-use'), useLab: $('.nv-use .lab'),
     useBar: $('.nv-use .bar'), useFill: $('.nv-use .bar i'), usePct: $('.nv-use .pct'), deathT: $('.nv-death .t'), deathH: $('.nv-death .h'),
     sb: $('.nv-sb'), sbMeta: $('.nv-sb .meta'), sbTb: $('.nv-sb .tb'), menu: $('.nv-menu'), note: $('.nv-note'), pinfo: $('.nv-pinfo'),
+    sbEnd: $('.nv-sb-end'), sbEndMeta: $('.nv-sb-end .meta'), sbEndTb: $('.nv-sb-end .tb'), scoresBtn: $('[data-act="scores"]'),
     result: $('.nv-result'), statgrid: $('.nv-statgrid'), playBtn: $('[data-act="play"]'), restartBtn: $('[data-act="restart"]'),
     mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), side: $('[data-set="side"]'),
   };
@@ -148,6 +151,13 @@ export function createHud(ctx) {
   const minimap = (() => { try { return createMinimap(ctx, $('.nv-mm canvas'), $('.nv-mm-zone')); } catch (e) { console.warn('[hud] minimap', e); return null; } })();
   const isAlly = a => a && ctx.player && (ctx.game?.isAlly ? ctx.game.isAlly(a) : a.team === ctx.player.team);
   const stat = a => a.stats || tally.get(a) || { kills: 0, deaths: 0 };
+  // HUD-side extra stats (game.stats has no assists / headshots): actor -> {assists, hs}; victim -> Set(attackers)
+  const extra = new Map(), hurtBy = new Map();
+  const ex = a => { let e = extra.get(a); if (!e) extra.set(a, e = { assists: 0, hs: 0 }); return e; };
+  const hurt = (att, vic) => { if (!att || !vic || att === vic) return; let s = hurtBy.get(vic); if (!s) hurtBy.set(vic, s = new Set()); s.add(att); };
+  ev.on('weapon:hit', ({ actor } = {}) => hurt(ctx.player, actor));
+  ev.on('bot:fire', ({ bot, hit, target } = {}) => { if (hit) hurt(bot, target); });
+  ev.on('round:start', ({ round } = {}) => { hurtBy.clear(); if ((round ?? ctx.game?.round) === 1) extra.clear(); });
 
   // ---------------------------------------------------------------- settings
   function applySettings() {
@@ -178,6 +188,8 @@ export function createHud(ctx) {
   function showMenu(mode) {
     menuMode = mode;
     E.menu.classList.remove('main', 'pause', 'end');
+    E.scoresBtn.classList.toggle('hide', mode !== 'end');
+    if (mode !== 'end') { E.sbEnd.classList.remove('on'); E.sbEnd.dataset.pinned = ''; }
     if (!mode) { E.menu.classList.remove('on'); root.classList.remove('is-mainmenu'); return; }
     E.menu.classList.add('on', mode);
     root.classList.toggle('is-mainmenu', mode === 'main');
@@ -293,6 +305,9 @@ export function createHud(ctx) {
   // ---------------------------------------------------------------- killfeed / death / tally
   ev.on('actor:killed', ({ killer, victim, headshot } = {}) => {
     if (!victim) return;
+    if (killer && headshot) ex(killer).hs++;
+    for (const a of hurtBy.get(victim) || []) if (a !== killer && a.team !== victim.team) ex(a).assists++;
+    hurtBy.delete(victim);
     for (const [a, k] of [[victim, 'deaths'], [killer, 'kills']]) {
       if (!a) continue; let t = tally.get(a); if (!t) tally.set(a, t = { kills: 0, deaths: 0 }); t[k]++;
     }
@@ -355,21 +370,43 @@ export function createHud(ctx) {
   ev.on('bomb:dropped', ({ actor } = {}) => { if (isAlly(actor) || actor?.isPlayer) toast('Charge lâchée !', 'warn'); });
 
   // ---------------------------------------------------------------- scoreboard
-  function buildScoreboard() {
-    const g = ctx.game, p = ctx.player, actors = ctx.actors || [];
-    const sorted = list => list.sort((a, b) => (stat(b).score ?? stat(b).kills * 100) - (stat(a).score ?? stat(a).kills * 100) || stat(b).kills - stat(a).kills);
-    const ours = sorted(actors.filter(isAlly)), theirs = sorted(actors.filter(a => !isAlly(a)));
-    const row = a => { const s = stat(a); return `<tr class="${a.alive ? '' : 'dead'} ${a.isPlayer ? 'me' : ''}"><td class="n"><div class="nm"><span class="st"></span>${esc(a.name)}` +
-      `${a.hasBomb && isAlly(a) ? ICONS.bomb : ''}</div></td><td class="num">${s.kills}</td><td class="num">${s.deaths}</td><td class="num">${s.score ?? s.kills * 100}</td></tr>`; };
-    const tbl = (k, name, list) => `<table class="${k}"><tr><th class="team">${name}</th><th>É</th><th>M</th><th>SCORE</th></tr>${list.map(row).join('')}</table>`;
-    const side = t => (t === 'DEF' ? 'DÉFENSE' : 'ATTAQUE');
-    html(E.sbMeta, `MANCHE <b>${g?.round ?? 1}</b> &nbsp; <b class="u">${g?.score?.us ?? 0}</b> — <b class="t">${g?.score?.them ?? 0}</b>`);
-    html(E.sbTb, tbl('us', `ALLIÉS · ${side(p?.team)}`, ours) + tbl('them', `ENNEMIS · ${side(p?.team === 'ATK' ? 'DEF' : 'ATK')}`, theirs));
+  const scoreOf = a => stat(a).score ?? stat(a).kills * 100;
+  function matchMvp() {
+    let best = null;
+    for (const a of ctx.actors || []) if (!best || scoreOf(a) > scoreOf(best) || (scoreOf(a) === scoreOf(best) && stat(a).kills > stat(best).kills)) best = a;
+    return best && scoreOf(best) > 0 ? best : null;
   }
+  function buildScoreboard(metaEl = E.sbMeta, tbEl = E.sbTb, final = false) {
+    const g = ctx.game, p = ctx.player, actors = ctx.actors || [], mvp = final ? matchMvp() : null;
+    const sorted = list => list.sort((a, b) => scoreOf(b) - scoreOf(a) || stat(b).kills - stat(a).kills);
+    const ours = sorted(actors.filter(isAlly)), theirs = sorted(actors.filter(a => !isAlly(a)));
+    const row = a => {
+      const s = stat(a), x = extra.get(a) || { assists: 0, hs: 0 }, isMvp = a === mvp;
+      return `<tr class="${a.alive || final ? '' : 'dead'} ${a.isPlayer ? 'me' : ''} ${isMvp ? 'mvp' : ''}"><td class="n"><div class="nm"><span class="st"></span><span class="nmt">${esc(a.name)}</span>` +
+        `${isMvp ? '<b class="mvpb">MVP</b>' : ''}${!final && a.hasBomb && isAlly(a) ? ICONS.bomb : ''}</div></td>` +
+        `<td class="num">${s.kills}</td><td class="num">${x.assists}</td><td class="num">${s.deaths}</td><td class="num">${x.hs}</td>` +
+        `<td class="num">${(s.plants || 0) + (s.defuses || 0)}</td><td class="num">${s.mvps || 0}</td><td class="num sc">${scoreOf(a)}</td></tr>`;
+    };
+    const tbl = (k, name, list) => `<table class="${k}"><tr><th class="team">${name}</th><th>É</th><th>A</th><th>M</th><th>TÊTE</th><th>OBJ</th><th>MVP</th><th>SCORE</th></tr>${list.map(row).join('')}</table>`;
+    const side = t => (t === 'DEF' ? 'DÉFENSE' : 'ATTAQUE');
+    const lbl = final ? ['ALLIÉS', 'ENNEMIS'] : [`ALLIÉS · ${side(p?.team)}`, `ENNEMIS · ${side(p?.team === 'ATK' ? 'DEF' : 'ATK')}`];
+    html(metaEl, (final ? (mvp ? `MVP DU MATCH <b class="g">${esc(mvp.name)}</b> &nbsp; ` : '') : `MANCHE <b>${g?.round ?? 1}</b> &nbsp; `) +
+      `<b class="u">${g?.score?.us ?? 0}</b> — <b class="t">${g?.score?.them ?? 0}</b>`);
+    html(tbEl, `<div class="cols">${tbl('us', lbl[0], ours)}${tbl('them', lbl[1], theirs)}</div>`);
+  }
+  function toggleEndScores(on) {
+    on = on ?? !E.sbEnd.classList.contains('on');
+    if (on) buildScoreboard(E.sbEndMeta, E.sbEndTb, true);
+    E.sbEnd.classList.toggle('on', on);
+  }
+  const pinEnd = on => { E.sbEnd.dataset.pinned = on ? '1' : ''; toggleEndScores(on); };
+  E.scoresBtn.addEventListener('click', () => pinEnd(!E.sbEnd.classList.contains('on')));
+  E.sbEnd.querySelector('.nv-sb-x').addEventListener('click', () => pinEnd(false));
+  addEventListener('keydown', e => { if (e.code === 'Escape' && E.sbEnd.classList.contains('on')) pinEnd(false); });
 
   // ---------------------------------------------------------------- per-round reset (restart)
   function resetLocal() {
-    tally.clear(); Object.assign(me, { shots: 0, hits: 0, hs: 0, kills: 0, deaths: 0, roundKills: 0 });
+    tally.clear(); extra.clear(); hurtBy.clear(); Object.assign(me, { shots: 0, hits: 0, hs: 0, kills: 0, deaths: 0, roundKills: 0 });
     E.kf.innerHTML = ''; bq.length = 0;
   }
 
@@ -519,9 +556,10 @@ export function createHud(ctx) {
     }
 
     // scoreboard
-    const showSb = !!input?.scoreboard && !ctx.paused;
+    const tab = !!input?.scoreboard, showSb = tab && !ctx.paused;
     cls(E.sb, 'on', showSb);
     if (showSb && (sbTimer -= dt) <= 0) { sbTimer = 0.25; buildScoreboard(); }
+    if (menuMode === 'end' && memo(E.sbEnd, 'tab', tab)) { if (tab) toggleEndScores(true); else if (!E.sbEnd.dataset.pinned) toggleEndScores(false); }
 
     updateArcs(dt);
     updateTags(dt);

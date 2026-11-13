@@ -283,7 +283,28 @@
 .nv-sb tr.dead .st { background: transparent; box-shadow: none; border: 1px solid rgba(255, 255, 255, .35); }
 .nv-sb tr.me td { background: rgba(64, 217, 255, .16); color: #fff; }
 .nv-sb td .nv-ico { color: var(--gold); width: 16px; height: 16px; }
-.nv-sb td.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; width: 12%; }
+.nv-sb td.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; width: 7%; }
+/* two teams side by side (10 v 10) */
+.nv-sb { width: min(1320px, 97vw); padding: 18px 20px 16px; }
+.nv-sb .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.nv-sb th { padding: 2px 6px; font-size: 11px; letter-spacing: .14em; }
+.nv-sb td { padding: 4px 6px; font-size: 15px; }
+.nv-sb td.n { width: auto; max-width: 0; }
+.nv-sb td.n .nm { gap: 8px; min-width: 0; }
+.nv-sb .nmt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nv-sb td.sc { color: #fff; }
+.nv-sb tr.mvp td { background: rgba(255, 207, 77, .14); color: #fff; }
+.nv-sb tr.mvp td:first-child { border-left-color: var(--gold); }
+.nv-sb .mvpb { font-size: 11px; letter-spacing: .14em; padding: 1px 6px; color: #1a1205; background: linear-gradient(90deg, var(--gold), #ffb02e); flex: none; }
+.nv-sb .hd .meta .g { color: var(--gold); font-family: var(--f-ui); letter-spacing: .1em; }
+.nv-sb-end { position: fixed; z-index: 3; pointer-events: auto; max-height: 94vh; overflow-y: auto; box-shadow: 0 20px 80px rgba(0, 0, 0, .6); border-top-color: var(--gold); }
+.nv-sb-end:not(.on) { visibility: hidden; }
+.nv-sb-end .hd { gap: 18px; }
+.nv-sb-end .hd .meta { flex: 1; text-align: right; }
+.nv-sb-x { cursor: pointer; width: 34px; height: 34px; border: 1px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .06); color: #fff; font-size: 16px; }
+.nv-sb-x:hover { background: rgba(255, 255, 255, .16); }
+.nv-sb-leg { font-size: 12px; letter-spacing: .1em; color: var(--faint); margin-top: 4px; }
+@media (max-width: 1100px) { .nv-sb .cols { grid-template-columns: 1fr; } }
 
 /* ---------- menus ---------- */
 .nv-menu { position: absolute; inset: 0; pointer-events: auto; display: flex; align-items: safe center; justify-content: safe center; opacity: 0; visibility: hidden;
