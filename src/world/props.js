@@ -9,15 +9,24 @@ import { FACADE } from './textures.js';
 const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), E = new THREE.Euler();
 const mat4 = (x, y, z, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) => M4.compose(V.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz, 'XYZ')), S.set(sx, sy, sz));
 
-export function buildProps(G, T, physics, scene, uTime) {
-  const solid = (x0, y0, z0, x1, y1, z1, m = 'wood') => physics.add(new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, y1, z1)), m, null);
+export function buildProps(G, Tx, T, physics, addSolid, scene, uTime) {
+  let curY = 0, depth = 0;
+  const F = (x, z) => T.floorAt(x, z) ?? 0;
+  const solid = (x0, y0, z0, x1, y1, z1, m = 'wood') => addSolid(new THREE.Box3(new THREE.Vector3(x0, y0 + curY, z0), new THREE.Vector3(x1, y1 + curY, z1)), m, {});
+  const lift = (Y, fn) => { // run fn with geometry / colliders / instances raised by Y (re-entrant: inner calls don't re-lift)
+    if (depth++ > 0) { fn(); depth--; return; }
+    const marks = {}; for (const k in G) marks[k] = G[k].p.length; const mc = crates.length, mb = barrels.length, mg = bags.length;
+    curY = Y; try { fn(); } finally { curY = 0; depth--; }
+    if (Y) { for (const k in G) { const p = G[k].p; for (let i = marks[k] + 1; i < p.length; i += 3) p[i] += Y; }
+      for (let i = mc; i < crates.length; i++) crates[i][1] += Y; for (let i = mb; i < barrels.length; i++) barrels[i][4] = Y; for (let i = mg; i < bags.length; i++) bags[i][1] += Y; }
+  };
   const r = rng(4242), W = [1, 1, 1];
   const crates = [], barrels = [], bags = []; let waterMat = null;
 
   // ---------- primitives ----------
   const crate = (x, z, s = 1.2, lvl = 0, base = 0) => { const y = base + lvl * s; crates.push([x, y + s / 2, z, s, (r() - 0.5) * 0.06]); solid(x - s / 2, y, z - s / 2, x + s / 2, y + s, z + s / 2, 'wood'); };
   const stack = (x, z, n = 2, s = 1.2) => { for (let i = 0; i < n; i++) crate(x, z, s, i); };
-  const barrel = (x, z, c = 0x3f6b8c) => { barrels.push([x, z, c, r() * 6]); solid(x - 0.3, 0, z - 0.3, x + 0.3, 0.92, z + 0.3, 'metal'); };
+  const barrel = (x, z, c = 0x3f6b8c) => { barrels.push([x, z, c, r() * 6, 0]); solid(x - 0.3, 0, z - 0.3, x + 0.3, 0.92, z + 0.3, 'metal'); };
   const sandbags = (x0, z0, x1, z1, h = 1.05) => { // axis-aligned wall of bags
     const alongX = Math.abs(x1 - x0) >= Math.abs(z1 - z0), L = alongX ? x1 - x0 : z1 - z0, rows = Math.round(h / 0.175);
     for (let row = 0; row < rows; row++) for (let t = (row % 2) * 0.27 + 0.27; t < L - 0.2; t += 0.54) {
@@ -129,103 +138,113 @@ export function buildProps(G, T, physics, scene, uTime) {
     for (const t of [xa + 2, (xa + xb) / 2, xb - 2]) for (const [s, p] of [[1, zb], [-1, za]]) faceQuad(G.facade, { ax: 'z', s, p }, t - 0.55, t + 0.55, 5.6, 7.8, 0.03, cellUV(FACADE.SHUT_GREEN), W);
   };
 
-  // ---------- SITE A — "Cour du Marché" (sandy yard) ----------
-  crate(-33, -23); crate(-31.8, -23); crate(-33, -21.8); crate(-32.4, -22.4, 1.2, 1); crate(-30.3, -21.5, 0.9);
-  lowWall(-39, -16.3, -31, -15.7); lowWall(-24, -14.3, -21.5, -13.7, 0.9);
-  truck(-45, -26, 0x5d6b4a);
-  sandbags(-27.5, -31, -22.5, -31); sandbags(-50, -33, -50, -29.5);
-  barrel(-50, -12, 0x3f6b8c); barrel(-49.3, -12.6, 0x3f6b8c); barrel(-50.4, -13.3, 0x9a4a2a); barrel(-26, -10.5, 0x9a4a2a);
-  stack(-20.4, -21.2, 2); crate(-20.4, -23.0, 1.0);
-  crate(-16, -34.6, 1.1); crate(-16, -33.5, 1.1); // Arrière A
-  palm(-21.5, -34); palm(-52, -21, 7.5); palm(-37, -10, 6.5);
-  decal(DECAL.A, -32, -18.6, 3.2, 3.2, 0, col(0xffffff)); decal(DECAL.HAZARD, -32, -27.5, 6, 1.5, 0); decal(DECAL.OIL, -43, -20, 3, 3, 1);
-  wallDecal(DECAL.A, 'x', -1, -18, -21, 4.2, 2.6, 2.6); wallDecal(DECAL.A, 'z', 1, -36, -44, 3.8, 2.6, 2.6);
+  // ---------- placement (every helper is lifted onto the local floor via T.floorAt) ----------
+  const P = (fn) => (x, z, ...a) => lift(F(x, z), () => fn(x, z, ...a));
+  const [Crate, Stack, Barrel, Sandbags, Jersey, LowWall, Container, Car, Truck, Stall, Palm, Lamp, Decal] =
+    [crate, stack, barrel, sandbags, jersey, lowWall, container, car, truck, stall, palm, lamp, (x, z, ...a) => decal(a[0], x, z, ...a.slice(1))].map(P);
+  const GDecal = (reg, x, z, w, h, ang) => Decal(x, z, reg, w, h, ang);
+  const fountain = (fx, fz) => {
+    const Y = F(fx, fz);
+    G.stone.add(new THREE.CylinderGeometry(1.72, 1.8, 0.8, 8), mat4(fx, Y + 0.4, fz, Math.PI / 8), col(0xe0d0b4), 0.6);
+    G.stone.add(new THREE.CylinderGeometry(0.22, 0.3, 1.7, 10), mat4(fx, Y + 0.85, fz), col(0xe0d0b4));
+    G.stone.add(new THREE.CylinderGeometry(0.9, 0.25, 0.3, 16), mat4(fx, Y + 1.75, fz), col(0xe0d0b4));
+    G.stone.add(new THREE.SphereGeometry(0.22, 12, 8), mat4(fx, Y + 2.05, fz), col(0xe0d0b4));
+    const water = new THREE.Mesh(new THREE.CircleGeometry(1.55, 24), new THREE.MeshStandardMaterial({ color: 0x2c5a5e, roughness: 0.06, metalness: 0.2, normalMap: Tx.sand.normalMap, normalScale: new THREE.Vector2(0.25, 0.25) }));
+    water.rotation.x = -Math.PI / 2; water.position.set(fx, Y + 0.7, fz); water.receiveShadow = true; scene.add(water);
+    const bowl = water.clone(); bowl.geometry = new THREE.CircleGeometry(0.8, 16); bowl.position.y = Y + 1.88; scene.add(bowl);
+    solid(fx - 1.6, Y, fz - 1.6, fx + 1.6, Y + 0.8, fz + 1.6, 'concrete'); waterMat = water.material;
+  };
+  const slab = (x0, x1, z0, z1, c = 0xb7b0a4) => G.concrete.box(x0, 0, z0, x1, 0.012, z1, col(c), 'ny px nx pz nz', 4);
 
-  // ---------- SITE B — "Docks" (concrete apron, containers) ----------
-  G.concrete.box(18, 0, -36, 54, 0.012, -8, col(0xb7b0a4), 'ny px nx pz nz', 4);
-  container(41, -33, true, 0xa2412f); container(41, -33, true, 0x2f5f8f, 2.6);
-  container(25, -17, false, 0x3d7a4a); container(47.5, -21, false, 0xc9852f);
-  crate(33, -23); crate(31.8, -23); crate(33, -21.8); crate(32.4, -22.4, 1.2, 1); crate(30.3, -21.5, 0.9);
-  jersey(35, -16, true, 3); jersey(38.2, -16, true, 3);
-  sandbags(22.5, -31, 27.5, -31);
-  barrel(49, -12, 0xc9852f); barrel(49.7, -12.6, 0x2f5f8f); barrel(48.6, -13.3, 0xc9852f); barrel(21, -11, 0x3f6b8c); barrel(21.7, -11.5, 0x9a4a2a);
-  crate(16, -34.6, 1.1); crate(16, -33.5, 1.1);
-  decal(DECAL.B, 32, -18.6, 3.2, 3.2, 0); decal(DECAL.HAZARD, 32, -27.5, 6, 1.5, 0); decal(DECAL.HAZARD, 44, -11, 6, 1.5, Math.PI / 2); decal(DECAL.OIL, 38, -20, 3.5, 3.5, 2);
-  wallDecal(DECAL.B, 'x', 1, 18, -21, 4.2, 2.6, 2.6); wallDecal(DECAL.B, 'z', 1, -36, 44, 3.8, 2.6, 2.6); wallDecal(DECAL.S_DOCKS, 'z', 1, -36, 32, 5.6, 4, 1);
-
-  // ---------- MID — Marché, Fontaine, Porte Mid ----------
-  { // fountain (collider 3.2 x 3.2 x 0.8)
-    const fx = 0, fz = 10.5;
-    G.stone.add(new THREE.CylinderGeometry(1.72, 1.8, 0.8, 8), mat4(fx, 0.4, fz, Math.PI / 8), col(0xe0d0b4), 0.6);
-    G.stone.add(new THREE.CylinderGeometry(0.22, 0.3, 1.7, 10), mat4(fx, 0.85, fz), col(0xe0d0b4));
-    G.stone.add(new THREE.CylinderGeometry(0.9, 0.25, 0.3, 16), mat4(fx, 1.75, fz), col(0xe0d0b4));
-    G.stone.add(new THREE.SphereGeometry(0.22, 12, 8), mat4(fx, 2.05, fz), col(0xe0d0b4));
-    const water = new THREE.Mesh(new THREE.CircleGeometry(1.55, 24), new THREE.MeshStandardMaterial({ color: 0x2c5a5e, roughness: 0.06, metalness: 0.2, normalMap: T.sand.normalMap, normalScale: new THREE.Vector2(0.25, 0.25) }));
-    water.rotation.x = -Math.PI / 2; water.position.set(fx, 0.7, fz); water.receiveShadow = true; scene.add(water);
-    const bowl = water.clone(); bowl.geometry = new THREE.CircleGeometry(0.8, 16); bowl.position.y = 1.88; scene.add(bowl);
-    solid(fx - 1.6, 0, fz - 1.6, fx + 1.6, 0.8, fz + 1.6, 'concrete');
-    waterMat = water.material;
+  // PORT (level 0) — ATK spawn x[-9,9] z~50 kept clear
+  slab(-72, 72, 42, 56);
+  Container(-36, 46, true, 0xa2412f); Container(-36, 46, true, 0x2f5f8f, 2.6); Container(24, 47, true, 0x3d7a4a); Container(-60, 49, false, 0xc9852f);
+  Crate(-24, 50); Crate(-22.8, 50); Crate(-23.4, 50, 1.2, 1); Stack(16, 45, 2); Crate(30, 52); Crate(-46, 52, 1.0);
+  Barrel(-14, 54); Barrel(-13.3, 54.6, 0x9a4a2a); Barrel(35, 45.5, 0xc9852f); Barrel(56, 50, 0x3f6b8c); Barrel(56.7, 50.6, 0x3f6b8c);
+  Car(46, 48, true, 0x7a8a6a); Jersey(-30, 44, true, 3); Jersey(12, 43.2, true, 3);
+  for (let x = -70; x <= 70; x += 10) { G.metal.add(new THREE.CylinderGeometry(0.16, 0.2, 0.55, 10), mat4(x, 0.27, 55.6), col(0x2e3133)); }
+  // LEFT lane — Montée, courtyard, landing
+  Crate(-50, 40); Barrel(-55, 44.5, 0x3f6b8c); Stack(-62.5, 33, 2); Crate(-55, 31, 1.0); Palm(-53.5, 34.5, 6.5);
+  Barrel(-57.5, 15.5, 0x9a4a2a); Barrel(-58.2, 16.1, 0x3f6b8c); Crate(-64.9, 20.5, 1.1); Lamp(-56.4, 18, Math.PI / 2);
+  // PLACE RONDE (level 0) — fountain, stalls, palms
+  fountain(-5, 26);
+  Stall(-16, 21, 1, 0); Stall(-16, 30, 1, 1); Stall(6, 23, -1, 2); Palm(-13, 32.6, 7); Palm(3.5, 19.5, 6.5); Lamp(5.6, 31, -Math.PI / 2);
+  Crate(-1, 14); Crate(8, 9.3, 1.0);
+  // Rue des Filets
+  Crate(-26, 28.9, 1.0); Barrel(-40, 31, 0x3f6b8c);
+  // Tunnel yard
+  Barrel(24, 5, 0xc9852f); Barrel(24.6, 5.6, 0x9a4a2a); Crate(32.4, 11, 1.1); Crate(28, 4.6, 1.0);
+  // HANGAR yard + QUAI EST
+  Car(51, 28.5, true, 0x8a4a3a); Crate(56.5, 30.5); Container(69.4, 26, false, 0x2f5f8f); Crate(66, 40); Crate(66, 38.8); Barrel(71, 43, 0xc9852f);
+  // SITE B — Chantier naval (level 0): hull on slipway, containers, crane
+  slab(44, 76, -14, 24); slab(50, 72, -20, -14);
+  { // boat hull on cradle (x[66,73] z[-11,7]), keel along z
+    const hx = 69.5, c0 = col(0x7a2f26), c1 = col(0xd8d2c4), c2 = col(0x2b3a45);
+    G.wood.box(hx - 2.6, 0, -9, hx + 2.6, 0.6, -7.8, col(0x6d4b2e)); G.wood.box(hx - 2.6, 0, 3, hx + 2.6, 0.6, 4.2, col(0x6d4b2e));
+    G.paint.box(hx - 1.2, 0.6, -10, hx + 1.2, 1.6, 6, c0); G.paint.box(hx - 2.2, 1.6, -10.5, hx + 2.2, 2.8, 6.5, c0);
+    G.paint.box(hx - 2.6, 2.8, -10.8, hx + 2.6, 3.6, 6.8, c1); G.paint.box(hx - 1.6, 3.6, -6, hx + 1.6, 5.4, 0, c2);
+    G.paint.box(hx - 0.9, 0.6, 6, hx + 0.9, 3.2, 8.2, c0); G.paint.box(hx - 0.5, 3.2, 6.8, hx + 0.5, 3.7, 8.6, c1);
+    solid(hx - 2.6, 0, -10.8, hx + 2.6, 3.6, 6.8, 'metal'); solid(hx - 1, 0, 6.8, hx + 1, 3.2, 8.2, 'metal');
   }
-  stall(-6, 18, 1, 0); stall(-6, 23.5, 1, 1); stall(6, 20.5, -1, 2); stall(6, -1.5, -1, 3); stall(-6, 2, 1, 2);
-  palm(-4.6, 7.4, 6.5); palm(4.7, 14.2, 7);
-  // Porte Mid: walls at z=-18 with a 4 m opening x[-1.5, 2.5]
-  for (const [a, b] of [[-6, -1.5], [2.5, 6]]) { G.stone.box(a, 0, -18.45, b, 4.3, -17.55, col(0xdfcfb2), 'ny'); G.stone.box(a - 0.05, 4.3, -18.55, b + 0.05, 4.5, -17.45, col(0xeadfca), 'ny'); solid(a, 0, -18.45, b, 4.5, -17.55, 'concrete'); }
-  G.stone.box(-1.5, 3.7, -18.45, 2.5, 4.5, -17.55, col(0xdfcfb2), ''); // lintel
-  G.wood.box(-1.5, 0, -17.55, -1.38, 2.9, -16.1, col(0x5a3a22)); G.wood.box(2.38, 0, -17.55, 2.5, 2.9, -16.1, col(0x5a3a22)); // open gate leaves
-  solid(-1.5, 0, -17.55, -1.38, 2.9, -16.1); solid(2.38, 0, -17.55, 2.5, 2.9, -16.1);
-  crate(3.6, -14.5); crate(4.8, -14.5); crate(4.2, -14.5, 1.2, 1); crate(-4.4, -21.5); jersey(-3.5, -24.5, true, 3);
-  wallDecal(DECAL.ARROW, 'z', 1, -17.55, -4, 1.0, 1.4, 1.4); wallDecal(DECAL.NOVA, 'z', 1, -17.55, 4.25, 1.3, 3.2, 0.8);
-
-  // ---------- Arcades (Arches A / B) ----------
-  arcade(-18, -6, -12, -7); arcade(6, 18, -12, -7);
-
-  // ---------- Tunnel B: covered passage x[29,34] z[2,22] (visual roof, no collider) ----------
-  G.concrete.box(29, 3.7, 2, 34, 4.3, 22, col(0xb3ab9e), '', 4);
-  for (const zz of [6, 12, 18]) { G.metal.box(29, 3.45, zz - 0.15, 34, 3.7, zz + 0.15, col(0x5b5f60)); G.glow.box(31, 3.35, zz - 0.5, 32, 3.45, zz + 0.5, col(0xfff0d0)); }
-  for (const zz of [7, 17]) { const pl = new THREE.PointLight(0xffd9a0, 6, 12, 2); pl.position.set(31.5, 3.2, zz); scene.add(pl); }
-  wallDecal(DECAL.TAG, 'x', -1, 34, 9, 1.0, 2.2, 2.2); wallDecal(DECAL.ARROW, 'x', 1, 29, 4, 1.2, 1.2, 1.2);
-
-  // ---------- Routes / streets ----------
-  stack(-52.6, 12, 2); crate(-52.6, 13.2); barrel(-48, -2, 0x3f6b8c); barrel(-48.6, -2.6, 0x3f6b8c); // Long A
-  stack(52.6, 6, 2); crate(52.6, 7.2); barrel(48.3, 20, 0xc9852f); container(51.4, 13, false, 0x7a3f2c); // Long B (container 2.44 wide)
-  crate(-33.3, 20, 1.0); crate(-15, 8.6, 1.0); crate(15, 12.4, 1.0); jersey(-20, 10.5, false, 2.4); // Ruelle / Traverse
-  // ATK street
-  car(-26, 32.5, true, 0x7a8a6a); car(27, 33.5, true, 0x8a4a3a); jersey(-10, 30.5, true); jersey(11, 31, true); crate(8, 34.5); crate(-42, 33.5); stack(-44, 30, 2);
-  // DEF spawn
-  sandbags(-4, -32.3, 2, -32.3); crate(-10, -30.5); crate(10.5, -30.5); crate(10.5, -31.7, 1.2, 1); jersey(-11.5, -36, false);
-  for (const [x, z, a] of [[-5.4, -4, Math.PI / 2], [5.4, 27, -Math.PI / 2], [-5.4, 26, Math.PI / 2], [5.4, 4, -Math.PI / 2], [-12, 30.2, 0], [12, 37.5, Math.PI], [-47.4, 18, -Math.PI / 2], [47.4, -2, Math.PI / 2], [-8, -29.6, 0]]) lamp(x, z, a);
-  // wires, bunting, laundry
-  for (const z of [-2, 16, 25]) bunting(new THREE.Vector3(-6, 5.6, z), new THREE.Vector3(6, 5.6, z + 1));
-  for (const z of [0, 7, 18, 24]) laundry(new THREE.Vector3(-34, 4.6, z), new THREE.Vector3(-29, 4.6, z + 0.6));
-  for (const [ax, az, bx, bz] of [[-54, 4, -47, 5], [-54, 20, -47, 18], [47, 0, 54, 2], [47, 22, 54, 21], [29, -1, 34, -2]]) wire(new THREE.Vector3(ax, 6.2, az), new THREE.Vector3(bx, 6.4, bz), 0.7);
-  // ground grit decals
-  for (let i = 0; i < 70; i++) {
-    const x = -52 + r() * 104, z = -42 + r() * 84; if (physicsInside(physics, x, z)) continue;
-    const k = r(); decal(k < 0.45 ? DECAL.DIRT : k < 0.75 ? DECAL.CRACK : k < 0.9 ? DECAL.OIL : DECAL.MANHOLE, x, z, k < 0.9 ? 2 + r() * 2.5 : 1.3, k < 0.9 ? 2 + r() * 2.5 : 1.3, r() * 6.28);
+  Container(47, 8, false, 0xa2412f); Container(50, -10, true, 0x3d7a4a); Container(50, -10, true, 0xc9852f, 2.6);
+  Crate(59, 1.5); Crate(60.2, 1.5); Crate(59.6, 1.5, 1.2, 1); Crate(57.2, 3.2, 0.9); Jersey(56, 12, true, 3); Jersey(63, 14, true, 3);
+  Sandbags(52, 18, 57, 18); Barrel(46, 20, 0x3f6b8c); Barrel(46.7, 20.6, 0xc9852f); Barrel(74, -12, 0x9a4a2a); Stack(74.6, 18, 2);
+  for (const [x, z] of [[62, -18], [70, -18]]) { G.metal.box(x - 0.4, 0, z - 0.4, x + 0.4, 14, z + 0.4, col(0xd9a230)); solid(x - 0.4, 0, z - 0.4, x + 0.4, 14, z + 0.4, 'metal'); }
+  G.metal.box(60, 14, -18.6, 72, 15, -17.4, col(0xd9a230)); G.metal.box(64, 13, -18.4, 66, 14, -17.6, col(0x444444));
+  GDecal(DECAL.B, 60, 6.5, 3.4, 3.4, 0); GDecal(DECAL.HAZARD, 60, -2, 6, 1.5, 0); GDecal(DECAL.OIL, 52, 4, 3.5, 3.5, 2);
+  wallDecal(DECAL.B, 'x', -1, 76, 8, 1.8, 2.6, 2.6); wallDecal(DECAL.S_DOCKS, 'x', -1, 76, -4, 4.2, 4, 1);
+  // CORNICHE / BASTION (+3)
+  Crate(31, -11, 1.0); Crate(38, -9, 1.0); LowWall(37, -22, 41, -21.4, 1.0); Palm(39, -31, 6);
+  LowWall(56.5, -37.5, 59.5, -34.5, 1.1); for (const [x, z] of [[52, -42], [64, -42], [52, -30], [64, -30]]) Barrel(x, z, 0x6d6f70);
+  G.metal.add(new THREE.CylinderGeometry(0.06, 0.08, 9, 6), mat4(58, 3 + 1.1 + 4.5, -36), col(0x2b2d2e));
+  // SITE A — Place Haute (+3)
+  Crate(-59, -13); Crate(-57.8, -13); Crate(-59, -11.8); Crate(-58.4, -12.4, 1.2, 1); Crate(-55.6, -10.6, 0.9);
+  LowWall(-67, -6.6, -61, -6, 1.1); LowWall(-50, -22.6, -46, -22, 1.0); Truck(-49, -14, 0x5d6b4a);
+  Sandbags(-71, -19, -66, -19); Palm(-46, -2, 6.5); Palm(-70.5, -22.5, 7); Barrel(-71, -1, 0x3f6b8c); Barrel(-70.3, -1.6, 0x9a4a2a);
+  GDecal(DECAL.A, -58, -8.5, 3.4, 3.4, 0); GDecal(DECAL.HAZARD, -58, -17.5, 6, 1.5, 0);
+  wallDecal(DECAL.A, 'z', 1, -24, -66, 4.4, 2.6, 2.6); wallDecal(DECAL.A, 'x', 1, -72, -4, 4.6, 2.2, 2.2);
+  // MÉDINA (+3)
+  Crate(10, -6, 1.0); Crate(-4, -18.6, 1.0); Crate(2.6, -15.4, 1.0); Barrel(-6.6, -11, 0x9a4a2a); Stall(-6, -6, 1, 3); Palm(3, -24.5, 6);
+  // CITADELLE (+6) — DEF spawn x[-9,9] z~-50 kept clear
+  Crate(-20, -40); Crate(-18.8, -40); Crate(20, -40); Crate(20, -41.2, 1.2, 1); Sandbags(-6, -38, 0, -38); Sandbags(8, -42, 12, -42);
+  Palm(-26, -56, 7); Palm(26, -56, 7); Jersey(-12, -46, false, 3); Jersey(14, -36.5, true, 3); Lamp(-30, -40, Math.PI / 2); Lamp(30, -40, -Math.PI / 2);
+  // JARDINS (+3)
+  for (const [x, z, h] of [[-62, -46, 7], [-48, -46, 6.5], [-62, -34, 6], [-52, -38, 7.5], [-44, -33, 6.5]]) Palm(x, z, h);
+  LowWall(-58, -42.3, -52, -41.7, 0.9); LowWall(-50, -36.3, -46, -35.7, 0.9); Barrel(-64, -31, 0x3f6b8c);
+  // wires, bunting, laundry (absolute heights)
+  bunting(new THREE.Vector3(-16, 5.6, 20), new THREE.Vector3(6, 5.6, 22)); bunting(new THREE.Vector3(-16, 5.8, 31), new THREE.Vector3(6, 5.8, 29));
+  for (const x of [-27, -21]) laundry(new THREE.Vector3(x, 4.6, 26), new THREE.Vector3(x - 0.4, 4.6, 30));
+  for (const z of [-17, -12]) laundry(new THREE.Vector3(8, 7.6, z), new THREE.Vector3(12, 7.6, z + 0.4));
+  for (const z of [39, 43]) laundry(new THREE.Vector3(-56, 4.6, z), new THREE.Vector3(-48, 4.6, z + 0.5));
+  for (const [a, b] of [[[-64, 6.4, 26], [-58, 6.6, 26]], [[22, 6.4, 6], [34, 6.6, 7]], [[44, 6.2, 28], [58, 6.4, 27]], [[0, 9.4, -24], [6, 9.6, -24]], [[-26, 8.6, -9], [-16, 8.8, -9]]]) wire(new THREE.Vector3(...a), new THREE.Vector3(...b), 0.7);
+  // ground grit
+  for (let i = 0; i < 140; i++) {
+    const x = -76 + r() * 152, z = -60 + r() * 114, y = T.levelCell(x, z); if (y == null || nearSolid(physics, x, z, y)) continue;
+    const k = r(); GDecal(k < 0.45 ? DECAL.DIRT : k < 0.75 ? DECAL.CRACK : k < 0.9 ? DECAL.OIL : DECAL.MANHOLE, x, z, k < 0.9 ? 2 + r() * 2.5 : 1.3, k < 0.9 ? 2 + r() * 2.5 : 1.3, r() * 6.28);
   }
-  decal(DECAL.ARROW, -50.5, 2, 1.8, 1.8, 0); decal(DECAL.ARROW, 50.5, 2, 1.8, 1.8, 0); decal(DECAL.ARROW, -31.5, -2, 1.6, 1.6, 0); decal(DECAL.ARROW, 31.5, -2, 1.6, 1.6, 0);
+  for (const [x, z, a] of [[-52, 42, 0.6], [-61, 24, 0], [0, 30, 0], [-1, 15, 0.5], [-10, -7, Math.PI / 2], [30, 8, -Math.PI / 2], [50, 30, 0.3], [68, 30, 0], [22, -10, -Math.PI / 2]]) GDecal(DECAL.ARROW, x, z, 1.6, 1.6, a);
 
   // ---------- instanced crates / barrels / sandbags ----------
   const out = [];
   {
-    const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ map: T.crate.map, normalMap: T.crate.normalMap, roughnessMap: T.crate.roughnessMap }), crates.length);
+    const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ map: Tx.crate.map, normalMap: Tx.crate.normalMap, roughnessMap: Tx.crate.roughnessMap }), crates.length);
     crates.forEach(([x, y, z, s, ry], i) => m.setMatrixAt(i, mat4(x, y, z, ry, s * 0.995, s * 0.995, s * 0.995))); out.push(m);
   }
   {
     const g = new THREE.CylinderGeometry(0.3, 0.3, 0.92, 20); g.translate(0, 0.46, 0);
-    const m = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ map: T.metal.map, normalMap: T.metal.normalMap, roughnessMap: T.metal.roughnessMap, metalness: 0.4 }), barrels.length);
-    barrels.forEach(([x, z, c, ry], i) => { m.setMatrixAt(i, mat4(x, 0, z, ry)); m.setColorAt(i, new THREE.Color(c)); }); out.push(m);
+    const m = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ map: Tx.metal.map, normalMap: Tx.metal.normalMap, roughnessMap: Tx.metal.roughnessMap, metalness: 0.4 }), barrels.length);
+    barrels.forEach(([x, z, c, ry, y], i) => { m.setMatrixAt(i, mat4(x, y, z, ry)); m.setColorAt(i, new THREE.Color(c)); }); out.push(m);
   }
   {
     const g = new THREE.SphereGeometry(0.5, 10, 6); g.scale(0.56, 0.2, 0.34);
-    const m = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ map: T.sand.map, normalMap: T.sand.normalMap, color: 0xc8b48a, roughness: 1 }), bags.length);
+    const m = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ map: Tx.sand.map, normalMap: Tx.sand.normalMap, color: 0xc8b48a, roughness: 1 }), bags.length);
     bags.forEach(([x, y, z, ry], i) => m.setMatrixAt(i, mat4(x, y, z, ry + (r() - 0.5) * 0.15, 1, 1 + (r() - 0.5) * 0.2, 1))); out.push(m);
   }
   for (const m of out) { m.castShadow = m.receiveShadow = true; m.instanceMatrix.needsUpdate = true; scene.add(m); }
   return { waterMat };
 }
 
-function physicsInside(physics, x, z) {
-  for (const c of physics.colliders) { const b = c.box; if (x > b.min.x - 1 && x < b.max.x + 1 && z > b.min.z - 1 && z < b.max.z + 1 && b.max.y > 0.5) return true; }
+function nearSolid(physics, x, z, y) {
+  for (const c of physics.colliders) { const b = c.box; if (b.max.y > y + 0.3 && b.min.y < y + 2 && x > b.min.x - 1 && x < b.max.x + 1 && z > b.min.z - 1 && z < b.max.z + 1) return true; }
   return false;
 }

@@ -41,7 +41,7 @@ export function buildAtmosphere(ctx) {
   { // fit an ortho frustum to the map box in light view space
     const cam = new THREE.OrthographicCamera(); cam.position.copy(sun.position); cam.lookAt(0, 0, 0); cam.updateMatrixWorld();
     const inv = cam.matrixWorld.clone().invert(); let mnx = 1e9, mxx = -1e9, mny = 1e9, mxy = -1e9, mnz = 1e9, mxz = -1e9;
-    for (const x of [-57, 57]) for (const y of [0, 14]) for (const z of [-47, 47]) {
+    for (const x of [-83, 83]) for (const y of [0, 22]) for (const z of [-67, 59]) {
       const p = new THREE.Vector3(x, y, z).applyMatrix4(inv);
       mnx = Math.min(mnx, p.x); mxx = Math.max(mxx, p.x); mny = Math.min(mny, p.y); mxy = Math.max(mxy, p.y); mnz = Math.min(mnz, -p.z); mxz = Math.max(mxz, -p.z);
     }
@@ -49,6 +49,8 @@ export function buildAtmosphere(ctx) {
   }
   sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.00025; sun.shadow.normalBias = 0.035; sun.shadow.radius = 2;
   const hemi = new THREE.HemisphereLight(0xcfe0ff, 0xb08a64, 0.95); scene.add(hemi);
+  // bounce fill from the opposite side (no shadow): lifts shaded streets so soldiers stay readable
+  const bounce = new THREE.DirectionalLight(0xffd9b0, 0.55); bounce.position.set(-sunDir.x * 100, 40, -sunDir.z * 100); scene.add(bounce);
   return { sky, sun, hemi, sunDir };
 }
 
@@ -58,35 +60,36 @@ export function buildDistant(G, scene) {
   // hills
   const hg = new THREE.CylinderGeometry(330, 360, 1, 96, 6, true); const P = hg.attributes.position;
   for (let i = 0; i < P.count; i++) { const x = P.getX(i), z = P.getZ(i), a = Math.atan2(z, x), t = P.getY(i) + 0.5;
-    const hh = 22 + 18 * Math.sin(a * 3 + 1) + 10 * Math.sin(a * 7.3) + 6 * Math.sin(a * 17.1); P.setY(i, t * hh - 2); const k = 1 - t * 0.12; P.setX(i, x * k); P.setZ(i, z * k); }
+    const south = Math.max(0, Math.sin(a)); const hh = (22 + 18 * Math.sin(a * 3 + 1) + 10 * Math.sin(a * 7.3) + 6 * Math.sin(a * 17.1)) * (1 - south * 0.97); P.setY(i, t * hh - 2); const k = 1 - t * 0.12; P.setX(i, x * k); P.setZ(i, z * k); }
   hg.computeVertexNormals();
   const hills = new THREE.Mesh(hg, new THREE.MeshStandardMaterial({ color: 0x8c8460, roughness: 1, side: THREE.BackSide })); scene.add(hills);
-  const sea = new THREE.Mesh(new THREE.CircleGeometry(340, 48), new THREE.MeshStandardMaterial({ color: 0xa8956f, roughness: 1 })); sea.rotation.x = -Math.PI / 2; sea.position.y = -0.05; scene.add(sea);
+  const land = new THREE.Mesh(new THREE.PlaneGeometry(800, 456), new THREE.MeshStandardMaterial({ color: 0xa8956f, roughness: 1 })); land.rotation.x = -Math.PI / 2; land.position.set(0, -0.05, 56 - 228); scene.add(land);
   // skyline blocks around the walls
   const tints = [0xe9d3a8, 0xf1e4c8, 0xdcae7e, 0xe8c9a6, 0xd59a6f, 0xe6d9b8];
   for (let i = 0; i < 70; i++) {
-    const a = r() * Math.PI * 2, d = 75 + r() * 70, x = Math.cos(a) * d * 1.05, z = Math.sin(a) * d * 0.9, w = 8 + r() * 14, dd = 8 + r() * 14, h = 8 + r() * 14;
+    const a = r() * Math.PI * 2, d = 100 + r() * 70, x = Math.cos(a) * d * 1.05, z = Math.sin(a) * d * 0.9 - 20, w = 8 + r() * 14, dd = 8 + r() * 14, h = 10 + r() * 16;
+    if (z > 30) continue;
     G.plaster.box(x - w / 2, 0, z - dd / 2, x + w / 2, h, z + dd / 2, col(tints[i % tints.length]), 'ny', 4);
   }
   // bell tower (north)
-  const tx = -24, tz = -66; G.stone.box(tx - 3, 0, tz - 3, tx + 3, 26, tz + 3, col(0xe8d8bd), 'ny');
+  const tx = -24, tz = -92; G.stone.box(tx - 3, 0, tz - 3, tx + 3, 26, tz + 3, col(0xe8d8bd), 'ny');
   G.stone.box(tx - 3.4, 26, tz - 3.4, tx + 3.4, 27, tz + 3.4, col(0xf0e2c8), 'ny');
   G.roof.add(new THREE.ConeGeometry(4.2, 7, 4), new THREE.Matrix4().compose(new THREE.Vector3(tx, 30.5, tz), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 4, 0)), new THREE.Vector3(1, 1, 1)), [1, 1, 1], 2);
   // cranes (east, docks)
-  for (const [cx, cz, ry] of [[78, -30, 0.4], [92, 6, -0.3]]) {
+  for (const [cx, cz, ry] of [[100, 20, 0.4], [112, 52, -0.3]]) {
     const yel = col(0xd9a230); const m = new THREE.Matrix4();
     const add = (x0, y0, z0, x1, y1, z1) => { const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0); g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); m.compose(new THREE.Vector3(cx, 0, cz), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), new THREE.Vector3(1, 1, 1)); G.paint.add(g, m, yel); };
     add(-1, 0, -1, 1, 38, 1); add(-30, 38, -0.8, 18, 40, 0.8); add(-2, 40, -0.6, 2, 46, 0.6); add(10, 34, -2, 16, 38, 2);
   }
   // water tower (west)
-  const wx = -82, wz = 14; for (const [a, b] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) G.metal.box(wx + a - 0.3, 0, wz + b - 0.3, wx + a + 0.3, 18, wz + b + 0.3, col(0x6d6f70), 'ny');
+  const wx = -104, wz = -10; for (const [a, b] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) G.metal.box(wx + a - 0.3, 0, wz + b - 0.3, wx + a + 0.3, 18, wz + b + 0.3, col(0x6d6f70), 'ny');
   G.metal.add(new THREE.CylinderGeometry(5, 5, 7, 20), new THREE.Matrix4().makeTranslation(wx, 21.5, wz), col(0xc9c4b8));
   G.metal.add(new THREE.ConeGeometry(5.3, 2.5, 20), new THREE.Matrix4().makeTranslation(wx, 26.2, wz), col(0x8f8a80));
 }
 
 export function buildDust(scene, uTime) {
   const N = 1400, r = rng(7), p = new Float32Array(N * 3), s = new Float32Array(N);
-  for (let i = 0; i < N; i++) { p[i * 3] = -54 + r() * 108; p[i * 3 + 1] = 0.2 + r() * 6; p[i * 3 + 2] = -44 + r() * 88; s[i] = r(); }
+  for (let i = 0; i < N; i++) { p[i * 3] = -78 + r() * 156; p[i * 3 + 1] = 0.2 + r() * 10; p[i * 3 + 2] = -62 + r() * 116; s[i] = r(); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('seed', new THREE.BufferAttribute(s, 1));
   const mat = new THREE.ShaderMaterial({
     uniforms: { uTime, uPR: { value: Math.min(devicePixelRatio, 2) } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -102,7 +105,7 @@ export function buildDust(scene, uTime) {
 }
 
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uVig: { value: 0.32 } },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uVig: { value: 0.2 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime, uVig; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -110,7 +113,8 @@ const GradeShader = {
       float l = dot(c, vec3(0.299, 0.587, 0.114));
       c = mix(vec3(l), c, 1.1);                                   // saturation
       c = mix(c, c * vec3(1.04, 1.0, 0.94), smoothstep(0.4, 1.0, l)); // warm highlights
-      c = mix(c, c * vec3(0.93, 0.98, 1.06), 1.0 - smoothstep(0.0, 0.35, l)); // cool shadows
+      c = mix(c, c * vec3(0.97, 0.99, 1.03), 1.0 - smoothstep(0.0, 0.35, l)); // slight cool shadows
+      c = c + (1.0 - c) * 0.025; // shadow lift for readability
       c = (c - 0.5) * 1.05 + 0.5;
       vec2 q = vUv - 0.5; c *= 1.0 - uVig * dot(q, q) * 1.6;
       c += (h(vUv * 1000.0 + fract(uTime)) - 0.5) * 0.018;
