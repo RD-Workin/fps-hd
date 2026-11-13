@@ -48,4 +48,4 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
 ## Balance bench (bench2, bots only, player killed each round)
 - Fixed 105/40 s: 10v10 88 % ATK, 20v20 63 %. Auto timers alone: 75 % / 69 %. Rounds end by elimination ~45 s: timers are not the cause.
 - Fix: holder's advantage (holdCone/holdReact/holdPreAim), last ATK squad to other site, DEF threat radius site+24 m / 20 s window → full rotation.
-- Result: 10v10 50 % ATK (60 rounds), 20v20 56 % (32 rounds, before the rotation change).
+- Result: 10v10 50 % ATK (60 rounds), 20v20 56 % (32 rounds, before the rotation change) then 46 % (24 rounds, after).
