@@ -425,3 +425,32 @@
 
 .nv-perfwarn { grid-column: 1 / -1; font-size: 12px; letter-spacing: .08em; color: var(--dim); margin: -4px 0 4px; }
 .nv-perfwarn.warn { color: #ffcf6b; }
+
+/* ---------- killcam ---------- */
+.nv-kc { position: absolute; inset: 0; opacity: 0; transition: opacity .3s; pointer-events: none; }
+.nv-kc.on { opacity: 1; }
+.nv-kc .bar { position: absolute; left: 0; right: 0; height: 9vh; background: #000; transition: transform .45s cubic-bezier(.2, .9, .2, 1); }
+.nv-kc .bar.t { top: 0; transform: translateY(-100%); } .nv-kc .bar.b { bottom: 0; transform: translateY(100%); }
+.nv-kc.on .bar { transform: none; }
+.nv-kc .tag { position: absolute; top: calc(9vh + 16px); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
+  padding: 5px 16px; font-size: 16px; font-weight: 800; letter-spacing: .45em; color: #fff; background: rgba(200, 20, 40, .7);
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
+.nv-kc .tag i { width: 9px; height: 9px; border-radius: 50%; background: #fff; animation: nv-blink 1s step-end infinite; }
+.nv-kc.slow .tag::after { content: '×0,5'; font-family: var(--f-num); letter-spacing: .05em; color: var(--gold); }
+.nv-kc .info { position: absolute; right: 28px; bottom: calc(9vh + 18px); min-width: 380px; padding: 12px 26px 14px; text-align: right;
+  background: linear-gradient(90deg, transparent, rgba(40, 4, 10, .85) 18%); border-right: 3px solid var(--enemy); }
+.nv-kc .info .k { font-size: 12px; letter-spacing: .5em; color: #ff8a92; font-weight: 600; }
+.nv-kc .info .who { font-size: 40px; font-weight: 800; letter-spacing: .08em; line-height: 1.05; color: var(--enemy); text-shadow: 0 0 20px rgba(255, 90, 60, .5); }
+.nv-kc .info .row { display: flex; justify-content: flex-end; gap: 22px; margin-top: 4px; font-size: 15px; letter-spacing: .14em; color: var(--dim); white-space: nowrap; }
+.nv-kc .info .row span { display: inline-flex; align-items: center; gap: 7px; }
+.nv-kc .info .row b { font-family: var(--f-num); color: #fff; font-size: 19px; letter-spacing: .04em; }
+.nv-kc .info .row .nv-ico { width: 18px; height: 18px; color: #fff; }
+.nv-kc .info .row .rifle { width: 40px; height: 14px; }
+.nv-kc .info .row .hs, .nv-kc .info .row .hs b, .nv-kc .info .row .hs .nv-ico { color: var(--gold); }
+.nv-kc .prog { height: 3px; margin-top: 10px; background: rgba(255, 255, 255, .15); }
+.nv-kc .prog i { display: block; height: 100%; background: var(--enemy); transform-origin: 0 50%; transform: scaleX(0); }
+.nv-kc .skip { position: absolute; right: 28px; top: calc(9vh + 20px); font-size: 13px; letter-spacing: .24em; color: var(--dim); }
+.nv-kc .skip kbd { font-family: var(--f-num); font-size: 12px; padding: 1px 7px; border: 1px solid rgba(255, 255, 255, .4); border-radius: 3px; color: #fff; letter-spacing: .05em; }
+.nv-hud.is-killcam .nv-death, .nv-hud.is-killcam .nv-dead-tint, .nv-hud.is-killcam .nv-tags, .nv-hud.is-killcam .nv-top, .nv-hud.is-killcam .nv-mm,
+.nv-hud.is-killcam .nv-freeze, .nv-hud.is-killcam .nv-banner, .nv-hud.is-killcam .nv-toasts, .nv-hud.is-killcam .nv-sound { opacity: 0 !important; transition: opacity .3s; }
+@media (max-width: 700px) { .nv-kc .info { min-width: 0; left: 3vw; right: 3vw; } .nv-kc .info .row { flex-wrap: wrap; gap: 8px 16px; } .nv-kc .skip { display: none; } }

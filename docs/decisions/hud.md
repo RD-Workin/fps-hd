@@ -25,6 +25,10 @@
   gold ◆ if carrying the bomb, LOS check 5 Hz (dimmed/dashed when behind walls), scale by distance, fade 60–80 m.
 - Scoreboard (Tab + end screen « TABLEAU DES SCORES » button / Tab held / Échap closes): both teams side by side, cols É A M TÊTE OBJ MVP SCORE.
   Assists & HS tracked in HUD (weapon:hit + bot:fire hit -> damagers per victim; assist = damaged enemy, not killer). Match MVP = top score, gold row.
+- Killcam (killcam.js): ring buffer 20 Hz × 5.5 s of all actors (pos, yaw, aimPitch, alive; preallocated Float32Array, 64 max)
+  + 'bot:fire' log. 1.1 s after 'player:died' by a bot: 4.5 s replay over the killer's shoulder (last 0.7 s at ×0.5), bots re-posed via
+  bot.poseState()+model.pose() at recorded transforms (<70 m), cyan ghost of the player, tracers replayed via effects.tracer.
+  Shows killer name, weapon (NV-4/SR-8), distance, killer HP, headshot. Space/click skips -> core spectator cam. Aborts on round:start.
 ## Notes for others
 - round:end reason string is shown as-is (uppercased). Hit points shown are cosmetic (+150 HS), real score comes from game stats.
 - TODO: spectator label when dead (if game adds spectator cam); bots' names only from actor.name.

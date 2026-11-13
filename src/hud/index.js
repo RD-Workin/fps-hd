@@ -4,6 +4,7 @@
 import './hud.css';
 import { ICONS } from './icons.js';
 import { createMinimap } from './minimap.js';
+import { createKillcam } from './killcam.js';
 
 const LS_KEY = 'nova.hud';
 const ROUND_STREAK = ['', '', 'DOUBLE ÉLIMINATION', 'TRIPLE ÉLIMINATION', 'QUADRUPLE ÉLIMINATION', 'AS — ÉQUIPE RASÉE'];
@@ -151,6 +152,7 @@ export function createHud(ctx) {
   let menuMode = 'main', kick = 0, hpGhost = 100, lastHp = 100, sbTimer = 0, killerName = '';
   const dmg = []; // {el, from:{x,z}, t}
   for (const el of E.arcs) dmg.push({ el, from: null, t: 9 });
+  const killcam = (() => { try { return createKillcam(ctx, root, { esc, ICONS }); } catch (e) { console.warn('[hud] killcam', e); return null; } })();
   const minimap = (() => { try { return createMinimap(ctx, $('.nv-mm canvas'), $('.nv-mm-zone')); } catch (e) { console.warn('[hud] minimap', e); return null; } })();
   const isAlly = a => a && ctx.player && (ctx.game?.isAlly ? ctx.game.isAlly(a) : a.team === ctx.player.team);
   const stat = a => a.stats || tally.get(a) || { kills: 0, deaths: 0 };
@@ -575,6 +577,7 @@ export function createHud(ctx) {
 
     updateArcs(dt);
     updateTags(dt);
+    killcam?.update(dt);
     if (!ctx.paused || menuMode !== 'main') minimap?.update?.(dt);
   }
   let matchExitScheduled = false;
