@@ -37,5 +37,4 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
 - Phases: only 'live' moves/shoots; frozen respected (except while using). Paths: max 3 A* per frame, repath 2.5–4 s, stuck nudge.
 
 ## TODO / ideas
-- Tune DIFFICULTY once the real map lands (hit rate ~15 % in sim). Nav rebuilds when colliders.length changes.
-- Optional: ally callouts in HUD (bot.goal / intel), bomb backpack handled by game.
+- Tune DIFFICULTY once the real map lands (hit rate ~15 % in sim); nav rebuilds when colliders.length changes. Optional: HUD ally callouts.
