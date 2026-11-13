@@ -186,7 +186,7 @@ export function buildProps(G, Tx, T, physics, addSolid, scene, uTime) {
     G.paint.box(hx - 0.9, 0.6, 6, hx + 0.9, 3.2, 8.2, c0); G.paint.box(hx - 0.5, 3.2, 6.8, hx + 0.5, 3.7, 8.6, c1);
     solid(hx - 2.6, 0, -10.8, hx + 2.6, 3.6, 6.8, 'metal'); solid(hx - 1, 0, 6.8, hx + 1, 3.2, 8.2, 'metal');
   }
-  Container(47, 8, false, 0xa2412f); Container(50, -10, true, 0x3d7a4a); Container(50, -10, true, 0xc9852f, 2.6);
+  Container(47, 0, false, 0xa2412f); Crate(50.2, 2, 1.2); // crate = jump-up onto the container (overlooks B) Container(50, -10, true, 0x3d7a4a); Container(50, -10, true, 0xc9852f, 2.6);
   Crate(59, 1.5); Crate(60.2, 1.5); Crate(59.6, 1.5, 1.2, 1); Crate(57.2, 3.2, 0.9); Jersey(56, 12, true, 3); Jersey(63, 14, true, 3);
   Sandbags(52, 18, 57, 18); Barrel(46, 20, 0x3f6b8c); Barrel(46.7, 20.6, 0xc9852f); Barrel(74, -12, 0x9a4a2a); Stack(74.6, 18, 2);
   for (const [x, z] of [[62, -18], [70, -18]]) { G.metal.box(x - 0.4, 0, z - 0.4, x + 0.4, 14, z + 0.4, col(0xd9a230)); solid(x - 0.4, 0, z - 0.4, x + 0.4, 14, z + 0.4, 'metal'); }
@@ -206,7 +206,7 @@ export function buildProps(G, Tx, T, physics, addSolid, scene, uTime) {
   // MÉDINA (+3)
   Crate(10, -6, 1.0); Crate(-4, -18.6, 1.0); Crate(2.6, -15.4, 1.0); Barrel(-6.6, -11, 0x9a4a2a); Stall(-6, -6, 1, 3); Palm(3, -24.5, 6);
   // CITADELLE (+6) — DEF spawn x[-9,9] z~-50 kept clear
-  Crate(-20, -40); Crate(-18.8, -40); Crate(20, -40); Crate(20, -41.2, 1.2, 1); Sandbags(-6, -38, 0, -38); Sandbags(8, -42, 12, -42);
+  Crate(-20, -40); Crate(-18.8, -40); Crate(20, -40); Crate(20, -41.2, 1.2, 1); Sandbags(-8, -43, -3, -43); Sandbags(3, -41, 8, -41);
   Palm(-26, -56, 7); Palm(26, -56, 7); Jersey(-12, -46, false, 3); Jersey(14, -36.5, true, 3); Lamp(-30, -40, Math.PI / 2); Lamp(30, -40, -Math.PI / 2);
   // JARDINS (+3)
   for (const [x, z, h] of [[-62, -46, 7], [-48, -46, 6.5], [-62, -34, 6], [-52, -38, 7.5], [-44, -33, 6.5]]) Palm(x, z, h);
