@@ -169,7 +169,7 @@ export function buildProps(G, Tx, T, physics, addSolid, scene, uTime) {
   // PLACE RONDE (level 0) — fountain, stalls, palms
   fountain(-5, 26);
   Stall(-16, 21, 1, 0); Stall(-16, 30, 1, 1); Stall(6, 23, -1, 2); Palm(-13, 32.6, 7); Palm(3.5, 19.5, 6.5); Lamp(5.6, 31, -Math.PI / 2);
-  Crate(-1, 14); Crate(8, 9.3, 1.0);
+  Crate(-1, 14); Crate(8.6, 8.7, 1.0);
   // Rue des Filets
   Crate(-26, 28.9, 1.0); Barrel(-40, 31, 0x3f6b8c);
   // Tunnel yard
