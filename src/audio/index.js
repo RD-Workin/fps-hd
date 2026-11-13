@@ -1,21 +1,26 @@
 // Audio module: procedural Web Audio sound design (no files). See docs/decisions/audio.md.
-import { buildSfx } from './sounds.js';
+import { buildSfx, windLoop } from './sounds.js';
+import { buildMusic } from './music.js';
+import MusicWorker from './music.worker.js?worker&inline';
 import { impulseResponse } from './dsp.js';
 
-const LS_MUTED = 'nova.audio.muted', LS_VOL = 'nova.audio.volume';
+const LS_MUTED = 'nova.audio.muted', LS_VOL = 'nova.audio.volume', LS_MUS = 'nova.audio.music';
+const MUSIC_GAIN = 0.55, AMB_GAIN = 0.22;
 const MAX_VOICES = 32;
 const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, String(v)); } catch { /* ignore */ } };
 
 export function createAudio(ctx) {
-  const vol0 = parseFloat(lsGet(LS_VOL));
+  const vol0 = parseFloat(lsGet(LS_VOL)), mus0 = parseFloat(lsGet(LS_MUS));
   const audio = {
     muted: lsGet(LS_MUTED) === '1', volume: Number.isFinite(vol0) ? Math.min(1, Math.max(0, vol0)) : 0.8,
+    musicVolume: Number.isFinite(mus0) ? Math.min(1, Math.max(0, mus0)) : 1,
     ready: false, ac: null,
     setMuted(m) { this.muted = !!m; lsSet(LS_MUTED, this.muted ? 1 : 0); applyMaster(); ctx.events?.emit?.('audio:muted', { muted: this.muted }); },
     toggleMute() { this.setMuted(!this.muted); },
     setVolume(v) { this.volume = Math.min(1, Math.max(0, +v || 0)); lsSet(LS_VOL, this.volume); applyMaster(); ctx.events?.emit?.('audio:volume', { volume: this.volume }); },
-    play: () => null, update() {},
+    setMusicVolume(v) { this.musicVolume = Math.min(1, Math.max(0, +v || 0)); lsSet(LS_MUS, this.musicVolume); if (buses) buses.music.gain.setTargetAtTime(MUSIC_GAIN * this.musicVolume, ac.currentTime, 0.05); ctx.events?.emit?.('audio:music', { volume: this.musicVolume }); },
+    play: () => null, playUi: () => null, stinger: () => null, update() {},
   };
 
   addEventListener('keydown', e => {
@@ -35,17 +40,22 @@ export function createAudio(ctx) {
 
   // ---------------- graph: buses -> (sfx muffle LP) -> master -> compressor -> limiter -> out
   let bank = {}, buses;
+  const toBuffer = a => { const ch = Array.isArray(a) ? a : [a]; const b = ac.createBuffer(ch.length, ch[0].length, ac.sampleRate); ch.forEach((c, i) => b.copyToChannel(c, i)); return b; };
+  let windSeed = 99; const makeWindRng = () => { let s = windSeed; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; };
   try {
     const sr = ac.sampleRate;
     const raw = buildSfx(sr);
-    for (const k in raw) bank[k] = raw[k].map(a => { const b = ac.createBuffer(1, a.length, sr); b.copyToChannel(a, 0); return b; });
+    for (const k in raw) bank[k] = raw[k].map(a => toBuffer(a));
     master = ac.createGain();
     const comp = ac.createDynamicsCompressor(); comp.threshold.value = -16; comp.knee.value = 10; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.25;
     const lim = ac.createDynamicsCompressor(); lim.threshold.value = -1.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.1;
     master.connect(comp); comp.connect(lim); lim.connect(ac.destination);
     const muffle = ac.createBiquadFilter(); muffle.type = 'lowpass'; muffle.frequency.value = 20000; muffle.Q.value = 0.7; muffle.connect(master);
     const mk = (dest, g) => { const n = ac.createGain(); n.gain.value = g; n.connect(dest); return n; };
-    buses = { sfx: mk(muffle, 0.9), ui: mk(master, 0.7), music: mk(master, 0.6), muffle };
+    // duck nodes: gunfire/explosions briefly lower music + ambience so the action stays punchy
+    const musicDuck = mk(master, 1), ambDuck = mk(muffle, 1);
+    buses = { sfx: mk(muffle, 0.9), ui: mk(master, 0.7), music: mk(musicDuck, MUSIC_GAIN * audio.musicVolume), amb: mk(ambDuck, AMB_GAIN), muffle, musicDuck, ambDuck };
+    bank.wind = [toBuffer(windLoop(sr, makeWindRng()))];
     const ir = impulseResponse(sr); const irb = ac.createBuffer(2, ir[0].length, sr); irb.copyToChannel(ir[0], 0); irb.copyToChannel(ir[1], 1);
     const conv = ac.createConvolver(); conv.buffer = irb; buses.reverb = mk(conv, 1); conv.connect(buses.sfx);
     applyMaster();
@@ -95,7 +105,7 @@ export function createAudio(ctx) {
     }
     const dest = buses[o.bus || 'sfx'];
     if (v.dest !== dest) { try { v.out.disconnect(); } catch { /* ignore */ } v.out.connect(v.send); v.out.connect(dest); v.dest = dest; }
-    v.g.gain.setValueAtTime(gain, now); v.f.frequency.setValueAtTime(cutoff, now); v.send.gain.setValueAtTime(o.send ?? 0.12, now);
+    v.g.gain.cancelScheduledValues(now); v.g.gain.setValueAtTime(gain, now); v.f.frequency.setValueAtTime(cutoff, now); v.send.gain.setValueAtTime(o.send ?? 0.12, now);
     const src = ac.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate; src.connect(v.g);
     src.onended = () => { try { src.disconnect(); } catch { /* ignore */ } if (v.src === src) v.src = null; };
     src.start(t);
@@ -103,12 +113,46 @@ export function createAudio(ctx) {
     return v;
   }
   audio.play = play;
+
+  // ---------------- music: stingers built in a Worker (fallback: main thread in idle slices)
+  function addMusic(name, chans) { bank[name] = [toBuffer(chans)]; }
+  try {
+    const wk = new MusicWorker();
+    wk.onmessage = e => { if (e.data.done) wk.terminate(); else addMusic(e.data.name, e.data.chans); };
+    wk.onerror = () => { wk.terminate(); fallbackMusic(); };
+    wk.postMessage({ sr: ac.sampleRate });
+  } catch { fallbackMusic(); }
+  function fallbackMusic() { setTimeout(() => { try { buildMusic(ac.sampleRate, (n, v) => addMusic(n, v[0])); } catch (e) { console.warn('[audio] music disabled', e); } }, 1500); }
+  // stinger: one at a time on the music bus (a new one fades the previous out)
+  let curSting = null;
+  function stinger(name, o = {}) {
+    if (!bank[name]) return null;
+    if (curSting?.src) { const c = curSting; c.g.gain.setTargetAtTime(0, ac.currentTime + (o.delay || 0), 0.08); }
+    const v = play(name, { bus: 'music', send: 0, prio: 7, max: 1, pitchVar: 0, gainVar: 0, ...o });
+    if (v) { curSting = v; duck('amb', 0.45, (bank[name][0].duration) * 0.6 + (o.delay || 0), 1.2); }
+    return v;
+  }
+  audio.stinger = stinger;
+  function duck(which, level, hold, rec) {
+    const g = (which === 'music' ? buses.musicDuck : buses.ambDuck).gain, now = ac.currentTime;
+    g.cancelScheduledValues(now); g.setTargetAtTime(Math.min(level, g.value), now, 0.015); g.setTargetAtTime(1, now + hold, rec);
+  }
+  // looping beds: menu pad (music bus) and wind ambience (amb bus, muffled with sfx)
+  function makeLoop(name, dest) {
+    const g = ac.createGain(); g.gain.value = 0; g.connect(dest);
+    return { g, src: null, target: 0, offT: 0, set(v, tc) {
+      if (v !== this.target) { this.target = v; g.gain.setTargetAtTime(v, ac.currentTime, tc); this.offT = 0; }
+      if (v > 0 && !this.src && bank[name] && ac.state === 'running') { const s = ac.createBufferSource(); s.buffer = bank[name][0]; s.loop = true; s.connect(g); s.start(); this.src = s; }
+    }, tick(dt) { if (this.target === 0 && this.src && (this.offT += dt) > 6) { try { this.src.stop(); this.src.disconnect(); } catch { /* ignore */ } this.src = null; } } };
+  }
+  const menuBed = makeLoop('mus:menu', buses.music), windBed = makeLoop('wind', buses.amb);
   audio.playUi = n => play(n === 'hover' ? 'uiHover' : 'uiClick', { bus: 'ui', send: 0, prio: 3, gainVar: 0.05 });
 
   // ---------------- events
   const E = ctx.events, P = () => ctx.player, me = a => a && a === ctx.player;
   let lastKillSfx = -1;
   E.on('weapon:fire', () => {
+    duck('amb', 0.6, 0.08, 0.35);
     play('rifle', { gain: 1, prio: 4, max: 5, send: 0.28, pitchVar: 0.03 });
     if (Math.random() < 0.6) play('casing', { gain: 0.25, delay: 0.35 + Math.random() * 0.25, prio: 0, max: 2, send: 0.05, pitchVar: 0.1 });
   });
@@ -126,15 +170,25 @@ export function createAudio(ctx) {
   });
   E.on('player:damaged', p => { if (P()?.alive !== false || p?.amount) play('damage', { gain: Math.min(1, 0.5 + (p?.amount || 20) / 60), prio: 5, send: 0.05 }); });
   E.on('player:died', () => { play('death', { prio: 6, send: 0.2 }); deathMuffle = 1; });
-  E.on('round:start', () => { deathMuffle = 0; play('draw', { delay: 0.15, prio: 3 }); play('uiClick', { bus: 'music', send: 0, rate: 0.5, gain: 0.8 }); });
-  E.on('round:live', () => play('uiClick', { bus: 'music', send: 0, rate: 0.75 }));
-  E.on('bomb:planted', p => { play('wireCut', { pos: p?.position || null, prio: 4 }); });
+  E.on('round:start', () => { deathMuffle = 0; botUse = null; play('draw', { delay: 0.15, prio: 3 }); stinger(ctx.game?.isMatchPoint ? 'mus:matchPoint' : 'mus:roundStart', { gain: 0.9 }); });
+  E.on('round:live', () => stinger('mus:go', { gain: 0.8 }));
+  E.on('round:end', p => {
+    if (!p) return; const n = p.matchOver ? (p.weWon ? 'mus:matchWin' : 'mus:matchLoss') : (p.weWon ? 'mus:roundWin' : 'mus:roundLoss');
+    stinger(n, { delay: ctx.game?.bomb?.state === 'exploded' ? 0.9 : 0.35 }); matchStung = p.matchOver;
+  });
+  E.on('match:end', p => { if (!matchStung) stinger(p?.weWon ? 'mus:matchWin' : 'mus:matchLoss'); matchStung = false; });
+  E.on('bomb:planted', p => { botUse = null; play('wireCut', { pos: p?.position || null, prio: 4 }); stinger('mus:planted', { delay: 0.15, gain: 0.85 }); });
+  // bots planting/defusing: positional keypad / clicks while in progress
+  E.on('bomb:planting', p => { if (p?.actor && !me(p.actor)) botUse = { actor: p.actor, kind: 'plant', t: 0 }; });
+  E.on('bomb:defusing', p => { if (p?.actor && !me(p.actor)) botUse = { actor: p.actor, kind: 'defuse', t: 0 }; });
+  for (const n of ['bomb:plantCancel', 'bomb:defuseCancel', 'bomb:defused', 'bomb:exploded']) E.on(n, () => { botUse = null; });
   E.on('bomb:defused', () => { play('wireCut', { prio: 5, bus: 'ui' }); play('keypad', { bus: 'ui', delay: 0.1, rate: 1.3 }); });
   E.on('bomb:pickup', p => { if (me(p?.actor)) play('pickup', { bus: 'ui', prio: 3 }); });
   E.on('bomb:exploded', p => {
     const pos = p?.position || ctx.game?.bomb?.position; const d = pos ? camPos.distanceTo(pos) : 30;
     play('explosion', { pos: pos ? pos.clone().setY(1) : null, gain: 1.4, prio: 9, send: 0.5, occlude: false, max: 2 });
     play('explosionSub', { gain: Math.max(0.25, 1.2 - d / 60), prio: 9, send: 0 });
+    duck('music', 0.35, 0.6, 0.8); duck('amb', 0.2, 1.5, 1.5);
     if (d < 20) { play('tinnitus', { gain: 0.35 * (1 - d / 20), bus: 'ui', send: 0, prio: 8 }); blastMuffle = 1; }
   });
   // effects hooks (impacts, enemy tracers) — wrap ctx.effects functions once
@@ -168,7 +222,7 @@ export function createAudio(ctx) {
   const st = new WeakMap();
   let deathMuffle = 0, blastMuffle = 0, lastCut = 20000, reloadStage = 0, wasReloading = false, wasOnGround = true, minVy = 0;
   let stepAcc = 0, hbTimer = 0, breathFlip = false, bombBeepT = 0, warned = false, useT = 0, lastPhase = '';
-  let errOnce = false;
+  let errOnce = false, botUse = null, matchStung = false;
   audio.update = function (dt) {
     try {
       hookEffects();
@@ -191,6 +245,10 @@ export function createAudio(ctx) {
       if (blastMuffle) cut = Math.min(cut, 600 + (1 - blastMuffle) * 8000);
       if (Math.abs(cut - lastCut) / lastCut > 0.04) { buses.muffle.frequency.setTargetAtTime(cut, now, 0.12); lastCut = cut; }
       if (g?.phase !== lastPhase) { lastPhase = g?.phase; if (lastPhase === 'freeze') warned = false; }
+      // beds: menu pad on the main menu / end screen, wind whenever a match is running
+      const inMenu = !g?.started || g?.phase === 'menu' || g?.phase === 'over';
+      menuBed.set(inMenu ? 0.55 : 0, inMenu ? 1.2 : 0.5); menuBed.tick(dt);
+      windBed.set(inMenu ? 0 : (ctx.paused ? 0.5 : 1), 1.5); windBed.tick(dt);
       if (ctx.paused) return;
 
       // heartbeat + breathing at low health
@@ -265,9 +323,18 @@ export function createAudio(ctx) {
         const interval = tl > 10 ? 1.0 : tl > 5 ? 0.5 : tl > 2 ? 0.25 : 0.12;
         bombBeepT -= dt;
         if (tl > 1 && bombBeepT <= 0) { bombBeepT = interval; play('bombBeep', { pos: tmpV.copy(b.position).setY(b.position.y + 0.3), gain: 1.1, prio: 6, max: 2, send: 0.15, pitchVar: 0, gainVar: 0 }); }
-        if (tl <= 10 && !warned) { warned = true; play('keypad', { bus: 'ui', rate: 1.5 }); play('keypad', { bus: 'ui', rate: 1.5, delay: 0.15 }); play('keypad', { bus: 'ui', rate: 1.5, delay: 0.3 }); }
+        if (tl <= 10 && !warned) { warned = true; play('keypad', { bus: 'ui', rate: 1.5 }); play('keypad', { bus: 'ui', rate: 1.5, delay: 0.15 }); stinger('mus:bomb10', { gain: 0.8 }); }
         if (tl <= 1 && bombBeepT > -50) { bombBeepT = -100; play('bombArm', { pos: tmpV.copy(b.position).setY(0.4), gain: 1, prio: 7, pitchVar: 0 }); }
       } else bombBeepT = 0;
+      if (botUse) {
+        const a = botUse.actor;
+        if (!a.alive || g?.phase !== 'live') botUse = null;
+        else if ((botUse.t -= dt) <= 0 && camPos.distanceTo(a.position) < 30) {
+          const pos = tmpV.copy(a.position).setY(a.position.y + 0.6);
+          if (botUse.kind === 'plant') { play('keypad', { pos, gain: 0.6, prio: 3, max: 2, send: 0.1 }); botUse.t = 0.32; }
+          else { play('defuseClick', { pos, gain: 0.8, prio: 3, max: 2, send: 0.1 }); botUse.t = 0.25 + Math.random() * 0.3; }
+        }
+      }
     } catch (e) { if (!errOnce) { errOnce = true; console.warn('[audio] update error', e); } }
   };
   return audio;
