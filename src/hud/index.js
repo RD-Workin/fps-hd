@@ -138,6 +138,7 @@ export function createHud(ctx) {
 
   // ---------------------------------------------------------------- state
   const settings = { quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
+  let lastSpec = '';
   const tally = new Map(); // actor -> {kills, deaths}  (fallback when actor.stats missing)
   const me = { shots: 0, hits: 0, hs: 0, kills: 0, deaths: 0, roundKills: 0 };
   let menuMode = 'main', kick = 0, hpGhost = 100, lastHp = 100, sbTimer = 0, killerName = '';
@@ -448,6 +449,8 @@ export function createHud(ctx) {
     if (menuMode === 'main' && !g?.started) return;
     const alive = !!p?.alive;
     cls(root, 'is-dead', !!g?.started && !alive && g.phase !== 'over');
+    { const sp = !alive ? ctx.player?.spectating : null; const key = sp ? sp.name : '';
+      if (key !== lastSpec) { lastSpec = key; if (sp) html(E.deathH, `Spectateur : <b>${esc(sp.name)}</b> — clic gauche ou Espace pour changer`); } }
 
     // crosshair
     kick = Math.max(0, kick - dt * 60);

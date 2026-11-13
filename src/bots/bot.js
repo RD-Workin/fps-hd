@@ -256,6 +256,19 @@ export class Bot {
     let end;
     if (hit) {
       end = head ? aimP : aimP.clone().add(_c.set(rand(-0.15, 0.15), rand(-0.25, 0.15), rand(-0.15, 0.15)));
+      // Re-check line of sight at fire time: a shot into cover hits the cover, not the target.
+      const toEnd = _c.subVectors(end, eye); const len = toEnd.length(); toEnd.divideScalar(len);
+      const blocker = this.ctx.physics.raycast(eye, toEnd, len - 0.05);
+      if (blocker) {
+        end = blocker.point;
+        fx?.impact?.(blocker.point, blocker.normal, blocker.collider?.material || 'concrete');
+        fx?.tracer?.(muzzle.clone(), end.clone());
+        fx?.muzzleFlash?.(muzzle.clone(), _c.subVectors(end, muzzle).normalize().clone());
+        this.ctx.events.emit('bot:fire', { bot: this, origin: muzzle.clone(), hit: false, target: tg });
+        this.mag--; this.lastShotTime = t; this.fired = true; this.shotIdx++; this.burstLeft--;
+        this.nextShot = t + D.shotInterval * rand(0.95, 1.15) + (this.burstLeft <= 0 ? rand(...D.pause) * (dist < 10 ? 0.5 : 1) : 0);
+        return;
+      }
       const dmg = (head ? D.headDamage : D.damage) * (dist > D.falloffStart ? 0.85 : 1);
       const dir = _c.subVectors(end, eye).normalize();
       this.ctx.combat.applyDamage(tg, dmg, this, { headshot: head, fromPos: eye.clone() });

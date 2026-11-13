@@ -172,9 +172,9 @@
 .nv-banner.atk { --bc: var(--enemy); --bglow: rgba(255, 120, 60, .45); }
 .nv-banner.def { --bc: var(--ally); }
 
-.nv-freeze { position: absolute; left: 50%; top: calc(50% - 150px); transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .25s; }
+.nv-freeze { position: absolute; left: 50%; top: calc(50% + 64px); transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .25s; }
 .nv-freeze.on { opacity: 1; }
-.nv-hud.is-freeze .nv-banner { top: 12%; }
+.nv-hud.is-freeze .nv-banner { top: max(18%, 104px); }
 .nv-freeze .l { font-size: 13px; letter-spacing: .45em; color: var(--dim); font-weight: 600; }
 .nv-freeze .n { font-size: 64px; line-height: 1; color: #fff; text-shadow: 0 0 22px rgba(64, 217, 255, .7); }
 
@@ -187,7 +187,8 @@
 .nv-mm-n { position: absolute; left: 50%; top: 50%; width: 0; height: 0; will-change: transform; }
 .nv-mm-n span { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; background: #0b1622; border: 1px solid var(--ally);
   font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; color: var(--ally); }
-.nv-mm-zone { margin-top: 8px; text-align: center; font-size: 13px; letter-spacing: .24em; font-weight: 600; color: var(--dim); min-height: 16px; text-transform: uppercase; }
+.nv-mm-zone { margin: 8px auto 0; width: max-content; max-width: 228px; padding: 3px 12px; border-radius: 3px; background: rgba(6, 14, 22, .62); border: 1px solid rgba(64, 217, 255, .25); text-align: center; font-size: 12px; letter-spacing: .24em; font-weight: 600; color: #cfe6f5; min-height: 14px; text-transform: uppercase; }
+.nv-mm-zone:empty { display: none; }
 
 /* ---------- bottom-left: health ---------- */
 .nv-hp { position: absolute; left: 20px; bottom: 20px; width: 300px; padding: 12px 16px 14px; background: var(--panel); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
@@ -285,8 +286,8 @@
 .nv-sb td.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; width: 12%; }
 
 /* ---------- menus ---------- */
-.nv-menu { position: absolute; inset: 0; pointer-events: auto; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden;
-  transition: opacity .35s ease, visibility 0s linear .35s; overflow: auto; }
+.nv-menu { position: absolute; inset: 0; pointer-events: auto; display: flex; align-items: safe center; justify-content: safe center; opacity: 0; visibility: hidden;
+  transition: opacity .35s ease, visibility 0s linear .35s; overflow-y: auto; overflow-x: hidden; }
 .nv-menu.on { opacity: 1; visibility: visible; transition: opacity .35s ease, visibility 0s; }
 .nv-menu-bg { position: fixed; inset: 0; backdrop-filter: blur(9px) saturate(1.1); -webkit-backdrop-filter: blur(9px) saturate(1.1);
   background: radial-gradient(ellipse at 28% 45%, rgba(10, 40, 70, .35), rgba(3, 7, 12, .8) 70%), linear-gradient(90deg, rgba(3, 7, 12, .78), rgba(3, 7, 12, .35) 60%, rgba(3, 7, 12, .7)); }
@@ -295,7 +296,7 @@
 .nv-menu-grid { position: fixed; inset: 0; opacity: .14; pointer-events: none;
   background-image: linear-gradient(rgba(64, 217, 255, .5) 1px, transparent 1px), linear-gradient(90deg, rgba(64, 217, 255, .5) 1px, transparent 1px);
   background-size: 64px 64px; -webkit-mask-image: radial-gradient(ellipse at 30% 50%, #000, transparent 65%); mask-image: radial-gradient(ellipse at 30% 50%, #000, transparent 65%); }
-.nv-menu-in { position: relative; width: min(1180px, 94vw); display: grid; grid-template-columns: 1.15fr 1fr; gap: 56px; align-items: center; padding: 40px 0; }
+.nv-menu-in { margin: auto; position: relative; width: min(1180px, 94vw); display: grid; grid-template-columns: 1.15fr 1fr; gap: 56px; align-items: center; padding: 40px 0; }
 .nv-menu-l { position: relative; }
 .nv-emblem { position: absolute; left: -26px; top: -84px; width: 70px; height: 70px; }
 .nv-emblem .nv-ico { width: 70px; height: 70px; filter: drop-shadow(0 0 14px rgba(64, 217, 255, .55)); animation: nv-float 6s ease-in-out infinite; }
@@ -384,9 +385,19 @@
   .nv-menu-in { grid-template-columns: 1fr; gap: 24px; }
   .nv-title .b { font-size: 96px; }
   .nv-emblem { display: none; }
+  .nv-foot { display: none; }
 }
 @media (max-height: 760px) {
   .nv-title .b { font-size: 110px; }
   .nv-desc { margin: 10px 0 16px; }
   .nv-card { padding: 12px 18px 14px; }
+}
+
+/* ---------- small screens (integration fix) ---------- */
+@media (max-height: 760px), (max-width: 1000px) {
+  .nv-menu-in { grid-template-columns: 1fr; gap: 20px; padding: 24px 0; }
+  .nv-title .a { font-size: 26px; }
+  .nv-title .b { font-size: 84px; }
+  .nv-emblem { display: none; }
+  .nv-foot { display: none; }
 }
