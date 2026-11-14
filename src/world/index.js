@@ -5,7 +5,9 @@ import { Geo, grime, sway, groundMaterial } from './build.js';
 import { BOUNDS, SPAWNS, SITES, LABELS, NAV, GX0, GZ0, GW, GH, CELL } from './layout.js';
 import { createTerrain, buildTerrain } from './terrain.js';
 import { buildBuildings } from './buildings.js';
-import { buildProps } from './props.js';
+import { createKit } from './props.js';
+import { buildShip } from './ship.js';
+import { dressZones } from './zones.js';
 import { buildAtmosphere, buildDistant, buildDust, buildComposer } from './env.js';
 
 export function createWorld(ctx) {
@@ -48,14 +50,16 @@ export function createWorld(ctx) {
     const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
     const f = T.floorAt(cx, cz);
     let h = o.navH ?? (f == null ? 12 : box.max.y - f);
-    if (o.navH === 0 || box.min.y - (f ?? 0) > 1.7) return; // overhead masses don't block walking
+    if (o.navH === 0 || (o.navH == null && box.min.y - (f ?? 0) > 1.7)) return; // overhead masses don't block walking
     navColliders.push({ box: new THREE.Box3(new THREE.Vector3(box.min.x, 0, box.min.z), new THREE.Vector3(box.max.x, Math.max(0.2, h), box.max.z)), material });
   }
 
   // ---------- content ----------
   buildTerrain(T, G, addSolid);
   buildBuildings(G, T, addSolid);
-  const { waterMat } = buildProps(G, Tx, T, physics, addSolid, scene, uTime);
+  const K = createKit(G, Tx, T, physics, addSolid, scene);
+  buildShip(K); dressZones(K);
+  const { waterMat } = K.finish();
   buildDistant(G, scene);
   const noAO = [];
   const GB = { minX: -82, maxX: 82, minZ: -66, maxZ: 66 };

@@ -1,4 +1,4 @@
-// Props & set dressing: cover (crates, barrels, sandbags, barriers, containers, vehicles), market, fountain, palms,
+// Prop kit (primitives used by zones.js / ship.js): cover (crates, barrels, sandbags, barriers, containers, vehicles), market, fountain, palms,
 // arcades, Porte Mid, tunnel, lamps, wires, laundry, bunting, decals. Every blocking prop registers an AABB.
 import * as THREE from 'three';
 import { DECAL, rng } from './textures.js';
@@ -9,7 +9,7 @@ import { FACADE } from './textures.js';
 const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), E = new THREE.Euler();
 const mat4 = (x, y, z, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) => M4.compose(V.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz, 'XYZ')), S.set(sx, sy, sz));
 
-export function buildProps(G, Tx, T, physics, addSolid, scene, uTime) {
+export function createKit(G, Tx, T, physics, addSolid, scene) {
   let curY = 0, depth = 0;
   const F = (x, z) => T.floorAt(x, z) ?? 0;
   const solid = (x0, y0, z0, x1, y1, z1, m = 'wood') => addSolid(new THREE.Box3(new THREE.Vector3(x0, y0 + curY, z0), new THREE.Vector3(x1, y1 + curY, z1)), m, {});
@@ -189,171 +189,7 @@ export function buildProps(G, Tx, T, physics, addSolid, scene, uTime) {
   };
   const slab = (x0, x1, z0, z1, c = 0xb7b0a4) => G.concrete.box(x0, 0, z0, x1, 0.012, z1, col(c), 'ny px nx pz nz', 4);
 
-  // PORT (level 0) — ATK spawn x[-9,9] z~50 kept clear
-  slab(-72, 72, 42, 56);
-
-  { // LANDING SHIP moored bow-in at the quay, bow doors open, ramp down onto the port (ATK "arrived by sea").
-    // Hull x[-9,9] z[58,116] in the water, tank deck +0.9, stern superstructure. Outside nav bounds (bots stay on the quay).
-    // Colliders: side walls x[+-7,+-9] to 7.15, tank deck / ramp steps (floor), stern block, ramp guards. Visual detail only beyond.
-    const hullC = col(0x66717a), hullD = col(0x4f5960), darkC = col(0x2c3236), deckC = col(0x6a736c), redC = col(0x6e2a22), whiteC = col(0xd9d4c6), yel = col(0xd9a230);
-    const Z0 = 58, Z1 = 116, D = 0.9, TOP = 7;
-    const sheer = (z) => TOP + 1.3 * Math.pow(Math.max(0, (96 - z) / 38), 1.6); // deck line rises toward the bow
-    // side walls: extruded side elevation (z,y) with sheer + raked bow edge, 2 m thick (inner face = collider face)
-    const side = new THREE.Shape(); const pts = [[Z1, -1.1], [Z0 + 0.9, -1.1], [Z0 - 0.5, sheer(Z0)]];
-    for (let z = Z0 + 2; z <= Z1; z += 4) pts.push([z, sheer(z)]); pts.push([Z1, sheer(Z1)]);
-    side.moveTo(...pts[0]); for (const p of pts.slice(1)) side.lineTo(...p);
-    const sideG = new THREE.ExtrudeGeometry(side, { depth: 2, bevelEnabled: true, bevelThickness: 0.12, bevelSize: 0.12, bevelSegments: 2 });
-    for (const sx of [-1, 1]) G.hull.add(sideG, mat4(sx < 0 ? -7 : 9, 0, 0, -Math.PI / 2), hullC); // local x -> world z, local z -> world -x
-    // rounded stern cap + transom, boot-top band, knuckle and plate seams, fenders, portholes
-    G.hull.add(new THREE.CylinderGeometry(9.12, 9.12, 8.3, 28, 1, false, -Math.PI / 2, Math.PI), mat4(0, 3.05, Z1, 0, 1, 1, 0.42), hullC);
-    G.hull.add(new THREE.CylinderGeometry(9.2, 9.2, 0.7, 28, 1, false, -Math.PI / 2, Math.PI), mat4(0, -0.75, Z1, 0, 1, 1, 0.43), redC);
-    for (const sx of [-1, 1]) { const a = sx * 9.12, b = sx * 9.0, x0 = Math.min(a, b), x1 = Math.max(a, b);
-      G.paint.box(x0, -1.1, Z0 + 0.8, x1, -0.4, Z1, redC, 'ny py');
-      G.hull.box(sx < 0 ? -9.25 : 9.0, 2.4, Z0 + 1, sx < 0 ? -9.0 : 9.25, 2.6, Z1, hullD, 'ny');                 // rubbing strake
-      for (let z = Z0 + 5; z < Z1 - 1; z += 6.5) G.hull.box(x0 - 0.02, -0.4, z, x1 + 0.02, sheer(z) - 0.25, z + 0.12, hullD, 'ny py'); // frames / plate seams
-      for (let z = 99; z < 115; z += 2.2) G.glass.add(new THREE.CylinderGeometry(0.28, 0.28, 0.06, 12), mat4(sx * 9.14, 5.4, z, 0, 1, 1, 1, 0, Math.PI / 2), darkC);
-      for (const z of [Z0 + 6, Z0 + 26, Z0 + 46]) G.wood.add(new THREE.TorusGeometry(0.42, 0.2, 8, 16), mat4(sx * 9.4, 0.3, z, Math.PI / 2), col(0x262626)); // tyre fenders
-      // deck-edge railing on the walls (posts + 2 rails), white
-      for (let z = Z0 + 0.6; z < 96; z += 1.6) { const y = sheer(z); G.paint.box(sx * 8.05 - 0.03, y, z, sx * 8.05 + 0.03, y + 1.05, z + 0.06, whiteC, 'ny'); }
-      for (const h of [0.55, 1.05]) for (let z = Z0 + 0.6; z < 96; z += 3.2) { const y0 = sheer(z) + h, y1 = sheer(Math.min(96, z + 3.2)) + h, zm = Math.min(96, z + 3.2);
-        G.paint.add(new THREE.BoxGeometry(0.05, 0.05, Math.hypot(zm - z, y1 - y0)), mat4(sx * 8.05, (y0 + y1) / 2, (z + zm) / 2, 0, 1, 1, 1, Math.atan2(-(y1 - y0), zm - z)), whiteC); }
-      // bollards + mooring lines to the quay
-      G.metal.add(new THREE.CylinderGeometry(0.22, 0.25, 0.5, 10), mat4(sx * 8.0, sheer(62) + 0.25, 62), darkC);
-      G.metal.add(new THREE.CylinderGeometry(0.035, 0.035, 1, 5), new THREE.Matrix4().lookAt(new THREE.Vector3(sx * 8, sheer(62) + 0.4, 62), new THREE.Vector3(sx * 14, 0.2, 55.4), new THREE.Vector3(0, 1, 0)).multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2)).setPosition((sx * 8 + sx * 14) / 2, (sheer(62) + 0.6) / 2, (62 + 55.4) / 2).multiply(new THREE.Matrix4().makeScale(1, Math.hypot(6, sheer(62) + 0.2, 6.6), 1)), col(0x8a7a5a));
-      G.metal.add(new THREE.CylinderGeometry(0.22, 0.26, 0.45, 10), mat4(sx * 14, 0.22, 55.0), darkC);
-    }
-    // tank deck: plate, tie-down rails, yellow walkway lines, inner wall ribs
-    G.metal.box(-7, -1.1, Z0, 7, D, 96, deckC, 'ny', 2);
-    for (let z = 62; z < 96; z += 4) G.metal.box(-6.8, D, z, 6.8, D + 0.04, z + 0.15, darkC, 'ny');
-    for (const x of [-5.6, 5.4]) G.paint.box(x, D + 0.005, Z0 + 1, x + 0.2, D + 0.012, 95, yel, 'ny');
-    for (const sx of [-1, 1]) for (let z = Z0 + 2; z < 96; z += 3) G.hull.box(sx < 0 ? -7 : 6.85, D, z, sx < 0 ? -6.85 : 7, sheer(z) - 0.3, z + 0.18, hullD, 'ny');
-    // stern block + superstructure
-    G.hull.box(-7, -1.1, 96, 7, TOP + 1, Z1, hullC, 'ny');
-    G.paint.box(-7.2, TOP + 1, 95.8, 7.2, TOP + 1.25, 96.1, whiteC, 'ny');
-    G.hull.box(-6, TOP + 1, 100, 6, 15, 114, whiteC, 'ny'); G.hull.box(-7.5, 15, 100, 7.5, 18, 105, whiteC, 'ny');
-    G.glass.box(-7.55, 16, 99.95, 7.55, 17.2, 104, darkC, 'ny py'); G.glass.box(-6.05, 11, 100.5, 6.05, 12, 113.5, darkC, 'ny py');
-    G.paint.box(-9.5, 16.2, 101, 9.5, 16.5, 104, whiteC, 'ny'); G.paint.box(-6.2, 15, 99.9, 6.2, 15.15, 114.1, darkC, 'ny');
-    G.hull.box(-1.6, 15, 107, 1.6, 20.5, 111, darkC, 'ny'); G.paint.box(-1.65, 19, 106.95, 1.65, 19.6, 111.05, redC, 'ny'); // funnel + band
-    G.metal.add(new THREE.CylinderGeometry(0.12, 0.18, 10, 8), mat4(0, 22, 102.2), darkC); G.metal.box(-3, 25, 102, 3, 25.15, 102.4, darkC, 'ny');
-    G.metal.add(new THREE.CylinderGeometry(0.5, 0.5, 0.3, 12), mat4(0, 27.2, 102.2), darkC);
-    for (const sx of [-1, 1]) { G.paint.add(new THREE.CylinderGeometry(0.9, 0.9, 5, 12), mat4(sx * 6.9, 12.5, 107, 0, 1, 1, 1, Math.PI / 2), col(0xe07a2a)); // lifeboats
-      G.metal.box(sx * 6.3 - 0.1, 10.5, 104.5, sx * 6.3 + 0.1, 13.6, 104.7, darkC, 'ny'); G.metal.box(sx * 6.3 - 0.1, 10.5, 109.3, sx * 6.3 + 0.1, 13.6, 109.5, darkC, 'ny'); }
-    // bow doors swung fully open, folded back against the bow flanks (curved shells extruded vertically)
-    for (const sx of [-1, 1]) {
-      const sh = new THREE.Shape(), U = 6.5, o = [], inn = [];
-      for (let k = 0; k <= 12; k++) { const u = k / 12 * U, b = 1.5 * Math.sin(Math.PI * u / U); o.push([u, sx * (b + 0.3)]); inn.push([u, sx * b]); }
-      sh.moveTo(...inn[0]); for (const p of o) sh.lineTo(...p); for (const p of inn.reverse()) sh.lineTo(...p);
-      const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0)).setPosition(sx * 9.1, -0.7, Z0 + 0.3);
-      G.hull.add(new THREE.ExtrudeGeometry(sh, { depth: TOP + 0.9, bevelEnabled: false }), m, hullC);
-    }
-    // ramp: sloped plate (visual) over three 0.3 m steps (physics), side skirts, cleats, hinge, chains, hazard lip
-    const n = [0, 4, -0.9], L = Math.hypot(...n); n[0] /= L; n[1] /= L; n[2] /= L;
-    G.metal.quad([-7, D + 0.02, Z0], [7, D + 0.02, Z0], [7, 0.04, 54], [-7, 0.04, 54], n, [-7 / 1.5, 54 / 1.5, 7 / 1.5, Z0 / 1.5], [0.7, 0.72, 0.7]);
-    for (let z = 54.5; z < Z0 - 0.2; z += 0.5) { const y = (z - 54) / 4 * D; G.metal.box(-6.8, y, z, 6.8, y + 0.07, z + 0.07, darkC, 'ny'); }
-    for (const sx of [-1, 1]) {
-      const sk = new THREE.Shape(); sk.moveTo(54, 0); sk.lineTo(Z0, 0); sk.lineTo(Z0, D + 0.35); sk.lineTo(54, 0.3); sk.lineTo(54, 0);
-      G.hull.add(new THREE.ExtrudeGeometry(sk, { depth: 0.3, bevelEnabled: false }), mat4(sx < 0 ? -7 : 7.3, 0, 0, -Math.PI / 2), hullD);
-      G.metal.add(new THREE.CylinderGeometry(0.04, 0.04, 1, 5), new THREE.Matrix4().lookAt(new THREE.Vector3(sx * 7.1, sheer(Z0) - 0.4, Z0 + 0.4), new THREE.Vector3(sx * 7.1, 0.4, 54.3), new THREE.Vector3(0, 1, 0)).multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2)).setPosition(sx * 7.1, (sheer(Z0) + 0.0) / 2, (Z0 + 0.4 + 54.3) / 2).multiply(new THREE.Matrix4().makeScale(1, Math.hypot(sheer(Z0) - 0.8, Z0 - 54), 1)), darkC); // ramp chain
-    }
-    G.metal.add(new THREE.CylinderGeometry(0.25, 0.25, 14, 12), mat4(0, D - 0.05, Z0, 0, 1, 1, 1, 0, Math.PI / 2), darkC); // hinge
-    G.paint.box(-7.4, 0, 56, -7, 1.9, Z0, darkC, 'ny'); G.paint.box(7, 0, 56, 7.4, 1.9, Z0, darkC, 'ny');     // side guards over the water gap
-    G.paint.box(-7.4, 1.85, 56, -7, 1.95, Z0, yel, 'ny'); G.paint.box(7, 1.85, 56, 7.4, 1.95, Z0, yel, 'ny');
-    GDecal(DECAL.HAZARD, 0, 53.4, 14, 1.0, 0);
-    for (let k = 0; k < 3; k++) addSolid(new THREE.Box3(new THREE.Vector3(-7, 0, 54 + k * 4 / 3), new THREE.Vector3(7, (k + 1) * 0.3, Z0)), 'metal', { floor: true });
-    addSolid(new THREE.Box3(new THREE.Vector3(-7, 0, Z0), new THREE.Vector3(7, D, 96)), 'metal', { floor: true });
-    for (const [x0, x1] of [[-9, -7], [7, 9]]) addSolid(new THREE.Box3(new THREE.Vector3(x0, 0, Z0), new THREE.Vector3(x1, TOP + 0.15, Z1)), 'metal');
-    for (const [x0, x1] of [[-7.4, -7], [7, 7.4]]) addSolid(new THREE.Box3(new THREE.Vector3(x0, 0, 56), new THREE.Vector3(x1, 1.9, Z0)), 'metal');
-    addSolid(new THREE.Box3(new THREE.Vector3(-7, 0, 96), new THREE.Vector3(7, TOP + 1, Z1)), 'metal');
-    // hull number + name: canvas-painted decals on both bows and the stern (one small mesh)
-    {
-      const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 256; const g2 = cv.getContext('2d');
-      g2.fillStyle = 'rgba(0,0,0,0)'; g2.fillRect(0, 0, 1024, 256); g2.fillStyle = '#eceae2'; g2.font = 'bold 200px Impact, Arial Black, sans-serif'; g2.textAlign = 'center'; g2.textBaseline = 'middle';
-      g2.fillText('L 9014', 512, 112); g2.font = 'bold 44px Arial, sans-serif'; g2.fillText('— CORMORAN —', 512, 226);
-      for (let k = 0; k < 900; k++) { g2.clearRect(Math.random() * 1024, Math.random() * 256, 1 + Math.random() * 5, 1 + Math.random() * 3); } // chipped paint
-      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-      const m = new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -2 });
-      const geos = []; const pl = (x, y, z, ry, w) => { const p = new THREE.PlaneGeometry(w, w / 4); p.applyMatrix4(mat4(x, y, z, ry)); geos.push(p); };
-      pl(-9.14, 4.4, 75, -Math.PI / 2, 10); pl(9.14, 4.4, 75, Math.PI / 2, 10);
-      const merged = new THREE.BufferGeometry(); const pos = [], uv = [], nr = [], idx = []; let o = 0;
-      for (const gg of geos) { pos.push(...gg.attributes.position.array); uv.push(...gg.attributes.uv.array); nr.push(...gg.attributes.normal.array); for (const i of gg.index.array) idx.push(i + o); o += gg.attributes.position.count; }
-      merged.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); merged.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); merged.setAttribute('normal', new THREE.Float32BufferAttribute(nr, 3)); merged.setIndex(idx);
-      const mesh = new THREE.Mesh(merged, m); mesh.name = 'ship_markings'; mesh.receiveShadow = true; mesh.userData.static = true; scene.add(mesh);
-    }
-    // cargo left in the well deck: cover for whoever walks in; oil and wear
-    lift(D, () => { Truck(-3.5, 70); Stack(3.5, 66, 2); Crate(4, 78); Crate(4.9, 79, 1.0); Barrel(-5.5, 84, 0x3f6b8c); Barrel(-5, 84.8, 0x6d6f70); Stack(-3, 90, 3); Crate(4.5, 92, 1.2);
-      GDecal(DECAL.OIL, 1, 74, 3, 3, 1); GDecal(DECAL.OIL, -2, 86, 2.5, 2.5, 2.2); });
-  }
-  Container(-36, 46, true, 0xa2412f); Container(-36, 46, true, 0x2f5f8f, 2.6); Container(24, 47, true, 0x3d7a4a); Container(-60, 49, false, 0xc9852f);
-  Crate(-24, 50); Crate(-22.8, 50); Crate(-23.4, 50, 1.2, 1); Stack(16, 45, 2); Crate(30, 52); Crate(-46, 52, 1.0);
-  Barrel(-14, 54); Barrel(-13.3, 54.6, 0x9a4a2a); Barrel(35, 45.5, 0xc9852f); Barrel(56, 50, 0x3f6b8c); Barrel(56.7, 50.6, 0x3f6b8c);
-  Car(46, 48, true, 0x7a8a6a); Jersey(-30, 44, true, 3); Jersey(12, 43.2, true, 3);
-  for (let x = -70; x <= 70; x += 10) { G.metal.add(new THREE.CylinderGeometry(0.16, 0.2, 0.55, 10), mat4(x, 0.27, 55.6), col(0x2e3133)); }
-  // LEFT lane — Montée, courtyard, landing
-  Crate(-50, 40); Barrel(-55, 44.5, 0x3f6b8c); Stack(-62.5, 33, 2); Crate(-55, 31, 1.0); Palm(-53.5, 34.5, 6.5);
-  Barrel(-57.5, 15.5, 0x9a4a2a); Barrel(-58.2, 16.1, 0x3f6b8c); Crate(-64.9, 20.5, 1.1); Lamp(-56.4, 18, Math.PI / 2);
-  // PLACE RONDE (level 0) — fountain, stalls, palms
-  fountain(-5, 26);
-  Stall(-16, 21, 1, 0); Stall(-16, 30, 1, 1); Stall(6, 23, -1, 2); Palm(-13, 32.6, 7); Palm(3.5, 19.5, 6.5); Lamp(5.6, 31, -Math.PI / 2);
-  Crate(-1, 14); Crate(8.6, 8.7, 1.0);
-  // Rue des Filets
-  Crate(-26, 28.9, 1.0); Barrel(-40, 31, 0x3f6b8c);
-  // Tunnel yard
-  Barrel(24, 5, 0xc9852f); Barrel(24.6, 5.6, 0x9a4a2a); Crate(32.4, 11, 1.1); Crate(28, 4.6, 1.0);
-  // HANGAR yard + QUAI EST
-  Car(51, 28.5, true, 0x8a4a3a); Crate(56.5, 30.5); Container(69.4, 26, false, 0x2f5f8f); Crate(66, 40); Crate(66, 38.8); Barrel(71, 43, 0xc9852f);
-  // SITE B — Chantier naval (level 0): hull on slipway, containers, crane
-  slab(44, 76, -14, 24); slab(50, 72, -20, -14);
-  { // boat hull on cradle (x[66,73] z[-11,7]), keel along z
-    const hx = 69.5, c0 = col(0x7a2f26), c1 = col(0xd8d2c4), c2 = col(0x2b3a45);
-    G.wood.box(hx - 2.6, 0, -9, hx + 2.6, 0.6, -7.8, col(0x6d4b2e)); G.wood.box(hx - 2.6, 0, 3, hx + 2.6, 0.6, 4.2, col(0x6d4b2e));
-    G.paint.box(hx - 1.2, 0.6, -10, hx + 1.2, 1.6, 6, c0); G.paint.box(hx - 2.2, 1.6, -10.5, hx + 2.2, 2.8, 6.5, c0);
-    G.paint.box(hx - 2.6, 2.8, -10.8, hx + 2.6, 3.6, 6.8, c1); G.paint.box(hx - 1.6, 3.6, -6, hx + 1.6, 5.4, 0, c2);
-    G.paint.box(hx - 0.9, 0.6, 6, hx + 0.9, 3.2, 8.2, c0); G.paint.box(hx - 0.5, 3.2, 6.8, hx + 0.5, 3.7, 8.6, c1);
-    // colliders follow the stepped hull exactly (no invisible margin under the flare, cabin and bow are solid)
-    solid(hx - 2.6, 0, -9, hx + 2.6, 0.6, -7.8); solid(hx - 2.6, 0, 3, hx + 2.6, 0.6, 4.2);
-    solid(hx - 1.2, 0, -10, hx + 1.2, 1.6, 6, 'metal'); solid(hx - 2.2, 1.6, -10.5, hx + 2.2, 2.8, 6.5, 'metal');
-    solid(hx - 2.6, 2.8, -10.8, hx + 2.6, 3.6, 6.8, 'metal'); solid(hx - 1.6, 3.6, -6, hx + 1.6, 5.4, 0, 'metal');
-    solid(hx - 0.9, 0.6, 6, hx + 0.9, 3.2, 8.2, 'metal'); solid(hx - 0.5, 3.2, 6.8, hx + 0.5, 3.7, 8.6, 'metal');
-  }
-  Container(47, 0, false, 0xa2412f); Crate(50.2, 2, 1.2); Container(50, -10, true, 0x3d7a4a); // crate = jump-up onto the container (overlooks B)
-  Container(50, -10, true, 0xc9852f, 2.6);
-  Crate(59, 1.5); Crate(60.2, 1.5); Crate(59.6, 1.5, 1.2, 1); Crate(57.2, 3.2, 0.9); Jersey(56, 12, true, 3); Jersey(63, 14, true, 3);
-  Sandbags(52, 18, 57, 18); Barrel(46, 20, 0x3f6b8c); Barrel(46.7, 20.6, 0xc9852f); Barrel(74, -12, 0x9a4a2a); Stack(74.6, 18, 2);
-  for (const [x, z] of [[62, -18], [70, -18]]) { G.metal.box(x - 0.4, 0, z - 0.4, x + 0.4, 14, z + 0.4, col(0xd9a230)); solid(x - 0.4, 0, z - 0.4, x + 0.4, 14, z + 0.4, 'metal'); }
-  G.metal.box(60, 14, -18.6, 72, 15, -17.4, col(0xd9a230)); G.metal.box(64, 13, -18.4, 66, 14, -17.6, col(0x444444));
-  GDecal(DECAL.B, 60, 6.5, 3.4, 3.4, 0); GDecal(DECAL.HAZARD, 60, -2, 6, 1.5, 0); GDecal(DECAL.OIL, 52, 4, 3.5, 3.5, 2);
-  wallDecal(DECAL.B, 'x', -1, 76, 8, 1.8, 2.6, 2.6); wallDecal(DECAL.S_DOCKS, 'x', -1, 76, -4, 4.2, 4, 1);
-  // CORNICHE / BASTION (+3)
-  Crate(31, -11, 1.0); Crate(38, -9, 1.0); LowWall(37, -22, 41, -21.4, 1.0); Palm(39, -31, 6);
-  LowWall(56.5, -37.5, 59.5, -34.5, 1.1); for (const [x, z] of [[52, -42], [64, -42], [52, -30], [64, -30]]) Barrel(x, z, 0x6d6f70);
-  G.metal.add(new THREE.CylinderGeometry(0.06, 0.08, 9, 6), mat4(58, 3 + 1.1 + 4.5, -36), col(0x2b2d2e));
-  // SITE A — Place Haute (+3)
-  Crate(-59, -13); Crate(-57.8, -13); Crate(-59, -11.8); Crate(-58.4, -12.4, 1.2, 1); Crate(-55.6, -10.6, 0.9);
-  LowWall(-67, -6.6, -61, -6, 1.1); LowWall(-50, -22.6, -46, -22, 1.0); Truck(-49, -14, 0x5d6b4a);
-  Sandbags(-71, -19, -66, -19); Palm(-46, -2, 6.5); Palm(-70.5, -22.5, 7); Barrel(-71, -1, 0x3f6b8c); Barrel(-70.3, -1.6, 0x9a4a2a);
-  GDecal(DECAL.A, -58, -8.5, 3.4, 3.4, 0); GDecal(DECAL.HAZARD, -58, -17.5, 6, 1.5, 0);
-  wallDecal(DECAL.A, 'z', 1, -24, -66, 4.4, 2.6, 2.6); wallDecal(DECAL.A, 'x', 1, -72, -4, 4.6, 2.2, 2.2);
-  // MÉDINA (+3)
-  Crate(10, -6, 1.0); Crate(-4, -18.6, 1.0); Crate(2.6, -15.4, 1.0); Barrel(-6.6, -11, 0x9a4a2a); Stall(-6, -6, 1, 3); Palm(3, -24.5, 6);
-  // CITADELLE (+6) — DEF spawn x[-9,9] z~-50 kept clear
-  Crate(-20, -40); Crate(-18.8, -40); Crate(20, -40); Crate(20, -41.2, 1.2, 1); Sandbags(-8, -43, -3, -43); Sandbags(3, -41, 8, -41);
-  Palm(-26, -56, 7); Palm(26, -56, 7); Jersey(-12, -46, false, 3); Jersey(14, -36.5, true, 3); Lamp(-30, -40, Math.PI / 2); Lamp(30, -40, -Math.PI / 2);
-  // JARDINS (+3)
-  for (const [x, z, h] of [[-62, -46, 7], [-48, -46, 6.5], [-62, -34, 6], [-52, -38, 7.5], [-44, -33, 6.5]]) Palm(x, z, h);
-  LowWall(-58, -42.3, -52, -41.7, 0.9); LowWall(-50, -36.3, -46, -35.7, 0.9); Barrel(-64, -31, 0x3f6b8c);
-  // wires, bunting, laundry (absolute heights)
-  bunting(new THREE.Vector3(-16, 5.6, 20), new THREE.Vector3(6, 5.6, 22)); bunting(new THREE.Vector3(-16, 5.8, 31), new THREE.Vector3(6, 5.8, 29));
-  for (const x of [-27, -21]) laundry(new THREE.Vector3(x, 4.6, 26), new THREE.Vector3(x - 0.4, 4.6, 30));
-  for (const z of [-17, -12]) laundry(new THREE.Vector3(8, 7.6, z), new THREE.Vector3(12, 7.6, z + 0.4));
-  for (const z of [39, 43]) laundry(new THREE.Vector3(-56, 4.6, z), new THREE.Vector3(-48, 4.6, z + 0.5));
-  for (const [a, b] of [[[-64, 6.4, 26], [-58, 6.6, 26]], [[22, 6.4, 6], [34, 6.6, 7]], [[44, 6.2, 28], [58, 6.4, 27]], [[0, 9.4, -24], [6, 9.6, -24]], [[-26, 8.6, -9], [-16, 8.8, -9]]]) wire(new THREE.Vector3(...a), new THREE.Vector3(...b), 0.7);
-  // ground grit
-  for (let i = 0; i < 140; i++) {
-    const x = -76 + r() * 152, z = -60 + r() * 114, y = T.levelCell(x, z); if (y == null || nearSolid(physics, x, z, y)) continue;
-    const k = r(); GDecal(k < 0.45 ? DECAL.DIRT : k < 0.75 ? DECAL.CRACK : k < 0.9 ? DECAL.OIL : DECAL.MANHOLE, x, z, k < 0.9 ? 2 + r() * 2.5 : 1.3, k < 0.9 ? 2 + r() * 2.5 : 1.3, r() * 6.28);
-  }
-  for (const [x, z, a] of [[-52, 42, 0.6], [-61, 24, 0], [0, 30, 0], [-1, 15, 0.5], [-10, -7, Math.PI / 2], [30, 8, -Math.PI / 2], [50, 30, 0.3], [68, 30, 0], [22, -10, -Math.PI / 2]]) GDecal(DECAL.ARROW, x, z, 1.6, 1.6, a);
-
+  const finish = () => {
   // ---------- instanced crates / barrels / sandbags ----------
   const out = [];
   {
@@ -371,10 +207,15 @@ export function buildProps(G, Tx, T, physics, addSolid, scene, uTime) {
     bags.forEach(([x, y, z, ry], i) => m.setMatrixAt(i, mat4(x, y, z, ry + (r() - 0.5) * 0.15, 1, 1 + (r() - 0.5) * 0.2, 1))); out.push(m);
   }
   for (const m of out) { m.castShadow = m.receiveShadow = true; m.instanceMatrix.needsUpdate = true; scene.add(m); }
-  return { waterMat };
+    return { waterMat };
+  };
+  return { G, Tx, T, F, physics, addSolid, scene, r, W, solid, lift, mat4, col, crate, stack, barrel, sandbags, jersey, lowWall, container, car, truck, tyre, decal, wallDecal,
+    lamp, wire, bunting, laundry, stall, palm, arcade, fountain, slab, Crate, Stack, Barrel, Sandbags, Jersey, LowWall, Container, Car, Truck, Stall, Palm, Lamp, Decal, GDecal, P, finish,
+    get waterMat() { return waterMat; } };
 }
 
-function nearSolid(physics, x, z, y) {
+
+export function nearSolid(physics, x, z, y) {
   for (const c of physics.colliders) { const b = c.box; if (b.max.y > y + 0.3 && b.min.y < y + 2 && x > b.min.x - 1 && x < b.max.x + 1 && z > b.min.z - 1 && z < b.max.z + 1) return true; }
   return false;
 }

@@ -2,12 +2,14 @@
 // balconies, awnings, shop signs, drainpipes. One AABB collider per block.
 import * as THREE from 'three';
 import { FACADE, DECAL, rng } from './textures.js';
-import { CELL, GX0, GZ0, LEVEL } from './layout.js';
+import { CELL, GX0, GZ0, LEVEL, COVERED, WALLS } from './layout.js';
 import { rects } from './terrain.js';
 const STAIRS = { '^': 1, 'v': 1, '>': 1, '<': 1 };
 import { col } from './build.js';
 
 const PLASTER = [0xe9d3a8, 0xf1e4c8, 0xdcae7e, 0xe8c9a6, 0xf3ece0, 0xd59a6f, 0xe6d9b8, 0xc9b49a, 0xe7b98f, 0xd8c4a4];
+const WHITE = [0xf4f1ea, 0xefe9dc, 0xf6efe2, 0xe9eef2, 0xf2e8d8];
+export const CEIL = 3.6; // clear height under a covered mass
 const WARE = [0x8a9aa0, 0x9a6e52, 0x6f8577, 0xa8a59a, 0x7d8ea6];
 export const cellUV = (k) => { const c = k % 8, r = Math.floor(k / 8); return [c / 8 + 0.001, 1 - (r + 1) / 2 + 0.001, (c + 1) / 8 - 0.001, 1 - r / 2 - 0.001]; };
 export const decalUV = ([x, y, w, h]) => [x / 2048, 1 - (y + h) / 2048, (x + w) / 2048, 1 - y / 2048];
@@ -45,7 +47,7 @@ export function buildBuildings(G, T, addSolid) {
   const white = [1, 1, 1];
   const outF = (x, z) => T.levelCell(x, z);
   const ringMax = (r) => { let m = 0; for (let j = r.j0 - 1; j <= r.j1; j++) for (let i = r.i0 - 1; i <= r.i1; i++) { const c = T.at(i, j); if (c in LEVEL) m = Math.max(m, LEVEL[c]); else if (c in STAIRS) m = Math.max(m, 3); } return m; };
-  const styleAt = (x, z) => (x > 36 && z > -24 ? 'warehouse' : z < -30 && Math.abs(x) < 40 ? 'stone' : 'plaster');
+  const styleAt = (x, z) => (x > 28 && z > -24 ? 'warehouse' : (z < -28 && Math.abs(x) < 34) || (x < -60 && z < -12 && z > -30) || (x > 60 && z < -40) ? 'stone' : Math.abs(x) < 27 && z < 5 && z > -28 ? 'white' : 'plaster');
   let bi = 0;
   const one = (r, y0, base) => {
     const [x0, x1, z0, z1] = [GX0 + r.i0 * CELL, GX0 + r.i1 * CELL, GZ0 + r.j0 * CELL, GZ0 + r.j1 * CELL];
@@ -63,12 +65,13 @@ export function buildBuildings(G, T, addSolid) {
     addSolid(new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, hTop + 0.6, z1)), style === 'warehouse' ? 'metal' : 'concrete', { navH: y0 > 0 ? 0 : 12 });
   };
   for (const r of rects(T.g, c => c === '#')) one(r, 0, ringMax(r));
-  for (const r of rects(T.g, c => c === 'c')) one(r, 3.6, 3.6);
-  for (const r of rects(T.g, c => c === 'C')) one(r, 6.6, 6.6);
+  for (const ch in COVERED) for (const r of rects(T.g, c => c === ch)) one(r, COVERED[ch] + CEIL, COVERED[ch] + CEIL);
+  buildWalls(G, addSolid);
 }
 
-function buildSegment(G, r, style, x0, x1, z0, z1, h, alongX, outF, shopSigns, white, y0 = 0) {
-  const tint = style === 'warehouse' ? col(WARE[(r() * WARE.length) | 0]) : style === 'stone' ? col(0xf0e2c8) : col(PLASTER[(r() * PLASTER.length) | 0]);
+function buildSegment(G, r, style0, x0, x1, z0, z1, h, alongX, outF, shopSigns, white, y0 = 0) {
+  const style = style0 === 'white' ? 'plaster' : style0;
+  const tint = style0 === 'white' ? col(WHITE[(r() * WHITE.length) | 0]) : style === 'warehouse' ? col(WARE[(r() * WARE.length) | 0]) : style === 'stone' ? col(0xf0e2c8) : col(PLASTER[(r() * PLASTER.length) | 0]);
   const stoneC = col(0xe6d6bb, 0.9 + r() * 0.15), trim = col(0xd8cbb4);
   const wallGeo = style === 'warehouse' ? G.corr : style === 'stone' ? G.stone : G.plaster;
   const pitched = style === 'plaster' && r() < 0.4 && Math.min(x1 - x0, z1 - z0) <= 14;
@@ -91,7 +94,7 @@ function buildSegment(G, r, style, x0, x1, z0, z1, h, alongX, outF, shopSigns, w
   // facades on the 4 faces
   const faces = [{ ax: 'x', s: 1, p: x1, t0: z0, t1: z1 }, { ax: 'x', s: -1, p: x0, t0: z0, t1: z1 }, { ax: 'z', s: 1, p: z1, t0: x0, t1: x1 }, { ax: 'z', s: -1, p: z0, t0: x0, t1: x1 }];
   const upperKinds = style === 'stone' ? [FACADE.GLASS_WOOD, FACADE.GLASS_WOOD, FACADE.GLASS_W] : style === 'warehouse' ? [FACADE.VENT, FACADE.GLASS_W] :
-    [[FACADE.SHUT_GREEN, FACADE.SHUT_BLUE, FACADE.SHUT_BROWN][(r() * 3) | 0], FACADE.GLASS_WOOD, FACADE.GLASS_W];
+    [style0 === 'white' ? FACADE.SHUT_BLUE : [FACADE.SHUT_GREEN, FACADE.SHUT_BLUE, FACADE.SHUT_BROWN][(r() * 3) | 0], FACADE.GLASS_WOOD, FACADE.GLASS_W];
   for (const f of faces) {
     const W = f.t1 - f.t0; if (W < 2.4) continue;
     const n = Math.max(1, Math.floor((W - 1.2) / 2.8)), step = W / n;
@@ -162,4 +165,42 @@ function roofPrism(G, x0, x1, z0, z1, y, alongX, gable) {
   // ridge cap
   if (alongX) G.roof.box(x0, y + rise - 0.05, (z0 + z1) / 2 - 0.15, x1, y + rise + 0.12, (z0 + z1) / 2 + 0.15, [0.8, 0.8, 0.8], 'ny');
   else G.roof.box((x0 + x1) / 2 - 0.15, y + rise - 0.05, z0, (x0 + x1) / 2 + 0.15, y + rise + 0.12, z1, [0.8, 0.8, 0.8], 'ny');
+}
+
+// Thin walls with windows / doors / gates (layout.WALLS). Colliders: solid spans, window sills (block walking, not bullets
+// above them) and lintels. Windows get a stone sill, a timber frame and open shutters; doors an open leaf.
+export function buildWalls(G, addSolid) {
+  const TH = 0.3, HEAD = { win: 2.3, door: 2.4, gate: 3.1 };
+  const B3 = (a) => new THREE.Box3(new THREE.Vector3(a[0], a[1], a[2]), new THREE.Vector3(a[3], a[4], a[5]));
+  let wi = 0;
+  for (const w of WALLS) {
+    const rr = rng(500 + wi++ * 13), Y = w.y, top = Y + CEIL, ware = w.m === 'corr';
+    const geo = ware ? G.corr : w.m === 'stone' ? G.stone : G.plaster, tint = ware ? col(0x8a9aa0) : w.m === 'stone' ? col(0xe6d6bb) : col([0xf1e4c8, 0xe9d3a8, 0xf3ece0][(rr() * 3) | 0]);
+    const wood = col([0x3f6b8c, 0x4d7a4a, 0x7a4a2e][(rr() * 3) | 0]), stoneC = col(0xdccbb0);
+    // box helper in wall space: t along the wall, d across (-TH/2..TH/2 = wall body)
+    const bx = (g, t0, t1, y0, y1, d0, d1, c, skip = '') => (w.ax === 'x' ? g.box(t0, y0, w.p + d0, t1, y1, w.p + d1, c, skip) : g.box(w.p + d0, y0, t0, w.p + d1, y1, t1, c, skip));
+    const sol = (t0, t1, y0, y1, o) => addSolid(B3(w.ax === 'x' ? [t0, y0, w.p - TH / 2, t1, y1, w.p + TH / 2] : [w.p - TH / 2, y0, t0, w.p + TH / 2, y1, t1]), ware ? 'metal' : 'concrete', o);
+    const opens = [...(w.open || [])].sort((p, q) => p[0] - q[0]);
+    let t = w.a;
+    const span = (t0, t1) => { if (t1 - t0 < 0.02) return; bx(geo, t0, t1, Y, top, -TH / 2, TH / 2, tint, 'ny py'); sol(t0, t1, Y, top, { navH: CEIL }); };
+    for (const [o0, o1, kind] of opens) {
+      span(t, o0); t = o1;
+      const head = Y + HEAD[kind];
+      bx(geo, o0, o1, head, top, -TH / 2, TH / 2, tint, 'py'); sol(o0, o1, head, top, { navH: 0 });
+      if (kind === 'win') {
+        bx(geo, o0, o1, Y, Y + 1.0, -TH / 2, TH / 2, tint, 'ny'); sol(o0, o1, Y, Y + 1.0, { navH: 1.0 });
+        bx(G.stone, o0 - 0.08, o1 + 0.08, Y + 0.98, Y + 1.06, -TH / 2 - 0.1, TH / 2 + 0.1, stoneC);                       // sill
+        for (const tt of [o0, o1 - 0.07]) bx(G.wood, tt, tt + 0.07, Y + 1.06, head, -0.06, 0.06, wood, 'ny py');          // jambs
+        bx(G.wood, o0, o1, head - 0.07, head, -0.06, 0.06, wood); bx(G.wood, (o0 + o1) / 2 - 0.03, (o0 + o1) / 2 + 0.03, Y + 1.06, head - 0.07, -0.04, 0.04, wood, 'ny py');
+        const sw = (o1 - o0) / 2;                                                                                           // shutters folded open on both faces
+        for (const d of [-1, 1]) for (const [a, b] of [[o0 - sw, o0 - 0.02], [o1 + 0.02, o1 + sw]]) { if (a < w.a || b > w.b) continue; bx(G.wood, a, b, Y + 1.06, head, d * (TH / 2 + 0.05) - 0.025, d * (TH / 2 + 0.05) + 0.025, wood); }
+      } else {
+        for (const tt of [o0 - 0.1, o1]) bx(kind === 'gate' && !ware ? G.stone : G.wood, tt, tt + 0.1, Y, head, -TH / 2 - 0.04, TH / 2 + 0.04, kind === 'gate' && !ware ? stoneC : wood, 'ny');
+        bx(kind === 'gate' && !ware ? G.stone : G.wood, o0 - 0.1, o1 + 0.1, head, head + 0.12, -TH / 2 - 0.04, TH / 2 + 0.04, kind === 'gate' && !ware ? stoneC : wood);
+        if (kind === 'door') { const L = o1 - o0 - 0.1; if (w.ax === 'x') G.wood.box(o0, Y, w.p + TH / 2, o0 + 0.06, head - 0.04, w.p + TH / 2 + L, wood, 'ny'); else G.wood.box(w.p + TH / 2, Y, o0, w.p + TH / 2 + L, head - 0.04, o0 + 0.06, wood, 'ny'); }
+        bx(G.stone, o0, o1, Y, Y + 0.04, -TH / 2 - 0.15, TH / 2 + 0.15, stoneC, 'ny');                                      // threshold
+      }
+    }
+    span(t, w.b);
+  }
 }

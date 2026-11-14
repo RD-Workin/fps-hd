@@ -1,53 +1,81 @@
 // "Citadelle de Port-Cassis" — 10v10 S&D map on 3 ground levels (0 port, +3 ville haute, +6 citadelle).
 // The map is authored as a 2 m cell grid carved out of solid buildings. See docs/decisions/world.md.
 export const CELL = 2, GX0 = -80, GZ0 = -64, GW = 80, GH = 64; // x[-80,80] z[-64,64]
-// Cell codes: '#' building, '.' floor 0, ',' floor +3, ':' floor +6, 'c' covered floor 0 (passage under a building),
-// 'C' covered floor +3, ';' floor +1.5, '=' floor +4.5, '^' 'v' '>' '<' stairs rising toward -z / +z / +x / -x, 'w' sea.
+// Cell codes: '#' building, '.' floor 0, ';' +1.5, ',' +3, '=' +4.5, ':' +6, covered floors (room / passage under a
+// building mass): 'c' 0, 'e' +1.5, 'C' +3. Stairs '^' 'v' '>' '<' rise toward -z / +z / +x / -x. 'w' sea.
 // A 1.5 m drop between two floors has no railing: players can jump up it (jump apex ~1.2 m + 0.45 step-up), bots can't.
-export const LEVEL = { '.': 0, 'c': 0, ';': 1.5, ',': 3, 'C': 3, '=': 4.5, ':': 6 };
+export const LEVEL = { '.': 0, 'c': 0, ';': 1.5, 'e': 1.5, ',': 3, 'C': 3, '=': 4.5, ':': 6 };
+export const COVERED = { c: 0, e: 1.5, C: 3 };
 export const BOUNDS = { minX: -80, maxX: 80, minZ: -64, maxZ: 56 };
 
+// v4 "Port-Cassis": open streets around building islands. South = port (ATK), north = citadel (DEF).
+// Left lane -> site A (Place de l'Église, +3). Centre = Place Ronde -> Grand Escalier -> Médina (+3), forks to A and B.
+// Right lane -> site B (Chantier naval, 0), overlooked by the Corniche (+3) and a dock (+1.5).
 const CARVES = [
   ['w', -80, 80, 56, 64],
-  // Port (ATK spawn) — quay with jogs
-  ['.', -72, -40, 46, 56], ['.', -40, 40, 42, 56], ['.', 40, 72, 44, 56],
-  // LEFT lane: Montée des Pêcheurs -> courtyard -> covered passage -> landing -> stairs -> Place Haute
-  ['.', -56, -48, 36, 46], ['.', -64, -52, 30, 36], ['c', -64, -58, 22, 30], ['.', -66, -56, 14, 22], ['^', -66, -60, 10, 14], [',', -68, -58, 0, 10],
-  // CENTER lane: Halle (covered) -> Place Ronde -> jogging alley -> grand stairs -> Médina
-  ['c', -4, 4, 34, 42], ['.', -16, 6, 18, 34], ['.', -4, 2, 12, 18], ['.', -2, 10, 8, 12], ['^', 2, 10, 2, 8], [',', 0, 12, -2, 2],
-  // connector LOW left<->center: Rue des Filets
-  ['.', -30, -16, 26, 30], ['.', -44, -28, 30, 34], ['.', -54, -42, 32, 36],
-  // connector LOW center<->right: Tunnel (covered passages + small yard)
-  ['c', 10, 22, 8, 12], ['.', 22, 34, 4, 12], ['c', 34, 44, 6, 10],
-  // RIGHT lane: Hangar (covered) -> yard -> shipyard ; Quai Est
-  ['c', 40, 48, 32, 44], ['.', 44, 58, 24, 32], ['.', 64, 72, 22, 44],
-  // Site B: Chantier naval (level 0)
-  ['.', 44, 76, -14, 24], ['.', 50, 72, -20, -14],
-  // Site A: Place Haute (+3) + abbey gallery connector (covered at +3)
-  [',', -72, -44, -24, 0], [',', -44, -40, -16, -8], ['C', -40, -26, -14, -10], [',', -26, -16, -12, -6], [',', -16, 0, -10, -4],
-  // Médina (+3): dense centre with small alleys and a courtyard
-  [',', -6, 12, -10, -2], [',', 8, 12, -20, -10], [',', -8, -4, -20, -10], [',', -6, 4, -20, -14], [',', 0, 6, -28, -20],
-  // Corniche (+3) overlooking the shipyard, Bastion (+3)
-  [',', 12, 26, -12, -6], [',', 26, 44, -14, -8], [',', 36, 42, -28, -14], [',', 40, 50, -34, -28],
-  [',', 50, 66, -44, -26], [',', 48, 68, -40, -30], [',', 42, 50, -46, -38],
-  // Jardins (+3)
-  [',', -66, -42, -50, -30], [',', -60, -52, -30, -24],
-  // Citadelle (+6) — DEF spawn
-  [':', -34, 34, -58, -34], [':', -28, 28, -62, -58],
-  // Elevation inside each lane: mid floors +1.5 / +4.5 with short stairs; their 1.5 m edges are jump-up ledges
-  // LEFT: landing -> steps -> +1.5 balcony; jump from the balcony straight onto Place Haute (+3) beside the stairs
-  ['^', -66, -56, 16, 18], [';', -66, -56, 14, 16], [';', -60, -56, 10, 14],
-  // CENTER: raised fountain terrace on Place Ronde; the alley climbs to +1.5, drops into the Tunnel, rises to the Médina
-  [';', -16, -8, 18, 26], ['<', -8, -6, 20, 24],
-  [';', -4, 2, 12, 16], ['^', -4, 2, 16, 18], [';', -2, 10, 8, 12], ['<', 10, 12, 8, 12],
-  // RIGHT: raised loading dock in the shipyard (overlooks B), hump bridge on Quai Est
-  [';', 44, 54, 10, 24], ['^', 44, 48, 24, 26], ['v', 50, 54, 8, 10],
-  ['^', 64, 72, 36, 38], [';', 64, 72, 30, 36], ['v', 64, 72, 28, 30],
-  // Médina rooftop perch (jump-only), sunken plaza in the Citadelle
-  ['=', -6, -2, -18, -14],
-  ['=', -10, 10, -46, -38], ['^', -4, 4, -48, -46], ['v', -4, 4, -38, -36],
-  // stairs (after floors so they override)
-  ['<', 44, 50, -14, -8], ['^', 54, 60, -26, -20], ['^', 0, 6, -34, -28], ['>', -42, -34, -46, -40], ['<', 34, 42, -46, -40],
+  // PORT (0): quay, two sheds break the long strip
+  ['.', -76, 76, 42, 56], ['#', 14, 24, 42, 48], ['c', -46, -34, 46, 54],
+  // front row openings: Montée (steps to the Cour), Halle (covered market), Grand-Rue, Hangar (interior), Quai Est
+  ['.', -60, -52, 36, 42], ['^', -60, -52, 30, 36], ['c', -28, -14, 28, 42], ['.', -4, 4, 30, 42], ['c', 30, 46, 28, 42], ['.', 66, 76, 8, 42],
+  // LEFT: Cour des Pêcheurs (+1.5) -> Escalier de l'Église -> landing (+3)
+  [';', -68, -46, 14, 30], ['^', -66, -58, 8, 14], [',', -68, -56, 0, 8],
+  // connector left <-> centre: Rue des Filets (0), steps up to the Cour
+  ['.', -46, -16, 22, 28], ['<', -50, -46, 22, 28],
+  // CENTRE: Place Ronde (0), café terrace (+1.5), Café (room, +1.5), Grand Escalier (0 -> +3)
+  ['.', -16, 14, 12, 30], [';', -16, -6, 12, 20], ['<', -6, -2, 14, 18], ['e', -16, -6, 4, 12], ['^', 4, 14, 2, 12],
+  // A-short: Rue des Filets -> steps -> back alley (+1.5, also the Café back door) -> steps -> Passage (+3) -> Maison A (room) -> plaza
+  ['.', -30, -26, 14, 22], ['^', -30, -26, 10, 14], [';', -30, -16, 6, 10], ['<', -38, -30, 6, 10], [',', -44, -38, -6, 10], ['C', -56, -44, 0, 6],
+  // connector centre <-> right: Tunnel, Cour de l'Entrepôt with a loading platform (+1.5), Atelier (room with windows on B)
+  ['.', 14, 22, 14, 20], ['c', 22, 32, 14, 20], ['.', 32, 62, 8, 28], [';', 50, 62, 16, 28], ['>', 46, 50, 20, 24], ['c', 56, 66, 8, 14],
+  // Quai Est hump (+1.5)
+  [';', 66, 76, 22, 30], ['^', 66, 76, 30, 34], ['v', 66, 76, 18, 22],
+  // SITE B: Chantier naval (0), north dock (+1.5), gate pier
+  ['.', 44, 76, -22, 8], ['#', 44, 48, 4, 8], [';', 64, 76, -22, -14], ['>', 60, 64, -20, -16],
+  // SITE A: Place de l'Église (+3), church block, DEF balcony (+4.5)
+  [',', -74, -44, -28, 0], ['#', -74, -62, -28, -14], ['=', -56, -44, -28, -22],
+  // Galerie de l'Abbaye (covered, +3) + cloister garden, link to the Jardins
+  ['C', -44, -24, -16, -10], [',', -42, -26, -24, -16], [',', -34, -30, -32, -24],
+  // MÉDINA (+3): open quarter around four blocks, kiosk perch (+4.5)
+  [',', -24, 24, -26, 2], ['#', -20, -8, -6, 2], ['#', -20, -10, -22, -12], ['#', 10, 20, -22, -12], ['#', 16, 24, -6, 2], ['=', -2, 2, -16, -12],
+  // CORNICHE (+3) above B, alley to the Bastion
+  [',', 24, 44, -14, -6], [',', 36, 42, -28, -14],
+  // BASTION (+3) with its tower
+  [',', 34, 70, -50, -28], ['#', 62, 70, -50, -42],
+  // JARDINS (+3), gate to the plaza
+  [',', -70, -34, -52, -32], [',', -62, -56, -32, -28],
+  // CITADELLE (+6): DEF spawn, keep
+  [':', -26, 26, -60, -36], ['#', -6, 6, -60, -56],
+  // stairs between levels (after floors so they override)
+  ['v', -50, -46, -32, -28],                               // Jardins -> balcony (+3 -> +4.5)
+  ['^', -4, 4, -36, -26],                                  // Médina -> Citadelle
+  ['>', -34, -26, -48, -42], ['<', 26, 34, -48, -42],      // Jardins / Bastion -> Citadelle
+  ['<', 44, 52, -14, -8],                                  // B -> Corniche
+  ['^', 56, 62, -28, -22],                                 // B -> Bastion
+];
+
+// Thin walls with openings around rooms and galleries (centre line on a cell boundary). ax 'x': wall along x at z = p.
+// open: [t0, t1, kind] with kind 'win' (sill 1.0, head 2.3: shoot through, no walking), 'door' (head 2.4), 'gate' (head 3.1).
+export const WALLS = [
+  // Café (+1.5): two windows and a door on the terrace, back door to the alley
+  { ax: 'x', p: 12, a: -16, b: -6, y: 1.5, open: [[-15.2, -13.2, 'win'], [-12.2, -10.6, 'door'], [-9.4, -7.4, 'win']] },
+  { ax: 'z', p: -16, a: 6, b: 10, y: 1.5, open: [[7.2, 8.8, 'door']] },
+  // Maison A (+3): windows on the plaza, three doors
+  { ax: 'x', p: 0, a: -56, b: -44, y: 3, open: [[-54.6, -52.6, 'win'], [-50.6, -48.6, 'win'], [-47.2, -45.6, 'door']] },
+  { ax: 'z', p: -56, a: 0, b: 6, y: 3, open: [[1.2, 2.8, 'door']] },
+  { ax: 'z', p: -44, a: 0, b: 6, y: 3, open: [[2.2, 3.8, 'door']] },
+  // Atelier (0): windows on site B (no door on that side), doors to the yard and to the Quai Est
+  { m: 'corr', ax: 'x', p: 8, a: 56, b: 66, y: 0, open: [[57, 59.4, 'win'], [62.4, 64.8, 'win']] },
+  { m: 'corr', ax: 'z', p: 56, a: 8, b: 14, y: 0, open: [[10.2, 11.8, 'door']] },
+  { m: 'corr', ax: 'x', p: 14, a: 56, b: 62, y: 0, open: [[58, 60, 'win']] },
+  { m: 'corr', ax: 'z', p: 66, a: 8, b: 14, y: 0, open: [[10.2, 11.8, 'door']] },
+  // Hangar (0): two truck doors on the port, a door and a window on the yard
+  { m: 'corr', ax: 'x', p: 42, a: 30, b: 46, y: 0, open: [[32, 36.5, 'gate'], [39.5, 44, 'gate']] },
+  { m: 'corr', ax: 'x', p: 28, a: 32, b: 46, y: 0, open: [[34, 37.5, 'gate'], [41, 43.4, 'win']] },
+  // Halle (0): arcades on both ends
+  { m: 'stone', ax: 'x', p: 42, a: -28, b: -14, y: 0, open: [[-27, -23.6, 'gate'], [-22.7, -19.3, 'gate'], [-18.4, -15, 'gate']] },
+  { m: 'stone', ax: 'x', p: 28, a: -28, b: -16, y: 0, open: [[-27, -23.8, 'gate'], [-23, -19.8, 'gate'], [-19, -16.4, 'gate']] },
+  // Galerie de l'Abbaye (+3): arcade on the cloister garden
+  { m: 'stone', ax: 'x', p: -16, a: -42, b: -26, y: 3, open: [[-41, -38, 'gate'], [-37, -34, 'gate'], [-33, -30, 'gate'], [-29, -26.6, 'gate']] },
 ];
 
 export function buildGrid() {
@@ -60,39 +88,41 @@ export function buildGrid() {
 
 const ry = (x, z, tx, tz) => Math.atan2(-(tx - x), -(tz - z)); // yaw looking from (x,z) to (tx,tz); 0 looks -z
 export const SPAWNS = {
-  // 20 per side (supports up to 20v20): two staggered rows
-  ATK: [50, 53].flatMap((z, r) => [-19, -17, -15, -13, -11, -9, -7, -5, -3, -1].map(x => ({ x: x + 10 * r + r, z, yaw: 0 }))).map(s => s),
-  DEF: [-50, -54].flatMap((z, r) => [-19, -17, -15, -13, -11, -9, -7, -5, -3, -1].map(x => ({ x: x + 10 * r + r, z, yaw: Math.PI }))),
+  // 20 per side (up to 20v20): two staggered rows. ATK on the quay in front of the landing ship, DEF in the citadel yard.
+  ATK: [50, 53].flatMap((z, r) => [-19, -17, -15, -13, -11, -9, -7, -5, -3, -1].map(x => ({ x: x + 11 * r, z, yaw: 0 }))),
+  DEF: [-48, -52].flatMap((z, r) => [-19, -17, -15, -13, -11, -9, -7, -5, -3, -1].map(x => ({ x: x + 11 * r, z, yaw: Math.PI }))),
 };
-export const SITES = [{ name: 'A', x: -58, z: -12, radius: 7 }, { name: 'B', x: 60, z: 2, radius: 7 }];
+export const SITES = [{ name: 'A', x: -56, z: -12, radius: 7 }, { name: 'B', x: 60, z: -6, radius: 7 }];
 
 export const LABELS = [
-  ['Port', 0, 47], ['Citadelle', 0, -44], ['Site A', -58, -18], ['Site B', 60, -4], ['Montée', -52, 40], ['Halle', 0, 38],
-  ['Place Ronde', -5, 22], ['Rue des Filets', -32, 32], ['Tunnel', 28, 8], ['Hangar', 44, 36], ['Quai Est', 68, 34],
-  ['Abbaye', -33, -12], ['Médina', 3, -6], ['Corniche', 30, -11], ['Bastion', 58, -36], ['Jardins', -54, -40],
+  ['Port', 0, 47], ['Citadelle', 0, -46], ['Site A', -56, -18], ['Site B', 60, -12], ['Montée', -56, 38], ['Halle', -21, 35],
+  ['Place Ronde', 2, 24], ['Rue des Filets', -34, 25], ['Cour', -58, 22], ['Café', -11, 8], ['Tunnel', 26, 17], ['Hangar', 38, 35],
+  ['Entrepôt', 42, 16], ['Quai Est', 71, 34], ['Atelier', 61, 11], ['Abbaye', -34, -13], ['Médina', 2, -9], ['Corniche', 32, -10],
+  ['Bastion', 50, -38], ['Jardins', -52, -42], ['Passage', -41, 3], ['Escalier', 9, 7],
 ].map(([text, x, z]) => ({ text, x, z }));
 
 // Bot hints (x,z only; floor height via world.nav.floorAt). routes[site]: ATK spawn -> site polylines.
 export const NAV = {
   routes: {
     A: [
-      [[-20, 49], [-52, 44], [-58, 33], [-61, 26], [-61, 18], [-63, 12], [-63, 4], [-58, -8]],                              // gauche
-      [[0, 48], [0, 38], [-2, 22], [-1, 15], [4, 10], [6, 5], [6, 0], [-8, -7], [-21, -9], [-33, -12], [-42, -12], [-55, -12]], // centre -> abbaye
-      [[-10, 48], [-6, 30], [-22, 28], [-36, 32], [-50, 34], [-61, 26], [-61, 18], [-63, 12], [-63, 4], [-58, -8]],           // Rue des Filets
+      [[-20, 49], [-56, 44], [-56, 33], [-60, 22], [-62, 11], [-62, 4], [-58, -8]],                                           // Montée -> Escalier de l'Église
+      [[-12, 46], [-21, 40], [-21, 30], [-28, 25], [-28, 12], [-24, 8], [-34, 8], [-41, 4], [-41, -3], [-50, -6]],            // Halle -> A-short
+      [[0, 46], [0, 34], [-1, 22], [-4, 16], [-11, 16], [-11.4, 10], [-13, 8], [-22, 8], [-34, 8], [-41, 3], [-50, 3], [-46.4, -3], [-52, -8]], // Café -> Maison A
+      [[0, 46], [0, 34], [4, 20], [9, 12], [9, 0], [0, -8], [-22, -9], [-34, -13], [-46, -13], [-54, -12]],                    // Grand Escalier -> Abbaye
     ],
     B: [
-      [[20, 48], [44, 46], [44, 38], [51, 31], [58, 12], [60, 4]],                                                           // Hangar
-      [[30, 50], [68, 48], [68, 26], [62, 8]],                                                                               // Quai Est
-      [[0, 48], [0, 38], [-2, 24], [-1, 15], [4, 10], [16, 10], [28, 8], [39, 8], [50, 6], [58, 4]],                          // Tunnel
-      [[0, 48], [0, 38], [-2, 22], [-1, 15], [4, 10], [6, 5], [8, -4], [20, -9], [36, -11], [48, -11], [56, -2]],             // Médina -> Corniche
+      [[14, 50], [34, 46], [34, 35], [36, 26], [44, 14], [52, 8], [54, 0], [60, -4]],                                         // Hangar -> gate
+      [[20, 52], [70, 48], [71, 26], [71, 10], [68, 2], [62, -4]],                                                            // Quai Est
+      [[0, 46], [0, 34], [8, 24], [16, 17], [27, 17], [38, 14], [52, 8], [54, 0], [60, -4]],                                  // Tunnel
+      [[0, 46], [0, 34], [4, 20], [9, 12], [9, 0], [12, -9], [26, -10], [42, -11], [53, -11], [58, -8]],                      // Grand Escalier -> Corniche
     ],
   },
   holds: {
-    A: [[-66, -18, -63, 4], [-48, -20, -63, 4], [-50, -4, -42, -12], [-70, -6, -63, 6], [-56, -22, -46, -12],
-      [-70, -22, -58, -12], [-50, -3, -58, -12], [-30, -12, -44, -12], [-20, -9, -42, -12]],
-    B: [[52, -16, 50, 26], [73, -8, 68, 22], [49, -3, 44, 8], [66, 12, 52, 28], [57, -8, 47, -11],
-      [48, 18, 60, 2], [74, 20, 60, 2], [66, -17, 60, 2], [56, 22, 60, 4]],
+    A: [[-70, -8, -62, 4], [-48, -18, -62, 2], [-52, -25, -58, -10], [-60, -24, -62, 0], [-66, -2, -46, -2], [-46, -4, -41, 4],
+      [-58, -14, -62, 2], [-36, -13, -22, -10], [-50, 3, -41, 4], [-64, -11, -46, -12], [-48, -10, -62, 4]],
+    B: [[70, -17, 52, 6], [66, -19, 70, 8], [50, -4, 52, 8], [74, -4, 71, 10], [58, -16, 48, -11], [62, 2, 52, 8],
+      [40, -11, 28, -10], [59, -25, 60, -6], [72, 4, 71, 14], [56, -10, 52, 6], [66, -8, 71, 8]],
   },
-  chokes: [[-52, 40], [-61, 26], [-63, 12], [0, 38], [6, 5], [-42, -12], [3, -24], [44, 38], [68, 30], [39, 8], [47, -11], [57, -23], [-38, -43], [38, -43]],
+  chokes: [[-56, 33], [-62, 11], [-28, 12], [-41, 3], [-34, -13], [0, 34], [9, 7], [0, -9], [0, -24], [27, 17], [36, 26], [52, 8], [71, 26], [48, -11], [59, -25], [-30, -45], [30, -45], [39, -21]],
 };
 for (const k of ['A', 'B']) NAV.holds[k] = NAV.holds[k].map(([x, z, tx, tz]) => ({ x, z, yaw: ry(x, z, tx, tz) }));
