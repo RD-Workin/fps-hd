@@ -43,6 +43,13 @@
 ## Perf
 - Geometry merged per material (~22 draw calls for the static world) + instanced crates/barrels/bags. v4: 659 physics
   colliders, 469 nav colliders (bots cost is dominated by model posing, not by colliders: see bots.md).
-- Shadows cached: shadowMap.autoUpdate=false; static bake once (and on quality change) with dynamic casters hidden;
-  HIGH refreshes every 2nd frame for soldiers/bomb, LOW never.
+- Shadows cached (`shadowCache.js`): shadowMap.autoUpdate=false; static bake once (and on quality change) with dynamic
+  casters hidden, then copied (64 MB at 4096). HIGH refreshes every 2nd frame WITHOUT clearing: a restore caster (first
+  scene child, depthFunc Always, gl_FragDepth) copies the bake back over the light-space rectangles of every dynamic
+  caster's bounding sphere (last refresh + this one), then soldiers/bomb draw on top. LOW never refreshes. Anything that
+  moves and casts must NOT carry `userData.static` (everything present when createWorld ends is flagged static).
+  `scene.userData.passHooks` (fn(mode: 'shadow'|'ao'|null)) are called around the shadow refresh and the AO pre-pass
+  (soldiers use them to draw cheaper LODs there).
+- GTAO at ~0.75x the CSS resolution (setSize wrapper in env.js). Dynamic resolution on HIGH/HiDPI (index.js `DR`).
+- Debug/bench handles: `world.post` (composer + passes), `world.shadows` (cache). See docs/PERF.md and scripts/perf/.
 - Pixel ratio: LOW 1.0, HIGH min(dpr,1.5). Shadow map 2048/4096. GTAO + bloom + dust on HIGH only.

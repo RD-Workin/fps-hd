@@ -323,7 +323,7 @@ export class Bot {
     const t = this.ctx.time;
     const changed = !this.pathGoal || Math.hypot(this.pathGoal.x - dest.x, this.pathGoal.z - dest.z) > 1.2;
     if ((changed || !this.path || t > this.repathT) && this.mgr.takePathBudget()) {
-      this.path = nav.findPath(this.position.x, this.position.z, dest.x, dest.z); this.pathI = 0;
+      const tp = performance.now(); this.path = nav.findPath(this.position.x, this.position.z, dest.x, dest.z); this.pathI = 0; this.mgr.pathSpent += performance.now() - tp;
       this.pathGoal = { x: dest.x, z: dest.z }; this.repathT = t + rand(2.5, 4);
     }
     if (!this.path || !this.path.length) return changed ? null : dest;

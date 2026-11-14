@@ -36,7 +36,10 @@ function raySphere(o, d, max, c, r) {
 export function createBots(ctx) {
   const mgr = {
     list: [], nav: null, navCount: -1, budget: 0, intel: { ATK: new Map(), DEF: new Map() },
-    takePathBudget() { if (this.budget <= 0) return false; this.budget--; return true; },
+    // up to 3 A* per frame, but stop once ~2 ms went into path-finding this frame (long cross-map paths at round start
+    // used to stack 3 x 6 ms in one frame = visible hitch); a bot that waits a frame keeps following its previous path
+    pathSpent: 0,
+    takePathBudget() { if (this.budget <= 0 || this.pathSpent > 2) return false; this.budget--; return true; },
     report(team, enemy) { this.intel[team].set(enemy, { pos: enemy.position.clone(), t: ctx.time }); },
     // nearest walkable point (≤ 10 m) hidden from the threat, preferably hugging cover
     findCover(bot, threat) {
@@ -84,7 +87,7 @@ export function createBots(ctx) {
     },
     update(dt) {
       ensureNav();
-      mgr.budget = 3;
+      mgr.budget = 3; mgr.pathSpent = 0;
       brain.update(dt);
       for (const b of mgr.list) b.update(dt);
     },

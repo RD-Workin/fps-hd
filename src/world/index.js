@@ -10,6 +10,7 @@ import { buildShip } from './ship.js';
 import { dressZones } from './zones.js';
 import { extendKit } from './kit2.js';
 import { buildAtmosphere, buildDistant, buildDust, buildComposer } from './env.js';
+import { createShadowCache } from './shadowCache.js';
 
 export function createWorld(ctx) {
   const { scene, physics, renderer } = ctx;
@@ -87,32 +88,53 @@ export function createWorld(ctx) {
   const post = buildComposer(ctx, { noAO });
   scene.traverse(o => { if (o.isMesh && !o.isInstancedMesh) { o.updateMatrix(); o.updateMatrixWorld(true); } if (o.isMesh) o.userData.static = true; });
 
-  // ---------- shadows: static map cached; dynamic casters (soldiers, bomb) refreshed at a capped rate on HIGH ----------
+  // ---------- shadows: static map cached; dynamic casters (soldiers, bomb) composited over it at a capped rate on HIGH ----------
+  // The world (~700 k shadow triangles) is rendered into the 4096 map ONCE (and on quality change). On HIGH, every 2nd
+  // frame only the texels that moving casters touched are restored from a copy of that bake, then soldiers/bomb are drawn
+  // on top (shadowCache.js). Before: the whole map was cleared and re-rendered every other frame (alternating heavy/light
+  // frames = micro-stutter). LOW never refreshes (static shadows only).
   renderer.shadowMap.autoUpdate = false;
+  const SH = createShadowCache(renderer, atm.sun, scene);
   let shadowDirty = true, frame = 0;
-  const _hidden = [];
   function renderShadowsThisFrame() {
     frame++;
-    if (shadowDirty) { // static-only bake: hide dynamic casters for this one update
-      scene.traverse(o => { if ((o.isMesh || o.isSkinnedMesh) && o.castShadow && !o.userData.static) { o.castShadow = false; _hidden.push(o); } });
-      renderer.shadowMap.needsUpdate = true; shadowDirty = false; return;
-    }
-    if (quality === 'high' && frame % 2 === 0) renderer.shadowMap.needsUpdate = true;
+    if (shadowDirty) { SH.beginBake(); shadowDirty = false; return; }
+    if (quality === 'high' && frame % 2 === 0) SH.beginDynamic();
   }
 
   // ---------- quality ----------
-  let quality = 'high';
+  let quality = 'high', maxPR = 1;
+  function applyPixelRatio(pr) {
+    renderer.setPixelRatio(pr); renderer.setSize(innerWidth, innerHeight);
+    post.composer.setPixelRatio(pr); post.composer.setSize(innerWidth, innerHeight);
+  }
   function setQuality(q) {
     quality = q === 'low' ? 'low' : 'high';
     const hi = quality === 'high';
     post.gtao.enabled = hi; post.bloom.enabled = hi;
-    const pr = hi ? Math.min(devicePixelRatio, 1.5) : 1; // PERF.md: LOW <= 1.0, HIGH <= 1.5
-    renderer.setPixelRatio(pr); renderer.setSize(innerWidth, innerHeight); post.composer.setPixelRatio(pr); post.composer.setSize(innerWidth, innerHeight);
+    maxPR = hi ? Math.min(devicePixelRatio, 1.5) : 1; // PERF.md: LOW <= 1.0, HIGH <= 1.5
+    DR.reset(maxPR); applyPixelRatio(maxPR);
     const sz = hi ? 4096 : 2048;
     if (atm.sun.shadow.mapSize.x !== sz) { atm.sun.shadow.mapSize.set(sz, sz); atm.sun.shadow.map?.dispose(); atm.sun.shadow.map = null; }
-    dust.visible = hi; shadowDirty = true;
+    SH.reset(); dust.visible = hi; shadowDirty = true;
     world.quality = quality;
   }
+  // ---------- dynamic resolution (HIGH on HiDPI screens only): never below 1.0 (native CSS resolution) ----------
+  // When the frame time stays above ~20 ms the supersampling is lowered by 0.25 steps, and raised back after a long calm
+  // stretch (with a back-off so it does not oscillate). Resizes are rare: each step re-allocates the post-process targets.
+  const DR = {
+    pr: 1, acc: 0, n: 0, calm: 0, block: 0,
+    reset(pr) { this.pr = pr; this.acc = 0; this.n = 0; this.calm = 0; this.block = 0; },
+    tick(dt) {
+      if (quality !== 'high' || maxPR <= 1 || ctx.paused) { this.acc = 0; this.n = 0; return; }
+      this.acc += dt; this.n++; this.block = Math.max(0, this.block - dt);
+      if (this.acc < 2) return;
+      const ms = this.acc / this.n * 1000; this.acc = 0; this.n = 0;
+      if (ms > 20 && this.pr > 1) { this.pr = Math.max(1, this.pr - 0.25); this.calm = 0; this.block = 30; applyPixelRatio(this.pr); }
+      else if (ms < 17.5 && this.pr < maxPR && this.block <= 0) { if ((this.calm += 2) >= 10) { this.pr = Math.min(maxPR, this.pr + 0.25); this.calm = 0; applyPixelRatio(this.pr); } }
+      else this.calm = 0;
+    },
+  };
 
   const V3 = (x, z) => new THREE.Vector3(x, T.floorAt(x, z) ?? 0, z);
   const world = {
@@ -121,7 +143,7 @@ export function createWorld(ctx) {
     bombSites: SITES.map(s => ({ name: s.name, center: V3(s.x, s.z), radius: s.radius })),
     minimap: { labels: LABELS, colliders: navColliders, floorAt: T.floorAt },
     nav: { ...NAV, colliders: navColliders, floorAt: T.floorAt, grid: { x0: GX0, z0: GZ0, w: GW, h: GH, cell: CELL, rows: T.g.map(r => r.join('')) } },
-    sun: atm.sun, quality,
+    sun: atm.sun, quality, post, shadows: SH, // post / shadows: debug & perf bench access
     setQuality,
     update(dt) {
       uTime.value += dt;
@@ -129,10 +151,11 @@ export function createWorld(ctx) {
       seaMat.normalMap.offset.set(uTime.value * 0.004, uTime.value * 0.006);
       post.grade.uniforms.uTime.value = uTime.value;
     },
-    render() {
+    render(dt) {
+      if (dt) DR.tick(dt);
       renderShadowsThisFrame();
       post.composer.render();
-      if (_hidden.length) { for (const o of _hidden) o.castShadow = true; _hidden.length = 0; }
+      SH.end();
     },
     resize(w, h) { post.composer.setSize(w, h); },
   };
