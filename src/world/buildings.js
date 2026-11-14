@@ -105,8 +105,13 @@ function buildSegment(G, r, style0, x0, x1, z0, z1, h, alongX, outF, shopSigns, 
       const fy = out(t); if (fy == null) continue;
       const Y = fy, ground = y0 <= fy + 0.5;
       const fq = (geo, a, b, ya, yb, d, uv) => faceQuad(geo, f, a, b, ya + Y, yb + Y, d, uv, white);
-      if (ground) { if (style === 'warehouse') faceBox(G.concrete, f, t - step / 2, t + step / 2, Y - 0.3, Y + 1.2, 0, 0.04, col(0xbdb5a8), 'ny'); else faceBox(G.stone, f, t - step / 2, t + step / 2, Y - 0.3, Y + 0.8, 0, 0.06, col(0xcfc0a5), 'ny'); }
       const g = ground ? r() : 2;
+      // plinth, cut around a ground-level opening: a door drawn 3 cm behind the plinth face flickers at range (z-fighting)
+      const cut = !ground ? 0 : style === 'warehouse' ? (g < 0.45 ? 0.8 : g < 0.7 ? 0.6 : 0) : g < 0.22 ? 0.8 : g < 0.45 ? 0.65 : 0;
+      if (ground) for (const [a, b] of cut ? [[t - step / 2, t - cut], [t + cut, t + step / 2]] : [[t - step / 2, t + step / 2]]) {
+        if (b - a < 0.02) continue;
+        if (style === 'warehouse') faceBox(G.concrete, f, a, b, Y - 0.3, Y + 1.2, 0, 0.04, col(0xbdb5a8), 'ny'); else faceBox(G.stone, f, a, b, Y - 0.3, Y + 0.8, 0, 0.06, col(0xcfc0a5), 'ny');
+      }
       if (style === 'warehouse') {
         const k = g < 0.45 ? FACADE.ROLLER : g < 0.7 ? FACADE.DOOR_METAL : g < 0.85 ? FACADE.EBOX : -1;
         if (g < 1 && k >= 0) { const w = k === FACADE.ROLLER ? 1.6 : 1.2, hh = k === FACADE.EBOX ? 1.6 : w * 2, y = k === FACADE.EBOX ? 0.9 : 0; fq(G.facade, t - w / 2, t + w / 2, y, y + hh, 0.03, cellUV(k)); }
@@ -195,9 +200,10 @@ export function buildWalls(G, addSolid) {
         const sw = (o1 - o0) / 2;                                                                                           // shutters folded open on both faces
         for (const d of [-1, 1]) for (const [a, b] of [[o0 - sw, o0 - 0.02], [o1 + 0.02, o1 + sw]]) { if (a < w.a || b > w.b) continue; bx(G.paint, a, b, Y + 1.06, head, d * (TH / 2 + 0.05) - 0.025, d * (TH / 2 + 0.05) + 0.025, shut); }
       } else {
-        for (const tt of [o0 - 0.1, o1]) bx(kind === 'gate' && !ware ? G.stone : G.wood, tt, tt + 0.1, Y, head, -TH / 2 - 0.04, TH / 2 + 0.04, kind === 'gate' && !ware ? stoneC : wood, 'ny');
-        bx(kind === 'gate' && !ware ? G.stone : G.wood, o0 - 0.1, o1 + 0.1, head, head + 0.12, -TH / 2 - 0.04, TH / 2 + 0.04, kind === 'gate' && !ware ? stoneC : wood);
-        if (kind === 'door') { const L = o1 - o0 - 0.1; if (w.ax === 'x') G.wood.box(o0, Y, w.p + TH / 2, o0 + 0.06, head - 0.04, w.p + TH / 2 + L, wood, 'ny'); else G.wood.box(w.p + TH / 2, Y, o0, w.p + TH / 2 + L, head - 0.04, o0 + 0.06, wood, 'ny'); }
+        // the frame overlaps the opening by 3 cm on each side and under the lintel: a frame face flush with the wall's cut face flickers (z-fighting)
+        for (const tt of [o0 - 0.1, o1 - 0.03]) bx(kind === 'gate' && !ware ? G.stone : G.wood, tt, tt + 0.13, Y, head, -TH / 2 - 0.04, TH / 2 + 0.04, kind === 'gate' && !ware ? stoneC : wood, 'ny py');
+        bx(kind === 'gate' && !ware ? G.stone : G.wood, o0 - 0.1, o1 + 0.1, head - 0.03, head + 0.12, -TH / 2 - 0.04, TH / 2 + 0.04, kind === 'gate' && !ware ? stoneC : wood);
+        if (kind === 'door') { const L = o1 - o0 - 0.16, a = o0 + 0.03, d = TH / 2 + 0.04; if (w.ax === 'x') G.wood.box(a, Y + 0.04, w.p + d, a + 0.06, head - 0.07, w.p + d + L, wood); else G.wood.box(w.p + d, Y + 0.04, a, w.p + d + L, head - 0.07, a + 0.06, wood); }
         bx(G.stone, o0, o1, Y, Y + 0.04, -TH / 2 - 0.15, TH / 2 + 0.15, stoneC, 'ny');                                      // threshold
       }
     }

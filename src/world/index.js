@@ -34,7 +34,7 @@ export function createWorld(ctx) {
     leaf: sway(std({ roughness: 0.92, emissive: 0x16240e }), uTime, { amp: 0.035, freq: 1.2, key: 'leaf', weight: '0.6' }),
     cloth: sway(std({ map: Tx.cloth, side: THREE.DoubleSide, roughness: 0.9 }), uTime, { amp: 0.06, key: 'cloth' }),
     frond: sway(std({ map: Tx.frond, side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.8 }), uTime, { amp: 0.12, freq: 1.4, key: 'frond', weight: 'uv.y' }),
-    facade: std({ map: Tx.facade.map, normalMap: Tx.facade.normalMap, roughnessMap: Tx.facade.roughnessMap, alphaTest: 0.5, vertexColors: false }),
+    facade: std({ map: Tx.facade.map, normalMap: Tx.facade.normalMap, roughnessMap: Tx.facade.roughnessMap, alphaTest: 0.5, vertexColors: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }),
     decal: std({ map: Tx.decals, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, roughness: 0.9 }),
     glass: std({ roughness: 0.08, metalness: 0.6 }),
     glow: std({ color: 0xffffff, emissive: 0xffb860, emissiveIntensity: 3.0, roughness: 0.4 }),
