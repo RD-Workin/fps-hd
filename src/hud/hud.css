@@ -449,6 +449,10 @@
 .nv-kc .info .row .hs, .nv-kc .info .row .hs b, .nv-kc .info .row .hs .nv-ico { color: var(--gold); }
 .nv-kc .prog { height: 3px; margin-top: 10px; background: rgba(255, 255, 255, .15); }
 .nv-kc .prog i { display: block; height: 100%; background: var(--enemy); transform-origin: 0 50%; transform: scaleX(0); }
+.nv-kc .xh { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); opacity: .85; transition: opacity .15s;
+  background: linear-gradient(#fff, #fff) center 0 / 2px 7px no-repeat, linear-gradient(#fff, #fff) center 100% / 2px 7px no-repeat,
+    linear-gradient(#fff, #fff) 0 center / 7px 2px no-repeat, linear-gradient(#fff, #fff) 100% center / 7px 2px no-repeat; filter: drop-shadow(0 0 1px #000); }
+.nv-kc.ads .xh { opacity: 0; }
 .nv-kc .skip { position: absolute; right: 28px; top: calc(9vh + 20px); font-size: 13px; letter-spacing: .24em; color: var(--dim); }
 .nv-kc .skip kbd { font-family: var(--f-num); font-size: 12px; padding: 1px 7px; border: 1px solid rgba(255, 255, 255, .4); border-radius: 3px; color: #fff; letter-spacing: .05em; }
 .nv-hud.is-killcam .nv-death, .nv-hud.is-killcam .nv-dead-tint, .nv-hud.is-killcam .nv-tags, .nv-hud.is-killcam .nv-top, .nv-hud.is-killcam .nv-mm,
