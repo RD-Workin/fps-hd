@@ -16,7 +16,7 @@ export function dressZones(K) {
   // =====================================================================================================
   // PORT (0) — ATK spawn x[-22,14] z[47,55] kept clear; landing ship ramp at x[-7,7]
   // =====================================================================================================
-  Floor(-76, 76, 42, 56, 'concrete');
+  Floor(-76, 76, 42, 56, 'concrete', 0xe4ddd0);
   for (let x = -72; x <= 72; x += 8) if (Math.abs(x) > 12) Bollard(x, 55.5);
   for (const x of [-66, -30, 34, 60]) Lamp(x, 43, 0);
   // west quay: container yard + boat on trestles
@@ -167,7 +167,7 @@ export function dressZones(K) {
   lift(4.5, () => { K.pergola(-1.7, -15.7, 1.7, -12.3); });
   Crate(3.2, -14, 1.0);                                                      // easy hop onto the perch
   Well(0, -6.6); Bench(-4, -20.8, 0); Bench(4, -20.8, 0);
-  Stall(-10, -17, 1, 1); Stall(10, -17, -1, 2); Cart(-13, -9.2, 0); Crate(-22.6, -4.6, 1.0); Barrel(21, -9.6, BLUE); Barrel(21.6, -10.4, OCHRE);
+  Stall(-10, -17, 1, 1); Stall(9.95, -17, -1, 2); Cart(-13, -9.2, 0); Crate(-22.6, -4.6, 1.0); Barrel(21, -9.6, BLUE); Barrel(21.6, -10.4, OCHRE);
   Crate(-21.4, -24.6); Crate(-21.4, -23.4, 1.0); Crate(21.6, -24.6); Stack(22.6, -1.2, 2); Pot(-9.4, -22.6, 1.2); Pot(9.4, -22.6, 1.2); Pot(-8.4, -6.6); Pot(15.4, -6.6);
   Palm(-6.5, -24, 6.5); Palm(7, -24, 6); Lamp(-23.4, -18, R); Lamp(23.4, -20, -R);
   Jersey(-2.2, -24.4, true, 3);                                              // DEF cover at the foot of the citadel stairs

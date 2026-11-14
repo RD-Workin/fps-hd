@@ -7,7 +7,7 @@ export function extendKit(K) {
   const R = Math.PI / 2;
   const SPH = new THREE.IcosahedronGeometry(1, 1), CYL8 = new THREE.CylinderGeometry(1, 1, 1, 8), CYL14 = new THREE.CylinderGeometry(1, 1, 1, 14);
   const CONE = new THREE.ConeGeometry(1, 1, 9);
-  const GREENS = [0x4d6b34, 0x58773a, 0x3f5c2e, 0x6a8442];
+  const GREENS = [0x5f8a3c, 0x6c9742, 0x4f7636, 0x7da24a];
   const green = () => col(GREENS[(r() * GREENS.length) | 0], 0.85 + r() * 0.3);
   // rotated footprint helper: half extents of a (w along local x, d along local z) box turned by ry in {0, R}
   const half = (w, d, ry) => (Math.abs(Math.sin(ry)) > 0.5 ? [d / 2, w / 2] : [w / 2, d / 2]);
@@ -143,10 +143,10 @@ export function extendKit(K) {
     for (let y = 0.15; y < h; y += 1.0) { G.metal.box(x0, y, z0, x1, y + 0.08, z1, col(0xd0782a), '');
       for (let t = 0.2; t < L - 0.6; t += 0.95 + r() * 0.5) { if (r() < 0.2) continue; const s = 0.6 + r() * 0.25, px = ax ? x0 + t : x0 + 0.08, pz = ax ? z0 + 0.08 : z0 + t; (r() < 0.6 ? G.wood : G.paint).box(px, y + 0.08, pz, px + (ax ? s : (x1 - x0) - 0.16), y + 0.08 + s * (0.7 + r() * 0.3), pz + (ax ? (z1 - z0) - 0.16 : s), r() < 0.6 ? col(0xb09468, 0.8 + r() * 0.3) : col([0x8a9aa0, 0x9a6e52, 0x4d6a5a][(r() * 3) | 0]), 'ny', 1.2); } }
     solid(x0, 0, z0, x1, h, z1, 'metal'); };
-  const counter = (x0, z0, x1, z1, h = 1.05, hex = 0x6d4b2e) => { G.wood.box(x0, 0, z0, x1, h - 0.06, z1, col(hex), 'ny'); G.wood.box(x0 - 0.05, h - 0.06, z0 - 0.05, x1 + 0.05, h, z1 + 0.05, col(0x4a3520), ''); solid(x0, 0, z0, x1, h, z1, 'wood'); };
+  const counter = (x0, z0, x1, z1, h = 1.05, hex = 0xb88c5c) => { G.wood.box(x0, 0, z0, x1, h - 0.06, z1, col(hex), 'ny'); G.wood.box(x0 - 0.05, h - 0.06, z0 - 0.05, x1 + 0.05, h, z1 + 0.05, col(0x94714a), ''); solid(x0, 0, z0, x1, h, z1, 'wood'); };
   const shelf = (ax, s, p, t0, t1, h = 2.2) => { // wall shelf with bottles / boxes (decor, 0.35 deep, small collider)
     const a = p, b = p + s * 0.35, x0 = ax === 'x' ? Math.min(a, b) : t0, x1 = ax === 'x' ? Math.max(a, b) : t1, z0 = ax === 'x' ? t0 : Math.min(a, b), z1 = ax === 'x' ? t1 : Math.max(a, b);
-    G.wood.box(x0, 0, z0, x1, h, z1, col(0x5a3f28), 'ny');
+    G.wood.box(x0, 0, z0, x1, h, z1, col(0xc09a6c), 'ny');
     for (let y = 0.5; y < h - 0.2; y += 0.55) for (let t = t0 + 0.15; t < t1 - 0.15; t += 0.2 + r() * 0.15) { const hh = 0.18 + r() * 0.2, cc = col([0x3d7a4a, 0xa2412f, 0xd8d4cc, 0x2f5f8f, 0xc9852f][(r() * 5) | 0]);
       if (ax === 'x') G.paint.box(p + s * 0.36 - 0.05, y, t, p + s * 0.36 + 0.05, y + hh, t + 0.09, cc, 'ny'); else G.paint.box(t, y, p + s * 0.36 - 0.05, t + 0.09, y + hh, p + s * 0.36 + 0.05, cc, 'ny'); }
     solid(x0, 0, z0, x1, h, z1, 'wood'); };
@@ -155,7 +155,7 @@ export function extendKit(K) {
   // thin floor overlay (interiors, plazas): kind 'wood' | 'tile' | 'concrete' | 'stone'
   const floor = (x0, x1, z0, z1, kind = 'wood', hex = null, y = 0.014) => { const g = kind === 'wood' ? G.wood : kind === 'stone' ? G.stone : G.concrete;
     g.box(x0, 0, z0, x1, y, z1, col(hex ?? (kind === 'wood' ? 0xa07a50 : kind === 'tile' ? 0xe6dccb : kind === 'stone' ? 0xe9dcc2 : 0xb7b0a4)), 'ny px nx pz nz', kind === 'wood' ? 1.6 : kind === 'stone' ? 3 : 4); };
-  const rug = (x0, x1, z0, z1, v = 0) => G.cloth.quad([x0, 0.03, z1], [x1, 0.03, z1], [x1, 0.03, z0], [x0, 0.03, z0], [0, 1, 0], [v / 4 + 0.02, 0, (v + 1) / 4 - 0.02, 1], [0.9, 0.85, 0.8]);
+  const rug = (x0, x1, z0, z1, v = 0) => G.cloth.quad([x0, 0.06, z1], [x1, 0.06, z1], [x1, 0.06, z0], [x0, 0.06, z0], [0, 1, 0], [v / 4 + 0.02, 0, (v + 1) / 4 - 0.02, 1], [0.9, 0.85, 0.8]);
   const tent = (x, z, alongX = true) => { const [hx, hz] = alongX ? [2.4, 1.6] : [1.6, 2.4], c = [0.78, 0.8, 0.62], h = 2.2;
     if (alongX) { G.cloth.quad([x - hx, 0, z + hz], [x + hx, 0, z + hz], [x + hx, h, z], [x - hx, h, z], [0, 0.6, 0.8], [0.52, 0, 0.73, 1], c); G.cloth.quad([x + hx, 0, z - hz], [x - hx, 0, z - hz], [x - hx, h, z], [x + hx, h, z], [0, 0.6, -0.8], [0.52, 0, 0.73, 1], c); }
     else { G.cloth.quad([x + hx, 0, z + hz], [x + hx, 0, z - hz], [x, h, z - hz], [x, h, z + hz], [0.8, 0.6, 0], [0.52, 0, 0.73, 1], c); G.cloth.quad([x - hx, 0, z - hz], [x - hx, 0, z + hz], [x, h, z + hz], [x, h, z - hz], [-0.8, 0.6, 0], [0.52, 0, 0.73, 1], c); }
@@ -163,7 +163,7 @@ export function extendKit(K) {
     solid(x - hx, 0, z - hz, x + hx, 1.6, z + hz, 'dirt'); };
 
   const lifted = { cypress, bush, hedge, planter, pot, tree, bench, cafeTable, bollard, dumpster, pallets, tyres, cart, kiosk, well, statue, pergola, flag, cannon, balls, boat, netPile, rack, counter, pillar, tent };
-  const out = { vine, flowers, shelf, lantern, buoy };
+  const out = { vine, flowers, shelf, lantern, buoy, ...lifted };
   for (const k in lifted) out[k[0].toUpperCase() + k.slice(1)] = P(lifted[k]);
   // rect-style helpers take (x0, ...) where the first two args are NOT (x, z): lift them on their centre instead
   for (const k of ['hedge', 'planter', 'rack', 'counter', 'pergola']) { const fn = lifted[k]; out[k[0].toUpperCase() + k.slice(1)] = (x0, z0, x1, z1, ...a) => lift(F((x0 + x1) / 2, (z0 + z1) / 2), () => fn(x0, z0, x1, z1, ...a)); }

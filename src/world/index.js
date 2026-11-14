@@ -31,7 +31,7 @@ export function createWorld(ctx) {
     hull: grime(pbr(Tx.metal, { metalness: 0.45 }), { amount: 0.3, ground: 0.01, streak: 0.3, rust: 0.85 }),
     wood: pbr(Tx.crate),
     bark: pbr(Tx.bark),
-    leaf: sway(std({ roughness: 0.92 }), uTime, { amp: 0.035, freq: 1.2, key: 'leaf', weight: '0.6' }),
+    leaf: sway(std({ roughness: 0.92, emissive: 0x16240e }), uTime, { amp: 0.035, freq: 1.2, key: 'leaf', weight: '0.6' }),
     cloth: sway(std({ map: Tx.cloth, side: THREE.DoubleSide, roughness: 0.9 }), uTime, { amp: 0.06, key: 'cloth' }),
     frond: sway(std({ map: Tx.frond, side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.8 }), uTime, { amp: 0.12, freq: 1.4, key: 'frond', weight: 'uv.y' }),
     facade: std({ map: Tx.facade.map, normalMap: Tx.facade.normalMap, roughnessMap: Tx.facade.roughnessMap, alphaTest: 0.5, vertexColors: false }),
@@ -146,9 +146,9 @@ function groundMask(T, cols, GB) {
   const mk = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
   const rect = (g, x0, z0, x1, z1) => g.fillRect((x0 - GB.minX) * PPM, (z0 - GB.minZ) * PPM, (x1 - x0) * PPM, (z1 - z0) * PPM);
   const sand = mk(), sg = sand.getContext('2d', { willReadFrequently: true }); sg.fillStyle = '#000'; sg.fillRect(0, 0, W, H); sg.filter = 'blur(8px)';
-  sg.fillStyle = '#fff'; rect(sg, -66, -50, -42, -30); rect(sg, 50, -44, 66, -26); rect(sg, -60, -30, -52, -24);
-  sg.fillStyle = '#8a8a8a'; rect(sg, -34, -58, 34, -34); rect(sg, -66, 14, -56, 22); rect(sg, 22, 4, 34, 12);
-  sg.fillStyle = '#555'; rect(sg, -72, -24, -44, 0);
+  sg.fillStyle = "#fff"; rect(sg, -70, -52, -34, -32); rect(sg, -42, -24, -26, -16); rect(sg, -62, -32, -56, -28);
+  sg.fillStyle = "#8a8a8a"; rect(sg, 34, -50, 70, -28); rect(sg, -26, -60, 26, -36); rect(sg, -68, 14, -46, 30); rect(sg, 32, 8, 62, 28);
+  sg.fillStyle = "#555"; rect(sg, -74, -28, -44, 0); rect(sg, -24, -26, 24, 2);
   const ao = mk(), ag = ao.getContext('2d', { willReadFrequently: true }); ag.fillStyle = '#fff'; ag.fillRect(0, 0, W, H); ag.filter = 'blur(4px)'; ag.fillStyle = '#000';
   for (const c of cols) { const b = c.box; const e = b.max.y > 2 ? 0.12 : 0.05; rect(ag, b.min.x - e, b.min.z - e, b.max.x + e, b.max.z + e); }
   const out = mk(), og = out.getContext('2d'), od = og.createImageData(W, H), sd = sg.getImageData(0, 0, W, H).data, ad = ag.getImageData(0, 0, W, H).data;

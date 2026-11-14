@@ -66,7 +66,7 @@ export function buildTerrain(T, G, addSolid) {
   for (const lv of lvls) {
     for (const r of rects(g, c => LEVEL[c] === lv)) {
       const [x0, x1, z0, z1] = rx(r);
-      G.stone.box(x0, 0, z0, x1, lv, z1, stoneC, 'py ny', 2);
+      G.stone.box(x0, 0, z0, x1, lv, z1, stoneC, 'py ny', 1.4);
       G.groundTop.quad([x0, lv, z1], [x1, lv, z1], [x1, lv, z0], [x0, lv, z0], [0, 1, 0], [x0 / 2.4, -z1 / 2.4, x1 / 2.4, -z0 / 2.4], [1, 1, 1]);
       addSolid(new THREE.Box3(new THREE.Vector3(x0, 0, z0), new THREE.Vector3(x1, lv, z1)), 'concrete', { floor: true });
     }
@@ -127,8 +127,8 @@ export function buildTerrain(T, G, addSolid) {
       const t0 = (data.ax === 'x' ? GZ0 : GX0) + a * CELL, t1 = (data.ax === 'x' ? GZ0 : GX0) + b * CELL;
       const p0 = data.side > 0 ? data.line : data.line - TH, p1 = data.side > 0 ? data.line + TH : data.line;
       const box = data.ax === 'x' ? [p0, 0, t0, p1, data.top, t1] : [t0, 0, p0, t1, data.top, p1];
-      G.stone.box(box[0], Math.max(0, data.bottom - 0.2), box[2], box[3], box[4], box[5], stoneC, 'ny', 2);
-      G.stone.box(box[0] - 0.05, box[4], box[2] - 0.05, box[3] + 0.05, box[4] + 0.1, box[5] + 0.05, capC, 'ny', 2);
+      G.stone.box(box[0], Math.max(0, data.bottom - 0.2), box[2], box[3], box[4], box[5], stoneC, 'ny', 1.4);
+      G.stone.box(box[0] - 0.05, box[4], box[2] - 0.05, box[3] + 0.05, box[4] + 0.1, box[5] + 0.05, capC, 'ny', 1.4);
       addSolid(new THREE.Box3(new THREE.Vector3(box[0], 0, box[2]), new THREE.Vector3(box[3], box[4] + 0.1, box[5])), 'concrete', {});
     }
   }
