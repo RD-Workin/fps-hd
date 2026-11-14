@@ -176,7 +176,7 @@ export function buildWalls(G, addSolid) {
   for (const w of WALLS) {
     const rr = rng(500 + wi++ * 13), Y = w.y, top = Y + CEIL, ware = w.m === 'corr';
     const geo = ware ? G.corr : w.m === 'stone' ? G.stone : G.plaster, tint = ware ? col(0x8a9aa0) : w.m === 'stone' ? col(0xe6d6bb) : col([0xf1e4c8, 0xe9d3a8, 0xf3ece0][(rr() * 3) | 0]);
-    const wood = col([0x3f6b8c, 0x4d7a4a, 0x7a4a2e][(rr() * 3) | 0]), stoneC = col(0xdccbb0);
+    const wci = (rr() * 3) | 0, wood = col([0x5f8bac, 0x6d9a6a, 0x9a6a4e][wci]), shut = col([0x7fb0d6, 0x8fc088, 0xc48a5e][wci]), stoneC = col(0xdccbb0);
     // box helper in wall space: t along the wall, d across (-TH/2..TH/2 = wall body)
     const bx = (g, t0, t1, y0, y1, d0, d1, c, skip = '') => (w.ax === 'x' ? g.box(t0, y0, w.p + d0, t1, y1, w.p + d1, c, skip) : g.box(w.p + d0, y0, t0, w.p + d1, y1, t1, c, skip));
     const sol = (t0, t1, y0, y1, o) => addSolid(B3(w.ax === 'x' ? [t0, y0, w.p - TH / 2, t1, y1, w.p + TH / 2] : [w.p - TH / 2, y0, t0, w.p + TH / 2, y1, t1]), ware ? 'metal' : 'concrete', o);
@@ -193,7 +193,7 @@ export function buildWalls(G, addSolid) {
         for (const tt of [o0, o1 - 0.07]) bx(G.wood, tt, tt + 0.07, Y + 1.06, head, -0.06, 0.06, wood, 'ny py');          // jambs
         bx(G.wood, o0, o1, head - 0.07, head, -0.06, 0.06, wood); bx(G.wood, (o0 + o1) / 2 - 0.03, (o0 + o1) / 2 + 0.03, Y + 1.06, head - 0.07, -0.04, 0.04, wood, 'ny py');
         const sw = (o1 - o0) / 2;                                                                                           // shutters folded open on both faces
-        for (const d of [-1, 1]) for (const [a, b] of [[o0 - sw, o0 - 0.02], [o1 + 0.02, o1 + sw]]) { if (a < w.a || b > w.b) continue; bx(G.wood, a, b, Y + 1.06, head, d * (TH / 2 + 0.05) - 0.025, d * (TH / 2 + 0.05) + 0.025, wood); }
+        for (const d of [-1, 1]) for (const [a, b] of [[o0 - sw, o0 - 0.02], [o1 + 0.02, o1 + sw]]) { if (a < w.a || b > w.b) continue; bx(G.paint, a, b, Y + 1.06, head, d * (TH / 2 + 0.05) - 0.025, d * (TH / 2 + 0.05) + 0.025, shut); }
       } else {
         for (const tt of [o0 - 0.1, o1]) bx(kind === 'gate' && !ware ? G.stone : G.wood, tt, tt + 0.1, Y, head, -TH / 2 - 0.04, TH / 2 + 0.04, kind === 'gate' && !ware ? stoneC : wood, 'ny');
         bx(kind === 'gate' && !ware ? G.stone : G.wood, o0 - 0.1, o1 + 0.1, head, head + 0.12, -TH / 2 - 0.04, TH / 2 + 0.04, kind === 'gate' && !ware ? stoneC : wood);
