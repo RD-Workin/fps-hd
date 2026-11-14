@@ -8,6 +8,7 @@ import { buildBuildings } from './buildings.js';
 import { createKit } from './props.js';
 import { buildShip } from './ship.js';
 import { dressZones } from './zones.js';
+import { extendKit } from './kit2.js';
 import { buildAtmosphere, buildDistant, buildDust, buildComposer } from './env.js';
 
 export function createWorld(ctx) {
@@ -30,6 +31,7 @@ export function createWorld(ctx) {
     hull: grime(pbr(Tx.metal, { metalness: 0.45 }), { amount: 0.3, ground: 0.01, streak: 0.3, rust: 0.85 }),
     wood: pbr(Tx.crate),
     bark: pbr(Tx.bark),
+    leaf: sway(std({ roughness: 0.92 }), uTime, { amp: 0.035, freq: 1.2, key: 'leaf', weight: '0.6' }),
     cloth: sway(std({ map: Tx.cloth, side: THREE.DoubleSide, roughness: 0.9 }), uTime, { amp: 0.06, key: 'cloth' }),
     frond: sway(std({ map: Tx.frond, side: THREE.DoubleSide, alphaTest: 0.5, roughness: 0.8 }), uTime, { amp: 0.12, freq: 1.4, key: 'frond', weight: 'uv.y' }),
     facade: std({ map: Tx.facade.map, normalMap: Tx.facade.normalMap, roughnessMap: Tx.facade.roughnessMap, alphaTest: 0.5, vertexColors: false }),
@@ -37,7 +39,7 @@ export function createWorld(ctx) {
     glass: std({ roughness: 0.08, metalness: 0.6 }),
     glow: std({ color: 0xffffff, emissive: 0xffb860, emissiveIntensity: 3.0, roughness: 0.4 }),
   };
-  const TILE = { plaster: 4, stone: 2, concrete: 4, corr: 2.4, roof: 2, metal: 1, paint: 1.5, hull: 3, wood: 1.2, bark: 1, cloth: 1, frond: 1, facade: 1, decal: 1, glow: 1, glass: 1 };
+  const TILE = { plaster: 4, stone: 1.4, concrete: 4, corr: 2.4, roof: 2, metal: 1, paint: 1.5, hull: 3, wood: 1.2, bark: 1, leaf: 1, cloth: 1, frond: 1, facade: 1, decal: 1, glow: 1, glass: 1 };
   const G = {}; for (const k in MAT) G[k] = new Geo(TILE[k]);
   G.groundTop = new Geo(2.4);
 
@@ -57,7 +59,7 @@ export function createWorld(ctx) {
   // ---------- content ----------
   buildTerrain(T, G, addSolid);
   buildBuildings(G, T, addSolid);
-  const K = createKit(G, Tx, T, physics, addSolid, scene);
+  const K = extendKit(createKit(G, Tx, T, physics, addSolid, scene));
   buildShip(K); dressZones(K);
   const { waterMat } = K.finish();
   buildDistant(G, scene);
