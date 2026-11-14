@@ -80,8 +80,14 @@ export class Brain {
       P.plantPt = { x: p.x, z: p.z }; P.plantSite = site.name;
     }
     const rest = new Set(list);
+    if (game.phase === 'live' && P.liveAt == null) P.liveAt = this.ctx.time;
     if (carrier && !carrier.isPlayer && rest.has(carrier)) {
       carrier.goal = { x: P.plantPt.x, z: P.plantPt.z, tol: 0.5, speed: 'run', kind: 'plant', use: true, noCover: hd(carrier.position, site.center) < site.radius + 3, noHunt: true };
+      // the bomb comes in behind the first squad: wait at its staging point until the push has started
+      const sq = P.squads?.[0], now = this.ctx.time;
+      if (sq && sq.site === site && sq.stage && !(sq.go && now > sq.goAt + 1.2) && [...P.member].some(([b, m]) => m.sq === sq && b.alive)
+        && hd(carrier.position, site.center) > site.radius + 6 && (game.roundTimeLeft ?? 99) > 40)
+        carrier.goal = { x: sq.stage[0], z: sq.stage[1], tol: 2.5, speed: 'run', noHunt: true, crouch: true, look: site.center };
       rest.delete(carrier);
     }
     if (bomb.state === 'dropped' && bomb.position) {
@@ -101,9 +107,17 @@ export class Brain {
     }
     // others: squads of <= 5, each on its own lane (world.nav.routes), departures staggered so stairs and
     // chokes don't jam. With 3+ squads the last one pressures the other site.
-    if (game.phase === 'live' && P.liveAt == null) P.liveAt = this.ctx.time;
     if (!P.squads || P.squadSite !== site.name) this.buildSquads([...rest], site);
     const now = this.ctx.time;
+    // grouped push: a squad gathers at its staging point (last route point out of the site's sight) and enters together
+    for (const sq of P.squads) {
+      if (sq.go || !sq.stage) continue;
+      let alive = 0, there = 0;
+      for (const [b, m] of P.member) if (m.sq === sq && b.alive) { alive++; if (m.i >= sq.stageI && hd(b.position, { x: sq.stage[0], z: sq.stage[1] }) < 9) there++; }
+      if (there && sq.t0 == null) sq.t0 = now;
+      const contact = [...P.member].some(([b, m]) => m.sq === sq && b.alive && now - b.alertT < 1.5 && m.i >= sq.stageI);
+      if (!alive || there >= Math.ceil(alive * 0.7) || (sq.t0 != null && now - sq.t0 > 7) || contact || (game.roundTimeLeft ?? 99) < 45) { sq.go = true; sq.goAt = now; }
+    }
     for (const b of rest) {
       const m = P.member.get(b);
       if (!m) { this.directToSite(b, site); continue; }
@@ -111,6 +125,11 @@ export class Brain {
       const route = m.route, tgt = m.site;
       while (m.i < route.length && (hd(b.position, { x: route[m.i][0], z: route[m.i][1] }) < 3.5 ||
         hd(b.position, tgt.center) < hd({ x: route[m.i][0], z: route[m.i][1] }, tgt.center) - 2)) m.i++;
+      const sq = m.sq;
+      if (sq.stage && !sq.go && m.i >= sq.stageI) { // hold at the staging point, weapon toward the site
+        b.goal = { x: sq.stage[0], z: sq.stage[1], tol: 2.5, speed: 'run', look: tgt.center, crouch: true, anchor: { x: sq.stage[0], z: sq.stage[1] }, huntRange: 10 };
+        continue;
+      }
       if (m.i < route.length) { const [x, z] = route[m.i]; b.goal = { x, z, tol: 2.5, speed: 'run', huntRange: 16 }; continue; }
       this.directToSite(b, tgt);
     }
@@ -132,11 +151,13 @@ export class Brain {
       const lanes = routes[tgt.name] || [];
       const lane = lanes.length ? lanes[(k + (P.laneShift ??= Math.floor(Math.random() * 4))) % lanes.length] : null;
       const via = lane ? null : this.viaPoint(this.spawnCenter('ATK'), tgt.center);
-      P.squads.push({ site: tgt, route: lane || [[via.x, via.z]] });
+      const route = lane || [[via.x, via.z]];
+      let stageI = -1; for (let i = route.length - 1; i > 0; i--) if (hd({ x: route[i][0], z: route[i][1] }, tgt.center) > 18) { stageI = i; break; }
+      P.squads.push({ site: tgt, route, stage: lane && stageI > 0 ? route[stageI] : null, stageI: stageI + 1, go: false, goAt: 0, t0: null });
     }
     list.forEach((b, i) => {
       const k = i % nSq, sq = P.squads[k], mi = Math.floor(i / nSq);
-      P.member.set(b, { route: sq.route, site: sq.site, i: 0, delay: k * 1.1 + mi * 0.5 });
+      P.member.set(b, { route: sq.route, site: sq.site, sq, i: 0, delay: k * 1.1 + mi * 0.5 });
       b.squad = k;
     });
   }

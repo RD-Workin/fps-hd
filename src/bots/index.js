@@ -62,6 +62,7 @@ export function createBots(ctx) {
     let b = ctx.world?.bounds;
     if (!b) { b = { minX: -60, maxX: 60, minZ: -50, maxZ: 50 }; }
     mgr.nav = new NavGrid(cols, b, { cell: 0.5, radius: 0.4 }); mgr.navCount = cols.length;
+    mgr.nav.setLinks(findLinks(ctx, mgr.nav));
     brain.spotCache.clear();
   }
 
@@ -105,4 +106,43 @@ export function createBots(ctx) {
   };
   if (typeof window !== 'undefined' && /[?&]bottest/.test(location.search)) import('./selftest.js').then(m => m.install(ctx));
   return bots;
+}
+
+// Jump / drop links between two floor levels (multi-level maps only): scan the grid for two walkable cells separated by a
+// ledge (1-4 blocked cells, floor difference 0.5-1.55 m), one candidate every 2 m, then keep those a simulated actor
+// really crosses with the game physics (run + jump for the way up, plain walk for the drop).
+const JUMP_V = 7.2;
+function findLinks(ctx, nav) {
+  const floorAt = ctx.world?.nav?.floorAt, phys = ctx.physics; if (!floorAt || !phys?.moveActor) return [];
+  const out = [], pos = new THREE.Vector3(), vel = new THREE.Vector3(), w = nav.w, h = nav.h, bl = nav.blocked;
+  const cross = (ax, az, fa, bx, bz, fb, up) => {
+    const dx = bx - ax, dz = bz - az, d = Math.hypot(dx, dz), nx = -dz / d, nz = dx / d;
+    for (const o of [0, -0.35, 0.35]) { // the bot never stands exactly on the start point
+      pos.set(ax + nx * o, fa + 0.01, az + nz * o); vel.set(0, 0, 0); let og = true, ok = false;
+      for (let i = 0; i < 40 && !ok; i++) {
+        const ex = bx - pos.x, ez = bz - pos.z, e = Math.hypot(ex, ez);
+        if (e < 0.4 && Math.abs(pos.y - fb) < 0.1) { ok = og; if (ok) break; }
+        vel.x = e > 0.05 ? ex / e * 5 : 0; vel.z = e > 0.05 ? ez / e * 5 : 0;
+        if (up && og && e > 0.3) vel.y = JUMP_V;
+        og = phys.moveActor(pos, vel, 1 / 30, 0.35, 1.8).onGround;
+      }
+      if (!ok) return false;
+    }
+    return true;
+  };
+  for (let z = 2; z < h - 2; z++) for (let x = 2; x < w - 2; x++) {
+    const i = z * w + x; if (bl[i]) continue;
+    for (const [dx, dz] of [[1, 0], [0, 1]]) {
+      if ((dx ? z : x) % 4) continue; // one candidate every 2 m along the ledge
+      let k = 1; while (k <= 5 && bl[i + (dx + dz * w) * k]) k++;
+      if (k < 2 || k > 5) continue;
+      const j = i + (dx + dz * w) * k; if (j < 0 || j >= bl.length || bl[j]) continue;
+      const ax = nav.centerX(i), az = nav.centerZ(i), bx = nav.centerX(j), bz = nav.centerZ(j), fa = floorAt(ax, az), fb = floorAt(bx, bz);
+      if (fa == null || fb == null) continue;
+      const dh = fb - fa; if (Math.abs(dh) < 0.5 || Math.abs(dh) > 1.55) continue;
+      if (cross(ax, az, fa, bx, bz, fb, dh > 0)) out.push({ ax, az, bx, bz, up: dh > 0, cost: k + (dh > 0 ? 6 : 2) });
+      if (cross(bx, bz, fb, ax, az, fa, dh < 0)) out.push({ ax: bx, az: bz, bx: ax, bz: az, up: dh < 0, cost: k + (dh < 0 ? 6 : 2) });
+    }
+  }
+  return out;
 }

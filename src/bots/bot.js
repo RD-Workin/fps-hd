@@ -188,7 +188,10 @@ export class Bot {
       const wp = dest.direct ? dest : this.followPath(dest);
       if (wp) {
         want.set(wp.x - this.position.x, 0, wp.z - this.position.z);
-        const l = want.length(); if (l > 0.05) want.multiplyScalar((crouch ? D.crouch : speed) / l); else want.set(0, 0, 0);
+        const jump = wp.jump === 'up'; if (jump) crouch = false; // ledge shortcut: full speed, jump as soon as the feet touch
+        const l = want.length(); if (l > 0.05) want.multiplyScalar((jump ? D.run : crouch ? D.crouch : speed) / l); else want.set(0, 0, 0);
+        if (jump && this.onGround && l > 0.3) { this.velocity.y = 7.2; this.velocity.x = want.x; this.velocity.z = want.z; }
+        this.jumpWp = wp.jump ? wp : null;
       }
       // separation from nearby actors
       for (const o of this.ctx.actors) {
@@ -206,7 +209,7 @@ export class Bot {
     // stuck detection
     if (dest && !locked) {
       this.stuckT += dt;
-      if (this.stuckT > 1.2) { if (this.stuckPos.distanceTo(this.position) < 0.35) { this.path = null; this.repathT = 0; if (!dest.direct) this.position.x += rand(-0.05, 0.05); this.strafeDir *= -1; } this.stuckT = 0; this.stuckPos.copy(this.position); }
+      if (this.stuckT > 1.2) { if (this.stuckPos.distanceTo(this.position) < 0.35) { if (this.jumpWp?.link) this.jumpWp.link.cost += 30; this.path = null; this.repathT = 0; if (!dest.direct) this.position.x += rand(-0.05, 0.05); this.strafeDir *= -1; } this.stuckT = 0; this.stuckPos.copy(this.position); }
     }
 
     // --- look / aim

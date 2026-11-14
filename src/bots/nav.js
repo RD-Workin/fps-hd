@@ -122,6 +122,20 @@ export class NavGrid {
     for (let i = 0; i < n; i++) if (!this.blocked[i]) this.walkableCount++;
   }
 
+  /**
+   * Off-grid one-way links (jump up a ledge, drop down): [{ax, az, bx, bz, cost (cells), up}].
+   * A* may cross them; the path then carries the two ends as mandatory waypoints, the far one tagged `jump: 'up'|'down'`.
+   */
+  setLinks(list) {
+    this.links = new Map(); this.linkCount = 0;
+    for (const l of list || []) {
+      const a = this.index(l.ax, l.az), b = this.index(l.bx, l.bz);
+      if (a < 0 || b < 0 || this.blocked[a] || this.blocked[b]) continue;
+      if (!this.links.has(a)) this.links.set(a, []);
+      this.links.get(a).push({ ...l, to: b }); this.linkCount++;
+    }
+  }
+
   // ---- helpers ----
   cellX(x) { return Math.floor((x - this.minX) / this.cell); }
   cellZ(z) { return Math.floor((z - this.minZ) / this.cell); }
@@ -210,6 +224,7 @@ export class NavGrid {
       const dx = Math.abs((i % w) - gxC), dz = Math.abs(((i / w) | 0) - gzC);
       return (dx + dz) + (SQRT2 - 2) * Math.min(dx, dz);
     };
+    const links = this.links && this.links.size ? this.links : null;
     G[s] = 0; P[s] = -1; ST[s] = gen;
     heap.push(s, hfun(s));
     let found = false, iter = 0;
@@ -242,6 +257,12 @@ export class NavGrid {
           }
         }
       }
+      const ls = links && links.get(cur);
+      if (ls) for (const l of ls) {
+        const j = l.to; if (CL[j] === gen) continue;
+        const ng = gc + l.cost;
+        if (ST[j] !== gen || ng < G[j]) { ST[j] = gen; G[j] = ng; P[j] = cur; heap.push(j, ng + hfun(j) * 1.02); }
+      }
     }
     if (!found) return null;
     // reconstruct
@@ -254,7 +275,12 @@ export class NavGrid {
     for (let k = 1; k < cells.length; k++) {
       const a = cells[k - 1], b = cells[k];
       const dx = (b % w) - (a % w), dz = ((b / w) | 0) - ((a / w) | 0);
-      if (k > 1 && (dx !== pdx || dz !== pdz)) pts.push({ x: this.centerX(a), z: this.centerZ(a) });
+      if (Math.abs(dx) > 1 || Math.abs(dz) > 1) { // crossed a link: both ends are mandatory
+        const l = links.get(a).find(q => q.to === b);
+        pts.push({ x: l.ax, z: l.az, hard: true }, { x: l.bx, z: l.bz, hard: true, jump: l.up ? 'up' : 'down', link: l });
+        pdx = pdz = 9; continue;
+      }
+      if (k > 1 && pdx !== 9 && (dx !== pdx || dz !== pdz)) pts.push({ x: this.centerX(a), z: this.centerZ(a) });
       pdx = dx; pdz = dz;
     }
     pts.push({ x: gxP, z: gzP });
@@ -262,7 +288,8 @@ export class NavGrid {
     const out = [];
     let i = 0;
     while (i < pts.length - 1) {
-      let j = pts.length - 1;
+      let j = i + 1;
+      while (j < pts.length - 1 && !pts[j].hard) j++; // never pull the string past a link end
       while (j > i + 1 && !this.los(pts[i].x, pts[i].z, pts[j].x, pts[j].z)) j--;
       out.push(pts[j]);
       i = j;
