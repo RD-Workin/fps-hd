@@ -74,6 +74,7 @@ export function createBots(ctx) {
     list: mgr.list,
     difficulty: DIFFICULTY,
     get nav() { return mgr.nav; },
+    get brain() { return brain; },
     setup(roster) {
       for (const b of mgr.list) b.dispose();
       mgr.list.length = 0;

@@ -49,3 +49,18 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
 - Fixed 105/40 s: 10v10 88 % ATK, 20v20 63 %. Auto timers alone: 75 % / 69 %. Rounds end by elimination ~45 s: timers are not the cause.
 - Fix: holder's advantage (holdCone/holdReact/holdPreAim), last ATK squad to other site, DEF threat radius site+24 m / 20 s window → full rotation.
 - Result: 10v10 50 % ATK (60 rounds), 20v20 56 % (32 rounds, before the rotation change) then 46 % (24 rounds, after).
+
+## Carte v4 (itération 4)
+- Liaisons de saut (`nav.setLinks`, `findLinks` dans index.js) : balayage de la grille pour deux cellules praticables séparées
+  par un rebord (1 à 4 cellules, écart de sol 0,5 à 1,55 m), un candidat tous les 2 m, validé par simulation physique
+  (course + saut pour monter, marche pour descendre, 3 départs décalés). 30 liaisons sur la Citadelle v4. A* les traverse
+  (coût = longueur + 6 cellules en montée, + 2 en descente) ; le chemin garde les deux bouts (`hard`), le second marqué
+  `jump`. Le bot court et saute dès qu'il touche le sol ; s'il reste bloqué, la liaison prend +30 de coût.
+- Assaut groupé : chaque escouade se regroupe à son point d'attente (dernier point de route à plus de 18 m du site),
+  accroupie, arme vers le site, et entre quand 70 % sont là, ou après 7 s, ou au premier contact, ou s'il reste < 45 s.
+  Le porteur attend avec la première escouade et entre 1,2 s après elle.
+- Défense, lecture de la poussée : si au moins 30 % de l'équipe adverse (3 minimum) est vue du côté d'un site
+  (plus proche de ce site de 18 m au moins, à moins de 62 m), le site devient « chaud » et la rotation part tout de suite.
+- Profil 10v10 (swiftshader) : 2,1 à 3,5 ms/image dont ~2,1 ms de pose des modèles, 0,25 ms de perception,
+  0,2 ms de déplacement, 0,07 ms de chemins. Les colliders de la carte ne sont pas le poste dominant.
+- Banc : `/tmp` uniquement (non versionné) : parties bots seuls, joueur éliminé à chaque manche, dt 1/30.

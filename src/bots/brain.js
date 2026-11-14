@@ -54,11 +54,16 @@ export class Brain {
   }
 
   updateThreat() {
-    const now = this.ctx.time;
+    const now = this.ctx.time, sites = this.sites(), seen = {};
     for (const [e, info] of this.mgr.intel.DEF) {
       if (now - info.t > 4 || !e.alive) continue;
-      for (const s of this.sites()) if (hd(info.pos, s.center) < s.radius + 24) this.threat[s.name] = Math.max(this.threat[s.name] ?? -100, info.t + (e.hasBomb ? 8 : 0));
+      for (const s of sites) if (hd(info.pos, s.center) < s.radius + 24) this.threat[s.name] = Math.max(this.threat[s.name] ?? -100, info.t + (e.hasBomb ? 8 : 0));
+      // reading the push: attackers spotted on one site's side of the map, well before they reach it
+      let near = null, nd = 1e9, far = 1e9; for (const s of sites) { const d = hd(info.pos, s.center); if (d < nd) { far = nd; nd = d; near = s; } else if (d < far) far = d; }
+      if (near && nd < 62 && far - nd > 18) (seen[near.name] ||= []).push(info.t + (e.hasBomb ? 8 : 0));
     }
+    const need = Math.max(3, Math.round((this.mgr.list.length / 2) * 0.3));
+    for (const k in seen) if (seen[k].length >= need) this.threat[k] = Math.max(this.threat[k] ?? -100, Math.max(...seen[k]));
   }
 
   // ------------------------------------------------------------ attackers
