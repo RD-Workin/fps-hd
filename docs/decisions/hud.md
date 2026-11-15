@@ -25,9 +25,12 @@
   gold ◆ if carrying the bomb, LOS check 5 Hz (dimmed/dashed when behind walls), scale by distance, fade 60–80 m.
 - Scoreboard (Tab + end screen « TABLEAU DES SCORES » button / Tab held / Échap closes): both teams side by side, cols É A M TÊTE OBJ MVP SCORE.
   Assists & HS tracked in HUD (weapon:hit + bot:fire hit -> damagers per victim; assist = damaged enemy, not killer). Match MVP = top score, gold row.
-- Killcam (killcam.js): ring buffer 20 Hz × 5.5 s of all actors (pos, yaw, aimPitch, alive; preallocated Float32Array, 64 max)
-  + 'bot:fire' log. 1.1 s after 'player:died' by a bot: 4.5 s replay over the killer's shoulder (last 0.7 s at ×0.5), bots re-posed via
-  bot.poseState()+model.pose() at recorded transforms (<70 m), cyan ghost of the player, tracers replayed via effects.tracer.
+- Killcam (killcam.js): ring buffer 30 Hz × 5.5 s of all actors (pos, yaw, aimPitch, height/alive; preallocated Float32Array, 64 max)
+  + shot log ('bot:fire' and the player's 'weapon:fire'). 1.1 s after 'player:died' by a bot: 4.5 s replay in FIRST PERSON from the killer's
+  recorded eye + aim (killer body hidden), with its weapon as a viewmodel (weapon/viewmodel.js + sniper.js built once, shared materials):
+  ADS (NV-4) / scope + zoom (SR-8) around each of its shots, bob, recoil, muzzle flash, tracers, impacts, gunshot via audio.play.
+  Last 0.7 s at ×0.5, 0.6 s tail after the kill. The player is a SoldierModel in its team colours that shoots back and falls on the fatal shot.
+  Bots re-posed via bot.poseState()+model.pose() at recorded transforms (<70 m, crouch + strafe from recorded data).
   Shows killer name, weapon (NV-4/SR-8), distance, killer HP, headshot. Space/click skips -> core spectator cam. Aborts on round:start.
 ## Notes for others
 - round:end reason string is shown as-is (uppercased). Hit points shown are cosmetic (+150 HS), real score comes from game stats.
