@@ -5,15 +5,13 @@
 // player's) is drawn on the camera, with ADS / scope while it engages, recoil, muzzle flash, tracers and sound.
 // Bot models are re-posed at their recorded transforms (bots.update overwrites them again next frame, so nothing leaks)
 // and the player is shown as a soldier in its team colours that falls when the fatal shot lands.
-import { buildViewmodel } from '../weapon/viewmodel.js';
-import { buildSniper } from '../weapon/sniper.js';
+// The first-person camera + viewmodel rig lives in fpview.js (shared with the spectator FPS view).
 import { WEAPONS } from '../weapon/index.js';
-import { createScope } from '../weapon/scope.js';
+import { createFpView } from './fpview.js';
 import { SoldierModel } from '../soldiers/index.js';
 
 const HZ = 30, SPAN = 5.5, SLOTS = Math.ceil(HZ * SPAN) + 2, MAXA = 64, F = 6; // x y z yaw pitch height(0 = dead)
 const REPLAY = 4.5, DELAY = 1.1, SLOWMO = 0.7, TAIL = 0.6; // s of history, wait after death, last seconds at 0.5x, after the kill
-const VM_FOV = 56, FOV = 75, SCOPE_FOV = 20; // VM_FOV mirrors weapon/index.js (viewmodel projection)
 const ENGAGE_BEFORE = 0.55, ENGAGE_AFTER = 0.4; // killer counts as aiming (ADS / scoped) this long around each of its shots
 
 export function createKillcam(ctx, hudRoot, { esc, ICONS }) {
@@ -23,7 +21,6 @@ export function createKillcam(ctx, hudRoot, { esc, ICONS }) {
   let head = -1, recAcc = 0;
   const shots = []; // {t, shooter, hit, target, dir?}
   const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), v4 = new THREE.Vector3(), v5 = new THREE.Vector3();
-  const mInv = new THREE.Matrix4();
 
   // ---------------------------------------------------------------- UI
   const el = document.createElement('div');
@@ -52,22 +49,7 @@ export function createKillcam(ctx, hudRoot, { esc, ICONS }) {
   ctx.scene.add(ghost);
 
   // ---------------------------------------------------------------- killer's first-person weapon
-  // Same procedural viewmodels as the player's (shared materials, own geometry), built on the first death.
-  const vmRoot = new THREE.Group(); vmRoot.visible = false; ctx.camera.add(vmRoot);
-  let kits = null, scope = null;
-  const getKits = () => {
-    if (kits) return kits;
-    kits = {};
-    for (const [id, build] of [['rifle', buildViewmodel], ['sniper', buildSniper]]) {
-      try {
-        const vm = build(); vm.rifle.visible = false; vmRoot.add(vm.rifle);
-        if (vm.magFresh) vm.magFresh.visible = false;
-        kits[id] = { vm, def: WEAPONS[id] };
-      } catch (e) { console.warn('[killcam] viewmodel', id, e); }
-    }
-    try { scope = createScope(); scope.el.style.zIndex = 'auto'; hudRoot.parentNode?.insertBefore(scope.el, hudRoot); } catch { scope = null; }
-    return kits;
-  };
+  const rig = createFpView(ctx, hudRoot);
 
   // ---------------------------------------------------------------- recording
   function record() {
@@ -94,7 +76,7 @@ export function createKillcam(ctx, hudRoot, { esc, ICONS }) {
     if (!killer || killer.isPlayer || !killer.position || ctx.game?.phase === 'over') return;
     const d = Math.round(killer.position.distanceTo(ctx.player.position));
     pending = { killer, at: ctx.time, wait: DELAY, dist: d, hp: Math.max(0, Math.round(killer.health ?? 100)), hs: false };
-    getKits(); getStand(); // build during the post-death delay, not on the first replayed frame
+    rig.getKits(); getStand(); // build during the post-death delay, not on the first replayed frame
   });
   ctx.events.on('actor:killed', ({ victim, headshot } = {}) => { if (victim?.isPlayer && pending) pending.hs = !!headshot; });
   const abort = () => { pending = null; stop(); };
@@ -137,15 +119,15 @@ export function createKillcam(ctx, hudRoot, { esc, ICONS }) {
     const t0 = Math.max(oldest, t1 - REPLAY);
     if (!(t1 - t0 > 0.5)) return;
     const wid = killer.weapon === 'sniper' ? 'sniper' : 'rifle';
-    const K = kc = {
+    const K = kc = Object.assign(rig.newState(wid), {
       killer, t0, t1, T: t0, shotIdx: shots.findIndex(s => s.t >= t0), roots: new Map(), hs: p.hs,
       kShots: shots.filter(s => s.shooter === killer && s.t >= t0 - 1 && s.t <= t1 + 0.1).map(s => s.t),
-      wid, kit: getKits()[wid] || null, ads: 0, kick: 0, kickYaw: 0, vmKick: 0, flashF: 0, bob: 0, bobAmp: 0, last: null, standDead: false,
-    };
+      last: null, standDead: false,
+    });
     // the killer's own body would fill the screen: hide it for the whole replay (restored in stop())
     const km = killer.model?.root;
     if (km) { K.roots.set(km, { a: killer, v: km.visible }); km.visible = false; }
-    if (K.kit) { K.kit.vm.rifle.visible = true; K.kit.vm.flash.visible = false; vmRoot.visible = true; }
+    rig.show(K);
     const st = getStand();
     if (st) { st.setTeam(ctx.player.team); st.reset(); st.root.visible = false; }
     whoEl.textContent = killer.name || 'Ennemi';
@@ -156,12 +138,9 @@ export function createKillcam(ctx, hudRoot, { esc, ICONS }) {
   function stop() {
     if (!kc) return;
     for (const [m, s] of kc.roots) { m.visible = s.v; restorePose(s.a); }
-    if (kc.kit) { kc.kit.vm.rifle.visible = false; kc.kit.vm.flash.visible = false; }
-    kc = null; ghost.visible = false; vmRoot.visible = false;
+    rig.hide(kc);
+    kc = null; ghost.visible = false;
     if (stand) stand.root.visible = false;
-    scope?.setK(0);
-    const cam = ctx.camera;
-    if (cam.fov !== FOV) { cam.fov = FOV; cam.updateProjectionMatrix(); } // weapon.update owns the fov again from the next frame
     el.classList.remove('on', 'slow', 'ads'); hudRoot.classList.remove('is-killcam');
     if (ctx.player) ctx.player._specSnap = true; // spectator camera snaps instead of sliding from the replay
   }
@@ -187,15 +166,6 @@ export function createKillcam(ctx, hudRoot, { esc, ICONS }) {
   }
   const standState = { dt: 0, pos: new THREE.Vector3(), yaw: 0, pitch: 0, speed: 0, moveX: 0, moveZ: -1, crouch: 0, ready: 1, reload: -1, headYaw: 0, fired: false };
   const restorePose = a => { try { if (a.alive && a.poseState && a.model?.pose) a.model.pose(a.poseState(0)); } catch { /* bots module changed */ } };
-  // viewmodel point -> where it appears in the world (the viewmodel has its own projection, see weapon/index.js)
-  function vmWorld(obj, out) {
-    const cam = ctx.camera;
-    cam.updateMatrixWorld(); obj.getWorldPosition(out);
-    out.applyMatrix4(mInv.copy(cam.matrixWorld).invert());
-    const k = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) / Math.tan(THREE.MathUtils.degToRad(VM_FOV) / 2);
-    out.x *= k; out.y *= k;
-    return out.applyMatrix4(cam.matrixWorld);
-  }
   const engaged = (K, t) => t > K.t1 - 0.5 || K.kShots.some(s => t > s - ENGAGE_BEFORE && t < s + ENGAGE_AFTER);
 
   function play(dt) {
@@ -233,29 +203,7 @@ export function createKillcam(ctx, hudRoot, { esc, ICONS }) {
 
     // ---------------- first-person camera at the killer's eyes
     if (k) {
-      const eh = Math.max(1.0, (k.h || 1.8) - 0.15);
-      K.bobAmp += (Math.min(1, k.spd / 5) - K.bobAmp) * Math.min(1, rdt * 6);
-      K.bob += rdt * (4 + k.spd * 1.6);
-      K.kick *= Math.exp(-rdt * 9); K.kickYaw *= Math.exp(-rdt * 9); K.vmKick *= Math.exp(-rdt * 16);
-      K.ads += ((engaged(K, t) ? 1 : 0) - K.ads) * Math.min(1, rdt * 10);
-      const sniper = K.wid === 'sniper', scopeK = sniper ? Math.min(1, Math.max(0, (K.ads - 0.55) / 0.4)) : 0;
-      cam.position.set(k.x, k.y + eh + Math.sin(K.bob * 2) * 0.022 * K.bobAmp * (1 - K.ads), k.z);
-      cam.up.set(0, 1, 0);
-      cam.rotation.set(k.pitch + K.kick, k.yaw + K.kickYaw, 0, 'YXZ');
-      const def = K.kit?.def || WEAPONS[K.wid];
-      let fov = FOV + ((def?.adsFov ?? FOV) - FOV) * (sniper ? Math.min(1, K.ads / 0.6) : K.ads);
-      if (sniper) fov += (SCOPE_FOV - fov) * scopeK;
-      if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
-      scope?.setK(scopeK);
-      // viewmodel: hip pose -> sight picture while engaging, bob while moving, kick on each shot
-      if (K.kit) {
-        const vm = K.kit.vm, B = def.base, R = def.brot, A = def.ads, a = K.ads, m = 1 - a;
-        vmRoot.visible = scopeK < 0.97;
-        const bx = Math.sin(K.bob) * 0.011 * K.bobAmp * m, by = -Math.abs(Math.cos(K.bob)) * 0.009 * K.bobAmp * m;
-        vmRoot.position.set(B[0] + (A[0] - B[0]) * a + bx, B[1] + (A[1] - B[1]) * a + by, B[2] + (A[2] - B[2]) * a + K.vmKick * 0.035);
-        vmRoot.rotation.set(R[0] * m + K.vmKick * 0.05 * m, R[1] * m + Math.sin(K.bob * 0.5) * 0.008 * K.bobAmp * m, R[2] * m);
-        if (vm.flash.visible && --K.flashF < 0) vm.flash.visible = false;
-      }
+      rig.drive(K, k, engaged(K, t), rdt);
       el.classList.toggle('ads', K.ads > 0.5);
     }
 
@@ -286,8 +234,8 @@ export function createKillcam(ctx, hudRoot, { esc, ICONS }) {
     else if (s.target?.position) tg = v3.copy(s.target.position).setY(s.target.position.y + (s.target.height || 1.8) * 0.72);
     if (!tg) tg = v3.copy(cam.position).addScaledVector(fwd, 60);
     if (!s.hit) { tg.x += (Math.random() - 0.5) * 1.2; tg.y += (Math.random() - 0.3) * 0.8; tg.z += (Math.random() - 0.5) * 1.2; }
-    const vm = K.kit?.vm, scoped = sniper && !vmRoot.visible;
-    const from = vm && !scoped ? vmWorld(vm.muzzle, v4) : v4.copy(cam.position).addScaledVector(fwd, 0.4).setY(cam.position.y - 0.05);
+    const vm = K.kit?.vm, scoped = K.scoped;
+    const from = vm && !scoped ? rig.vmWorld(vm.muzzle, v4) : v4.copy(cam.position).addScaledVector(fwd, 0.4).setY(cam.position.y - 0.05);
     const dir = v5.subVectors(tg, cam.position).normalize();
     if (!s.hit) { // a miss stops on the wall behind the target
       const w = ctx.physics?.raycast?.(cam.position, dir, 200);
@@ -295,8 +243,7 @@ export function createKillcam(ctx, hudRoot, { esc, ICONS }) {
     } else if (s.target === ctx.player) ctx.effects?.blood?.(tg.clone(), dir.clone());
     ctx.effects?.tracer?.(from.clone(), tg.clone());
     ctx.effects?.muzzleFlash?.(from.clone(), dir.clone(), { player: true });
-    if (vm && !scoped) { vm.flash.visible = true; vm.flash.rotation.z = Math.random() * 6.28; vm.star.visible = Math.random() > 0.15; K.flashF = 2; }
-    K.kick += sniper ? 0.05 : 0.012; K.kickYaw += (Math.random() - 0.5) * (sniper ? 0.01 : 0.006); K.vmKick = Math.min(1.5, K.vmKick + (sniper ? 1.4 : 0.8));
+    rig.fire(K);
     const slow = K.t1 - K.T < SLOWMO;
     try { ctx.audio?.play?.(sniper ? 'sniper' : 'rifle', { gain: 0.9, prio: 4, max: 4, send: 0.3, pitchVar: 0.03, rate: slow ? 0.8 : 1 }); } catch { /* audio not ready */ }
   }

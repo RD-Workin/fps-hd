@@ -32,6 +32,10 @@
   Last 0.7 s at ×0.5, 0.6 s tail after the kill. The player is a SoldierModel in its team colours that shoots back and falls on the fatal shot.
   Bots re-posed via bot.poseState()+model.pose() at recorded transforms (<70 m, crouch + strafe from recorded data).
   Shows killer name, weapon (NV-4/SR-8), distance, killer HP, headshot. Space/click skips -> core spectator cam. Aborts on round:start.
+  Camera + viewmodel rig shared with the spectator FPS view: fpview.js (createFpView: newState/show/hide/drive/fire/vmWorld, one instance per user).
+- Spectator FPS view (specview.js): while dead, V or right click toggles core shoulder cam <-> teammate's eyes (choice in localStorage
+  'nv-spec-view'). Live: bot yaw/aimPitch/height, ADS/scope when it has a visible target or shot < 0.45 s ago, gun lowered while reloadT >= 0,
+  recoil + flash on its 'bot:fire'; its body is hidden, its name tag skipped. Card: name, HP bar, weapon, mag/size, bomb. Runs before updateTags.
 ## Notes for others
 - round:end reason string is shown as-is (uppercased). Hit points shown are cosmetic (+150 HS), real score comes from game stats.
-- TODO: spectator label when dead (if game adds spectator cam); bots' names only from actor.name.
+- Bots' names only from actor.name.
