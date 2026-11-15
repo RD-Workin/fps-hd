@@ -27,5 +27,9 @@ asset `public/assets/soldiers/soldier.glb` (6.6 MB, meshopt + KTX2) + `basis/` t
 
 ## TODO / ideas
 - Atlas packing is wasteful (many small islands from the remeshed body): a hand UV unwrap would ~2x texel density.
-- Perf: pose ≈ 0.14 ms/bot (LOD0), LOD2 posed every other frame, fingers only at LOD0. `RIM_STRENGTH = 0.22` subtle team rim.
+- Perf: LOD_DIST [10, 30] m scaled by tan(fov/2) (scope keeps detail). Skinned meshes frustum-culled with a fixed
+  2.3 m sphere (any pose incl. death). Shadow refresh draws LOD2, AO pre-pass LOD1 at most (`passHooks`). Pose: lazy
+  chain matrices (`wm`) + one full update at the end (identical to the old per-rotation subtree updates); LOD2 and
+  off-screen soldiers posed every other frame; settled corpses skipped; facade root has matrixWorldAutoUpdate=false
+  (pose() keeps the soldier's matrices current, the renderer skips them). Fingers only at LOD0. `RIM_STRENGTH = 0.22` subtle team rim.
 - Optional: hit reactions (Hit_Chest is in the glb). Viewer: `/src/soldiers/pipeline/viewer.html?n=4&speed=2.6`.

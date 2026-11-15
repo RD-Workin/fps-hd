@@ -55,6 +55,13 @@ ctx.refreshActors();
 ctx.game.init?.();
 window.__ctx = ctx; // debug
 
+// Shader warm-up: compile every material in the scene (incl. hidden ones: muzzle flash, impacts, blood, bomb, explosion,
+// killcam ghost) while the menu is shown, so the first shot / plant / explosion does not freeze the game for a moment.
+// Runs again once the HD soldiers are in. Uses the parallel-compile extension when available (no main-thread stall).
+const warmShaders = () => { try { renderer.compileAsync(scene, camera).catch(() => {}); } catch { /* old three */ } };
+setTimeout(warmShaders, 0);
+preloadSoldiers(renderer)?.then(() => setTimeout(warmShaders, 500));
+
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);

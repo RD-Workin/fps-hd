@@ -134,9 +134,16 @@ export function buildComposer(ctx, extras) {
     const orig = gtao.render.bind(gtao);
     gtao.render = (...a) => {
       const hidden = [...camera.children, ...extras.noAO].filter(o => o.visible); hidden.forEach(o => (o.visible = false));
-      try { orig(...a); } finally { hidden.forEach(o => (o.visible = true)); }
+      const hooks = scene.userData.passHooks; if (hooks) for (const h of hooks) h('ao'); // soldiers: LOD1 at most for AO
+      try { orig(...a); } finally { hidden.forEach(o => (o.visible = true)); if (hooks) for (const h of hooks) h(null); }
     };
   }
+  // AO is low-frequency and denoised: compute it below the output resolution (the blend upsamples it). The scale follows
+  // the pixel ratio so the AO buffer stays ~0.75 of the CSS resolution: 0.75 at pr 1, 0.5 at pr 1.5. 1.8-4x fewer AO
+  // fragments, and the normal/depth pre-pass (a 2nd full scene render) shrinks with it.
+  { const setSize = gtao.setSize.bind(gtao);
+    gtao.setSize = (w, h) => { const s = Math.min(0.75, Math.max(0.5, 0.75 / renderer.getPixelRatio())); setSize(Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s))); };
+    gtao.setSize(w * renderer.getPixelRatio(), h * renderer.getPixelRatio()); }
   composer.addPass(gtao);
   const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.22, 0.5, 0.92); composer.addPass(bloom);
   composer.addPass(new OutputPass());

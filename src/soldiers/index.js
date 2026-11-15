@@ -16,7 +16,12 @@ export const TEAM_COLORS = { ATK: 0xc8372d, DEF: 0x2f7fe0 };
 // subtle team-coloured fresnel rim (readability pass, same idea as the procedural model); 0 disables
 export const RIM_STRENGTH = 0.45; // integrator: raised for readability (user feedback "on identifie mal")
 const RIM = { ATK: [0.95, 0.42, 0.16], DEF: [0.18, 0.42, 0.95] };
-export const LOD_DIST = [14, 38]; // m: LOD0 < 14 < LOD1 < 38 < LOD2
+// m at the hip FOV (75 deg); scaled by the current FOV so a scoped view keeps the detail. LOD1 (14k tris) at 10 m is ~100 px
+// tall at 1080p, LOD2 (3.7k) at 30 m ~40 px: no visible change, ~3x fewer skinned triangles in a crowded fight (perf pass).
+export const LOD_DIST = [10, 30]; // m: LOD0 < 10 < LOD1 < 30 < LOD2
+const TAN_HIP = Math.tan(THREE.MathUtils.degToRad(75) / 2);
+// conservative culling sphere around a soldier (m): covers every clip incl. the death fall (body lying ~1.9 m long)
+const CULL_R = 2.3, CULL_Y = 0.9;
 
 // ---------------------------------------------------------------- asset loading (once)
 let assetPromise = null, asset = null;
@@ -93,18 +98,41 @@ function prepare(gltf) {
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _v4 = new THREE.Vector3();
 const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m1 = new THREE.Matrix4(), _m2 = new THREE.Matrix4();
 const Y = new THREE.Vector3(0, 1, 0);
+const _frustum = new THREE.Frustum(), _pm = new THREE.Matrix4();
+// Cheaper LODs for the passes that do not need the full mesh: the dynamic shadow refresh draws every soldier at LOD2
+// (~36 texels tall in the 4096 map: same silhouette) and the half-res AO pre-pass at LOD1 at most. The world module calls
+// the hooks in scene.userData.passHooks around those passes; the colour pass keeps the camera LOD.
+const live = new Set();
+function passLod(mode) {
+  for (const s of live) {
+    if (!s.root.parent?.parent) { live.delete(s); continue; } // disposed bot
+    s.showLod(mode === 'shadow' ? 2 : mode === 'ao' ? Math.max(1, s.lod) : s.lod);
+  }
+}
 // rotate a bone by a world-space rotation q
+// Perf: while a soldier is being posed, world transforms are recomputed lazily, only along the chain from its root
+// (_top, whose matrixWorld is current) down to the bone that is read — instead of updating a bone's whole subtree after
+// every rotation and walking up to the scene on every read. Same maths, same results; one full update at the end of pose().
+let _top = null;
+const _chain = [], _wp = new THREE.Vector3(), _ws = new THREE.Vector3();
+function wm(o) {
+  let n = 0, p = o;
+  for (; p && p !== _top; p = p.parent) _chain[n++] = p;
+  if (!p) { o.updateWorldMatrix(true, false); return o.matrixWorld; }
+  for (let i = n - 1; i >= 0; i--) { const c = _chain[i]; if (c.matrixAutoUpdate) c.updateMatrix(); c.matrixWorld.multiplyMatrices(c.parent.matrixWorld, c.matrix); }
+  return o.matrixWorld;
+}
+const wpos = (o, out) => out.setFromMatrixPosition(wm(o));
+const wquat = (o, out) => { wm(o).decompose(_wp, out, _ws); return out; };
 function rotateWorld(bone, q) {
-  bone.parent.getWorldQuaternion(_q1);
+  wquat(bone.parent, _q1);
   _q2.copy(_q1).invert().multiply(q).multiply(_q1);
   bone.quaternion.premultiply(_q2);
-  bone.updateMatrixWorld(true);
 }
 // set a bone's world orientation from a target world quaternion
 function setWorldQuat(bone, q) {
-  bone.parent.getWorldQuaternion(_q1);
+  wquat(bone.parent, _q1);
   bone.quaternion.copy(_q1.invert().multiply(q));
-  bone.updateMatrixWorld(true);
 }
 // world quaternion mapping local axes (f, p) onto world axes (F, P)
 function alignQuat(f, p, F, P, out) {
@@ -116,7 +144,7 @@ function alignQuat(f, p, F, P, out) {
 }
 // 2-bone IK in world space: upper/lower/end bones, target position, pole direction
 function solveIK(upper, lower, end, target, pole, lenA, lenB) {
-  const a = upper.getWorldPosition(new THREE.Vector3()), b = lower.getWorldPosition(_v1.clone()), c = end.getWorldPosition(_v2.clone());
+  const a = wpos(upper, new THREE.Vector3()), b = wpos(lower, new THREE.Vector3());
   const t = target.clone().sub(a); let d = t.length();
   d = THREE.MathUtils.clamp(d, Math.abs(lenA - lenB) + 1e-3, lenA + lenB - 1e-3);
   const dir = t.normalize();
@@ -124,7 +152,7 @@ function solveIK(upper, lower, end, target, pole, lenA, lenB) {
   const pp = pole.clone().addScaledVector(dir, -pole.dot(dir)); if (pp.lengthSq() < 1e-8) pp.set(0, -1, 0); pp.normalize();
   const elbow = a.clone().addScaledVector(dir, cosA * lenA).addScaledVector(pp, sinA * lenA);
   rotateWorld(upper, _q1.clone().setFromUnitVectors(b.sub(a).normalize(), elbow.clone().sub(a).normalize()));
-  const b2 = lower.getWorldPosition(new THREE.Vector3()), c2 = end.getWorldPosition(new THREE.Vector3());
+  const b2 = wpos(lower, new THREE.Vector3()), c2 = wpos(end, new THREE.Vector3());
   const goal = a.addScaledVector(dir, d);
   rotateWorld(lower, new THREE.Quaternion().setFromUnitVectors(c2.sub(b2).normalize(), goal.sub(b2).normalize()));
 }
@@ -148,7 +176,7 @@ class HDSoldier {
       if (!o.isMesh) return;
       const n = (o.name + ' ' + (o.parent?.name || ''));
       const lvl = /LOD2/.test(n) ? 2 : /LOD1/.test(n) ? 1 : 0;
-      if (o.isSkinnedMesh) { o.frustumCulled = false; this.lods[lvl].push(o); }
+      if (o.isSkinnedMesh) this.lods[lvl].push(o);
       if (o.material?.name === 'Armband') this.armbands.push(o);
       else if (o.material?.name === 'Soldier') this.bodies.push(o);
     });
@@ -182,6 +210,21 @@ class HDSoldier {
     this.legs = [-1, 1].map(s => ({ th: P(), kn: P(), side: s }));
     this.meshes = this.lods.flat();
     this.lod = -1;
+    // frustum culling (was off: every soldier was skinned and drawn in the colour, AO and shadow passes, even behind the
+    // camera). Fixed sphere in each mesh's local frame, sized for any pose (computeBoundingSphere on a SkinnedMesh would
+    // skin all vertices on the CPU).
+    this.root.updateMatrixWorld(true);
+    const c = new THREE.Vector3(0, CULL_Y, 0);
+    for (const o of this.meshes) {
+      const inv = new THREE.Matrix4().copy(o.matrixWorld).invert();
+      o.boundingSphere = new THREE.Sphere(c.clone().applyMatrix4(inv), CULL_R / o.matrixWorld.getMaxScaleOnAxis());
+      o.frustumCulled = true;
+    }
+    this.cullSphere = new THREE.Sphere(new THREE.Vector3(), 1.4); this.offscreen = false;
+    this.deadPos = new THREE.Vector3(); this.settled = false; this.shown = -1;
+    live.add(this);
+    const hooks = ctx?.scene && (ctx.scene.userData.passHooks ||= []);
+    if (hooks && !hooks.includes(passLod)) hooks.push(passLod);
   }
 
   setTeam(team) {
@@ -190,14 +233,14 @@ class HDSoldier {
     const bm = this.A.bodyMats[team]; if (bm) for (const o of this.bodies) o.material = bm;
   }
   reset() {
-    this.dead = false; this.act.death.stop(); this.pivot.rotation.y = Math.PI; this.recoil = 0;
+    this.dead = false; this.settled = false; this.act.death.stop(); this.pivot.rotation.y = Math.PI; this.recoil = 0;
     for (const k of LOOPS) this.act[k].reset().play();
     if (this.holder.parent !== this.root) this.root.add(this.holder);
     this.holder.visible = true;
     if (this.mag) { this.mag.position.copy(this.magRest); this.mag.visible = true; }
   }
   kill(fallYawLocal) {
-    this.dead = true;
+    this.dead = true; this.settled = false;
     for (const k of LOOPS) this.act[k].stop();
     this.pivot.rotation.y = Math.PI + (fallYawLocal - this.A.deathAngle);
     const d = this.act.death; d.reset(); d.setEffectiveWeight(1); d.play();
@@ -207,8 +250,18 @@ class HDSoldier {
 
   updateLod() {
     const cam = this.ctx?.camera; let l = 0;
-    if (cam) { cam.getWorldPosition(_v1); const d = _v1.distanceTo(this.root.position); l = d < LOD_DIST[0] ? 0 : d < LOD_DIST[1] ? 1 : 2; }
-    if (l === this.lod) return; this.lod = l;
+    if (cam) {
+      cam.getWorldPosition(_v1); const d = _v1.distanceTo(this.root.position) * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) / TAN_HIP;
+      l = d < LOD_DIST[0] ? 0 : d < LOD_DIST[1] ? 1 : 2;
+      // off-screen soldiers are posed at half rate like far ones (camera matrices of the last render: generous sphere)
+      _pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _frustum.setFromProjectionMatrix(_pm);
+      this.cullSphere.center.copy(this.root.position).y += CULL_Y;
+      this.offscreen = !_frustum.intersectsSphere(this.cullSphere);
+    }
+    this.lod = l; if (l !== this.shown) this.showLod(l);
+  }
+  showLod(l) {
+    if (l === this.shown || l < 0) return; this.shown = l;
     this.lods.forEach((arr, i) => arr.forEach(o => (o.visible = i === l)));
     if (this.rifleLods) this.rifleLods.forEach((arr, i) => arr.forEach(o => (o.visible = (l > 0 ? 1 : 0) === i)));
   }
@@ -220,9 +273,16 @@ class HDSoldier {
     this.updateLod();
     this.posed = true;
     // far soldiers (LOD2): full pose every other frame, the skipped frame only moves the root
-    if (this.lod === 2 && !this.dead && (this.skip = !this.skip)) { this.skipDt = dt; r.updateMatrixWorld(true); this.updateProxies(); return; }
+    // off-screen ones too (their shadow animates at 30 Hz, invisible in practice; hitboxes still follow the root every frame)
+    if ((this.lod === 2 || this.offscreen) && !this.dead && (this.skip = !this.skip)) { this.skipDt = dt; r.updateMatrixWorld(true); this.updateProxies(); return; }
     if (this.skipDt) { dt += this.skipDt; this.skipDt = 0; }
-    if (this.dead) { this.mixer.update(dt); r.updateMatrixWorld(true); this.updateProxies(); return; }
+    if (this.dead) {
+      // a corpse whose death clip has finished and that no longer moves keeps its matrices and hitboxes
+      const still = this.act.death.paused && r.position.equals(this.deadPos) && r.rotation.y === this.deadYaw;
+      if (still && this.settled) return;
+      this.settled = still; this.deadPos.copy(r.position); this.deadYaw = r.rotation.y;
+      this.mixer.update(dt); r.updateMatrixWorld(true); this.updateProxies(); return;
+    }
     const ek = k => 1 - Math.exp(-dt * k);
     this.crouch += ((s.crouch || 0) - this.crouch) * ek(10);
     this.ready += ((s.ready ?? 1) - this.ready) * ek(6);
@@ -250,7 +310,7 @@ class HDSoldier {
       a.time = (k === 'idle' || k === 'cidle') ? (a.time + dt) % a.getClip().duration : this.phase * a.getClip().duration;
     }
     this.mixer.update(0);
-    r.updateMatrixWorld(true);
+    r.updateWorldMatrix(true, false); _top = r; // descendants are refreshed lazily (wm) until the full update below
     const B = this.b;
     // ---- lower body twist (strafe), upper body stays on the aim direction
     const rq = r.getWorldQuaternion(new THREE.Quaternion());
@@ -271,7 +331,7 @@ class HDSoldier {
     rotateWorld(B.neck, new THREE.Quaternion().setFromAxisAngle(right, -0.12 * this.ready - lean * 0.6 - pitch * 0.15));
     if (s.headYaw) rotateWorld(B.head, new THREE.Quaternion().setFromAxisAngle(up, s.headYaw * 0.6));
     // ---- rifle placement in body frame, anchored to the upper chest
-    const chest = r.worldToLocal(B['spine.003'].getWorldPosition(new THREE.Vector3()));
+    const chest = r.worldToLocal(wpos(B['spine.003'], new THREE.Vector3()));
     const h = this.holder, lr = 1 - this.ready, rl = s.reload ?? -1;
     h.position.set(chest.x + 0.115 - 0.05 * lr, chest.y + 0.065 - 0.17 * lr, chest.z - 0.36 + 0.06 * lr + this.recoil * 0.05);
     h.rotation.set(pitch - 0.7 * lr + this.recoil * 0.07, 0.03 + 0.5 * lr, 0.15 * lr, 'YXZ');
@@ -284,7 +344,7 @@ class HDSoldier {
     h.updateMatrixWorld(true);
     // ---- arms: IK to the grip / handguard (left hand fetches a mag while reloading), then hand orientation + fingers
     const H = (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix4(h.matrixWorld);
-    const hq = h.getWorldQuaternion(new THREE.Quaternion());
+    const hq = wquat(h, new THREE.Quaternion());
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(hq), hup = new THREE.Vector3(0, 1, 0).applyQuaternion(hq), hr = new THREE.Vector3(1, 0, 0).applyQuaternion(hq);
     const rootDown = new THREE.Vector3(0, -1, 0);
     const wristR = H(0.035, -0.045, 0.055);
@@ -304,6 +364,7 @@ class HDSoldier {
       magOut > 0 ? down.clone().addScaledVector(fwd, 0.3).normalize() : fwd.clone().multiplyScalar(0.55).addScaledVector(hr, 0.6).addScaledVector(hup, 0.25).normalize(),
       hup.clone().multiplyScalar(0.7).addScaledVector(hr, 0.6).normalize(), q));
     if (this.lod === 0) for (const [b, fq] of this.fingers) b.quaternion.copy(fq);
+    _top = null;
     r.updateMatrixWorld(true);
     this.updateProxies();
   }
@@ -315,7 +376,7 @@ class HDSoldier {
       const z = _v4.crossVectors(x, y);
       o.matrixWorld.makeBasis(x, y, z).setPosition(p); o.matrix.copy(o.matrixWorld);
     };
-    const P = b => b.getWorldPosition(new THREE.Vector3());
+    const P = b => new THREE.Vector3().setFromMatrixPosition(b.matrixWorld); // matrices were fully updated just before
     const hips = P(B.hips), s3 = P(B['spine.003']), neck = P(B.neck), head = P(B.head);
     set(this.hips, hips, s3.clone().sub(hips));
     set(this.spine, hips.clone().setY(hips.y + 0.05), neck.clone().sub(hips));
@@ -343,8 +404,12 @@ export class SoldierModel {
   upgrade(A) {
     const hd = new HDSoldier(this.team, A, this.ctx);
     this.root.remove(this.impl.root); this.impl = hd; this.root.add(hd.root);
+    // Perf: pose() ends with a full matrix update of the soldier, so the renderer's per-pass scene.updateMatrixWorld()
+    // (colour + AO passes) can skip the ~130 nodes of each soldier. The facade root itself never moves (identity).
+    this.root.updateMatrixWorld(true); this.root.matrixWorldAutoUpdate = false;
     if (this.deadYaw !== null) { hd.kill(this.deadYaw); hd.mixer.update(5); }
     if (this.lastState) hd.pose({ ...this.lastState, dt: 0 });
+    else hd.root.updateMatrixWorld(true);
   }
   get hips() { return this.impl.hips; } get spine() { return this.impl.spine; } get neck() { return this.impl.neck; }
   get arms() { return this.impl.arms; } get legs() { return this.impl.legs; } get muzzle() { return this.impl.muzzle; }
