@@ -13,7 +13,7 @@ Version en ligne : https://rd-workin.github.io/fps-hd/ (redéployée automatique
 par `.github/workflows/pages.yml` ; activer une fois Settings > Pages > Source = « GitHub Actions »).
 
 Contrôles : ZQSD (AZERTY) se déplacer · souris viser · clic gauche tirer · clic droit viser · R recharger · E poser/désamorcer · passer sur un cadavre = munitions ·
-Espace sauter · C s'accroupir · Maj marcher · Tab scores · M couper le son · F3 compteur de perfs · Échap pause.
+Espace sauter · C s'accroupir · Maj marcher · Tab scores · mort : clic/Espace allié suivant, V ou clic droit vue FPS de l'allié · M couper le son · F3 compteur de perfs · Échap pause.
 
 Mode : 10 contre 10, tir allié activé, camp de départ au choix dans le menu, changement de camp à la mi-temps.
 

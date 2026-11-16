@@ -462,3 +462,29 @@
 /* freeze declutter (Challenge 2): countdown lives in the clock, centre stays clear for the banner; picker sits at the bottom */
 .nv-freeze { display: none !important; }
 .nv-hud.is-freeze .nv-banner { top: max(14%, 96px); }
+
+/* spectator first-person view (specview.js): through a teammate's eyes */
+.nv-spv { position: absolute; inset: 0; opacity: 0; transition: opacity .25s; pointer-events: none; }
+.nv-spv.on { opacity: 1; }
+.nv-spv .xh { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); opacity: .8; transition: opacity .15s;
+  background: linear-gradient(#fff, #fff) center 0 / 2px 7px no-repeat, linear-gradient(#fff, #fff) center 100% / 2px 7px no-repeat,
+    linear-gradient(#fff, #fff) 0 center / 7px 2px no-repeat, linear-gradient(#fff, #fff) 100% center / 7px 2px no-repeat; filter: drop-shadow(0 0 1px #000); }
+.nv-spv.ads .xh { opacity: 0; }
+.nv-spv .card { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); min-width: 340px; padding: 10px 30px 12px; text-align: center;
+  background: linear-gradient(90deg, transparent, rgba(6, 26, 40, .82) 18%, rgba(6, 26, 40, .82) 82%, transparent); border-bottom: 2px solid var(--ally); }
+.nv-spv .card .k { font-size: 11px; letter-spacing: .5em; color: var(--ally); font-weight: 600; }
+.nv-spv .card .who { font-size: 30px; font-weight: 800; letter-spacing: .08em; line-height: 1.05; color: #fff; text-shadow: 0 0 16px rgba(64, 217, 255, .45); }
+.nv-spv .card .hp { height: 3px; margin: 6px auto 6px; width: 70%; background: rgba(255, 255, 255, .15); }
+.nv-spv .card .hp i { display: block; height: 100%; background: var(--ally); transform-origin: 0 50%; transition: transform .2s; }
+.nv-spv .card .hp i.low { background: var(--danger); }
+.nv-spv .card .row { display: flex; justify-content: center; gap: 20px; font-size: 14px; letter-spacing: .12em; color: var(--dim); white-space: nowrap; }
+.nv-spv .card .row span { display: inline-flex; align-items: center; gap: 7px; }
+.nv-spv .card .row b { font-family: var(--f-num); color: #fff; font-size: 18px; letter-spacing: .04em; }
+.nv-spv .card .row b.rl { color: var(--gold); font-size: 15px; letter-spacing: .12em; }
+.nv-spv .card .row .nv-ico { width: 17px; height: 17px; color: #fff; }
+.nv-spv .card .row .rifle { width: 40px; height: 14px; }
+.nv-spv .card .row .bomb, .nv-spv .card .row .bomb b, .nv-spv .card .row .bomb .nv-ico { color: var(--gold); }
+.nv-spv .keys { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 26px; font-size: 12px; letter-spacing: .2em; color: var(--dim); white-space: nowrap; }
+.nv-spv .keys kbd { font-family: var(--f-num); font-size: 11px; padding: 1px 6px; border: 1px solid rgba(255, 255, 255, .4); border-radius: 3px; color: #fff; letter-spacing: .05em; }
+.nv-hud.is-specfps .nv-death, .nv-hud.is-specfps .nv-dead-tint { opacity: 0 !important; transition: opacity .25s; }
+@media (max-width: 700px) { .nv-spv .card { min-width: 0; left: 3vw; right: 3vw; transform: none; } .nv-spv .keys { display: none; } }

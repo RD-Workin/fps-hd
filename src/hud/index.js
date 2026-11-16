@@ -5,6 +5,7 @@ import './hud.css';
 import { ICONS } from './icons.js';
 import { createMinimap } from './minimap.js';
 import { createKillcam } from './killcam.js';
+import { createSpecView } from './specview.js';
 
 const LS_KEY = 'nova.hud';
 const ROUND_STREAK = ['', '', 'DOUBLE ÉLIMINATION', 'TRIPLE ÉLIMINATION', 'QUADRUPLE ÉLIMINATION', 'AS — ÉQUIPE RASÉE'];
@@ -155,6 +156,7 @@ export function createHud(ctx) {
   const dmg = []; // {el, from:{x,z}, t}
   for (const el of E.arcs) dmg.push({ el, from: null, t: 9 });
   const killcam = (() => { try { return createKillcam(ctx, root, { esc, ICONS }); } catch (e) { console.warn('[hud] killcam', e); return null; } })();
+  const specView = (() => { try { return createSpecView(ctx, root, { esc, ICONS }); } catch (e) { console.warn('[hud] specview', e); return null; } })();
   const minimap = (() => { try { return createMinimap(ctx, $('.nv-mm canvas'), $('.nv-mm-zone')); } catch (e) { console.warn('[hud] minimap', e); return null; } })();
   const isAlly = a => a && ctx.player && (ctx.game?.isAlly ? ctx.game.isAlly(a) : a.team === ctx.player.team);
   const stat = a => a.stats || tally.get(a) || { kills: 0, deaths: 0 };
@@ -481,7 +483,7 @@ export function createHud(ctx) {
     cam.getWorldPosition(eye);
     const W = innerWidth, H = innerHeight, seen = new Set();
     for (const a of ctx.actors || []) {
-      if (a.isPlayer || !a.alive || !isAlly(a) || !a.position) continue;
+      if (a.isPlayer || !a.alive || !isAlly(a) || !a.position || a === specView?.target) continue;
       seen.add(a);
       let t = tags.get(a);
       if (!t) {
@@ -513,8 +515,10 @@ export function createHud(ctx) {
     if (menuMode === 'main' && !g?.started) return;
     const alive = !!p?.alive;
     cls(root, 'is-dead', !!g?.started && !alive && g.phase !== 'over');
-    { const sp = !alive ? ctx.player?.spectating : null; const key = sp ? sp.name : '';
-      if (key !== lastSpec) { lastSpec = key; if (sp) html(E.deathH, `Spectateur : <b>${esc(sp.name)}</b> — clic gauche ou Espace pour changer`); } }
+    // spectator first-person view (before the name tags: they must be projected with the camera that gets rendered)
+    if (!ctx.paused) { try { specView?.update(dt, { killcam: !!killcam?.active }); } catch (e) { console.warn('[hud] specview', e); } }
+    { const sp = !alive ? ctx.player?.spectating : null; const key = sp ? sp.name + '|' + (specView?.mode || '') : '';
+      if (key !== lastSpec) { lastSpec = key; if (sp) html(E.deathH, `Spectateur : <b>${esc(sp.name)}</b> — clic gauche ou Espace : allié suivant · V ou clic droit : vue ${specView?.mode === 'fps' ? '3e personne' : 'FPS'}`); } }
 
     // crosshair
     kick = Math.max(0, kick - dt * 60);
