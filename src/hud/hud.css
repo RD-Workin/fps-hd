@@ -488,3 +488,10 @@
 .nv-spv .keys kbd { font-family: var(--f-num); font-size: 11px; padding: 1px 6px; border: 1px solid rgba(255, 255, 255, .4); border-radius: 3px; color: #fff; letter-spacing: .05em; }
 .nv-hud.is-specfps .nv-death, .nv-hud.is-specfps .nv-dead-tint { opacity: 0 !important; transition: opacity .25s; }
 @media (max-width: 700px) { .nv-spv .card { min-width: 0; left: 3vw; right: 3vw; transform: none; } .nv-spv .keys { display: none; } }
+
+/* ---- Zombie mode ---------------------------------------------------------- */
+.nv-menu.zmode [data-sd], .nv-menu:not(.zmode) [data-zm] { display: none !important; }
+.nv-menu.zmode .nv-desc-sd, .nv-menu:not(.zmode) .nv-desc-zm { display: none; }
+.nv-hud.is-zombie .nv-wins, .nv-hud.is-zombie .nv-bombpill { display: none; }
+.nv-hud.is-zombie .nv-tm.them .sc { color: #9fd36a; }
+.nv-hud.is-zombie .nv-tm.them .side { color: #b7e08a; }

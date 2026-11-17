@@ -225,6 +225,7 @@ export function createWeapon(ctx) {
     },
     update(dt) {
       const inp = ctx.input, def = K.def, sniper = def.id === 'sniper';
+      if (ctx.game?.infiniteAmmo) this.reserve = def.maxReserve; // zombie mode: unlimited ammo (reloads still happen)
       syncProj();
       loadout.update();
       // bolt cycle (sniper)

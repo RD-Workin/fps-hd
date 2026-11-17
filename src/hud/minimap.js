@@ -142,6 +142,16 @@ export function createMinimap(ctx, canvas, zoneEl) {
       g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 1; g.stroke();
       g.globalAlpha = 1;
     }
+    // zombies (zombie mode): always visible, small dots
+    const zs = ctx.game?.mode === 'zombie' ? ctx.game.zombie?.horde?.dots?.() : null;
+    if (zs?.length) {
+      g.fillStyle = '#9be35a'; g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 0.8;
+      for (const z of zs) {
+        toMini(z.position.x, z.position.z, pt);
+        if (Math.hypot(pt.x - C, pt.y - C) > R - 4) continue;
+        g.beginPath(); g.arc(pt.x, pt.y, 2.4, 0, Math.PI * 2); g.fill(); g.stroke();
+      }
+    }
     // allies
     for (const a of actors) {
       if (a === p || a.team !== p.team) continue;

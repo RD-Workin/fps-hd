@@ -1,6 +1,7 @@
 // Search & Destroy game mode ("Recherche et Destruction"). See ARCHITECTURE.md → Game mode contract.
 import * as THREE from 'three';
 import { createBombVisuals } from './bombModel.js';
+import { createZombieMode } from './zombie.js';
 
 export const RULES = {
   FREEZE: 4, ROUND: 105, POST: 5, PLANT: 3, DEFUSE: 6, BOMB: 40,
@@ -50,6 +51,20 @@ export function createGame(ctx, options = {}) {
     bomb, useProgress: 0, useLabel: '', useAction: null,
     lastResult: null, halftimeDone: false, history: [],
     siteAt,
+    // game mode: 'sd' (Recherche & Destruction) or 'zombie' (waves, see zombie.js). Chosen in the menu; while a match
+    // runs the change waits for the next restart.
+    mode: 'sd', pendingMode: null,
+    get infiniteAmmo() { return this.mode === 'zombie'; },
+    setMode(m) {
+      m = m === 'zombie' ? 'zombie' : 'sd';
+      if (this.started) { this.pendingMode = m === this.mode ? null : m; return; }
+      if (m === this.mode) return;
+      if (this.mode === 'zombie') zombie.stop();
+      this.mode = m; this.pendingMode = null; this.init();
+    },
+    setZombieAllies(n) { const was = zombie.allies; zombie.setAllies(n); if (!this.started && this.mode === 'zombie' && was !== zombie.allies) this.init(); },
+    setZombieProgression(p) { zombie.setProgression(p); },
+    get zombie() { return zombie; },
     allyCount: TEAM_SIZE - 1, enemyCount: TEAM_SIZE,
     // round / bomb timers in seconds; null = automatic, scaled with team size (see autoTimings)
     roundTimeSetting: null, bombTimeSetting: null,
@@ -81,6 +96,10 @@ export function createGame(ctx, options = {}) {
     aliveCount(team) { return actors().filter(a => a.team === team && a.alive).length; },
 
     init() {
+      if (this.mode === 'zombie') {
+        stopAllUses(); visuals?.reset(); Object.assign(bomb, { state: 'defused', carrier: null, position: null, site: null, timeLeft: 0 });
+        zombie.init(); this.phase = 'menu'; placeMenuCamera(0); return;
+      }
       const roster = [
         ...ALLY_NAMES.slice(0, this.allyCount).map(name => ({ name, team: 'ATK', ally: true })),
         ...ENEMY_NAMES.slice(0, this.enemyCount).map(name => ({ name, team: 'DEF', ally: false })),
@@ -100,6 +119,7 @@ export function createGame(ctx, options = {}) {
     start() {
       if (this.started) return;
       this.started = true;
+      if (this.mode === 'zombie') { matchWinner = null; this.history = []; zombie.start(); placeCameraOnPlayer(); return; }
       this.score = { us: 0, them: 0 }; this.round = 0; matchWinner = null; this.halftimeDone = false; this.history = [];
       for (const a of actors()) { a.stats = null; ensureStats(a); }
       applySide(this.resolveSide());
@@ -109,12 +129,15 @@ export function createGame(ctx, options = {}) {
 
     restart() {
       this.started = false; // start() puts the squad back on the preferred side
+      if (this.pendingMode) { const m = this.pendingMode; this.pendingMode = null; if (this.mode === 'zombie') zombie.stop(); this.mode = m; this.init(); }
+      else if (this.mode === 'zombie') this.init();
       const want = this.allyCount + this.enemyCount;
       if ((ctx.bots?.list?.length ?? want) !== want) this.init(); // team sizes changed in the pause menu
       this.start();
     },
 
     actorUse(actor, dt) {
+      if (this.mode === 'zombie') return 0;
       if (this.phase !== 'live' || !actor || !actor.alive) return 0;
       const kind = canPlant(actor) ? 'plant' : canDefuse(actor) ? 'defuse' : null;
       if (!kind) { stopUse(actor); return 0; }
@@ -135,6 +158,7 @@ export function createGame(ctx, options = {}) {
     },
 
     update(dt) {
+      if (this.mode === 'zombie') { zombie.update(dt); frame++; return; }
       for (const a of actors()) ensureStats(a);
       switch (this.phase) {
         case 'freeze':
@@ -170,6 +194,8 @@ export function createGame(ctx, options = {}) {
       visuals?.update(dt, this);
     },
   };
+
+  const zombie = createZombieMode(ctx, game, { names: ALLY_NAMES });
 
   // Put the player's squad on `side` (swaps every actor's team if needed).
   function applySide(side) {

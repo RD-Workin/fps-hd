@@ -23,6 +23,7 @@ export class Brain {
   update(dt) {
     if ((this.t -= dt) > 0) return; this.t = 0.4;
     const { ctx } = this, game = ctx.game, nav = this.mgr.nav;
+    if (this.mgr.goalProvider) { if (nav) this.mgr.goalProvider(this.mgr.list.filter(b => b.alive)); return; } // zombie mode
     if (!game || !nav || !this.sites().length) return;
     const bots = this.mgr.list.filter(b => b.alive);
     this.updateThreat();
