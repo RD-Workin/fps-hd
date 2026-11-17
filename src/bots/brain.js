@@ -55,14 +55,15 @@ export class Brain {
 
   updateThreat() {
     const now = this.ctx.time, sites = this.sites(), seen = {};
+    const S = this.mgr.skillForTeam?.('DEF') ?? { threatRadius: 24, rotateNeed: 0.3 };
     for (const [e, info] of this.mgr.intel.DEF) {
       if (now - info.t > 4 || !e.alive) continue;
-      for (const s of sites) if (hd(info.pos, s.center) < s.radius + 24) this.threat[s.name] = Math.max(this.threat[s.name] ?? -100, info.t + (e.hasBomb ? 8 : 0));
+      for (const s of sites) if (hd(info.pos, s.center) < s.radius + S.threatRadius) this.threat[s.name] = Math.max(this.threat[s.name] ?? -100, info.t + (e.hasBomb ? 8 : 0));
       // reading the push: attackers spotted on one site's side of the map, well before they reach it
       let near = null, nd = 1e9, far = 1e9; for (const s of sites) { const d = hd(info.pos, s.center); if (d < nd) { far = nd; nd = d; near = s; } else if (d < far) far = d; }
       if (near && nd < 62 && far - nd > 18) (seen[near.name] ||= []).push(info.t + (e.hasBomb ? 8 : 0));
     }
-    const need = Math.max(3, Math.round((this.mgr.list.length / 2) * 0.3));
+    const need = Math.max(3, Math.round((this.mgr.list.length / 2) * S.rotateNeed));
     for (const k in seen) if (seen[k].length >= need) this.threat[k] = Math.max(this.threat[k] ?? -100, Math.max(...seen[k]));
   }
 
@@ -121,7 +122,8 @@ export class Brain {
       for (const [b, m] of P.member) if (m.sq === sq && b.alive) { alive++; if (m.i >= sq.stageI && hd(b.position, { x: sq.stage[0], z: sq.stage[1] }) < 9) there++; }
       if (there && sq.t0 == null) sq.t0 = now;
       const contact = [...P.member].some(([b, m]) => m.sq === sq && b.alive && now - b.alertT < 1.5 && m.i >= sq.stageI);
-      if (!alive || there >= Math.ceil(alive * 0.7) || (sq.t0 != null && now - sq.t0 > 7) || contact || (game.roundTimeLeft ?? 99) < 45) { sq.go = true; sq.goAt = now; }
+      const regroup = this.mgr.skillForTeam?.('ATK')?.regroup ?? true;
+      if (!regroup || !alive || there >= Math.ceil(alive * 0.7) || (sq.t0 != null && now - sq.t0 > 7) || contact || (game.roundTimeLeft ?? 99) < 45) { sq.go = true; sq.goAt = now; }
     }
     for (const b of rest) {
       const m = P.member.get(b);
@@ -194,7 +196,8 @@ export class Brain {
       P.anchors = new Set(['A', 'B'].map(r => sorted.find(b => roles.get(b) === r)).filter(Boolean));
     }
     // rotation toward a threatened site
-    let hot = null; for (const s of this.sites()) if (now - this.threat[s.name] < 20 && (!hot || this.threat[s.name] > this.threat[hot])) hot = s.name;
+    const win = this.mgr.skillForTeam?.('DEF')?.rotateWindow ?? 20;
+    let hot = null; for (const s of this.sites()) if (now - this.threat[s.name] < win && (!hot || this.threat[s.name] > this.threat[hot])) hot = s.name;
     const counters = {};
     list.forEach((b, i) => {
       let role = P.roles.get(b) || 'mid';

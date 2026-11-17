@@ -2,8 +2,9 @@
 import * as THREE from 'three';
 import { NavGrid } from './nav.js';
 import { Bot, DIFFICULTY } from './bot.js';
+import { SKILLS, SKILL_IDS } from './skill.js';
 import { Brain } from './brain.js';
-export { DIFFICULTY };
+export { DIFFICULTY, SKILLS, SKILL_IDS };
 
 const _oc = new THREE.Vector3();
 // hitbox segment index -> body part (see Bot.updateHitboxes: torso, 2x(thigh, shin), 2x(upper arm, forearm))
@@ -40,6 +41,10 @@ export function createBots(ctx) {
     // used to stack 3 x 6 ms in one frame = visible hitch); a bot that waits a frame keeps following its previous path
     pathSpent: 0,
     takePathBudget() { if (this.budget <= 0 || this.pathSpent > 2) return false; this.budget--; return true; },
+    // difficulty: the team facing the player plays `level`, the player's own team always 'normal'
+    level: 'normal',
+    skillForTeam(team) { const pt = ctx.player?.team; return pt && team !== pt ? SKILLS[this.level] : SKILLS.normal; },
+    skillFor(bot) { return this.skillForTeam(bot.team); },
     report(team, enemy) { this.intel[team].set(enemy, { pos: enemy.position.clone(), t: ctx.time }); },
     // nearest walkable point (≤ 10 m) hidden from the threat, preferably hugging cover
     findCover(bot, threat) {
@@ -76,6 +81,10 @@ export function createBots(ctx) {
   const bots = {
     list: mgr.list,
     difficulty: DIFFICULTY,
+    skills: SKILLS,
+    get skill() { return mgr.level; },
+    // 'easy' | 'normal' | 'veteran' — live: applies from the next perception tick
+    setSkill(level) { if (SKILLS[level]) mgr.level = level; return mgr.level; },
     get nav() { return mgr.nav; },
     get brain() { return brain; },
     setup(roster) {
