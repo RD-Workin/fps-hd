@@ -1,6 +1,7 @@
 // Search & Destroy game mode ("Recherche et Destruction"). See ARCHITECTURE.md → Game mode contract.
 import * as THREE from 'three';
 import { createBombVisuals } from './bombModel.js';
+import { createCtf } from './ctf.js';
 
 export const RULES = {
   FREEZE: 4, ROUND: 105, POST: 5, PLANT: 3, DEFUSE: 6, BOMB: 40,
@@ -19,7 +20,43 @@ const other = t => (t === 'ATK' ? 'DEF' : 'ATK');
 const hdist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
+// Game modes: 'sd' (Recherche & Destruction) and 'ctf' (Capture du drapeau, ./ctf.js). ctx.game is a facade that forwards
+// every read / write / call to the active mode, so the HUD, bots, weapon and audio keep reading ctx.game.* as before.
+// game.mode, game.setMode(m): applied at once in the main menu, otherwise at the next restart (pendingMode).
 export function createGame(ctx, options = {}) {
+  const sd = createSearchDestroy(ctx, options);
+  if (options.selfTest || options.noCtf) return sd;
+  const ctf = createCtf(ctx, sd, options);
+  const modes = { sd, ctf };
+  let active = sd;
+  const facade = {
+    get mode() { return active === ctf ? 'ctf' : 'sd'; },
+    pendingMode: null,
+    setMode(m) {
+      m = m === 'ctf' ? 'ctf' : 'sd';
+      if (active.started) { this.pendingMode = m === this.mode ? null : m; return; }
+      switchTo(m);
+    },
+    restart() {
+      if (this.pendingMode) { const m = this.pendingMode; this.pendingMode = null; active.started = false; switchTo(m); }
+      active.restart();
+    },
+  };
+  function switchTo(m) {
+    const next = modes[m]; if (next === active) return;
+    if (active === ctf) ctf.leave(); else sd.resetVisuals?.();
+    active = next;
+    if (active === ctf) { if (sd.phase === 'off') sd.init(); ctf.enter(); }
+    else if (!sd.started) sd.init();
+  }
+  return new Proxy(facade, {
+    get(t, k) { return k in t ? t[k] : active[k]; },
+    set(t, k, v) { if (k in t) t[k] = v; else active[k] = v; return true; },
+    has(t, k) { return k in t || k in active; },
+  });
+}
+
+function createSearchDestroy(ctx, options = {}) {
   const R = { ...RULES, ...(options.rules || {}) };
   const ev = (n, p) => ctx.events?.emit?.(n, p);
   const toast = text => ev('hud:toast', { text });
@@ -49,7 +86,8 @@ export function createGame(ctx, options = {}) {
     roundsToWin: R.ROUNDS_TO_WIN, started: false, rules: R,
     bomb, useProgress: 0, useLabel: '', useAction: null,
     lastResult: null, halftimeDone: false, history: [],
-    siteAt,
+    siteAt, mode: 'sd',
+    resetVisuals() { visuals?.reset(); },
     allyCount: TEAM_SIZE - 1, enemyCount: TEAM_SIZE,
     // round / bomb timers in seconds; null = automatic, scaled with team size (see autoTimings)
     roundTimeSetting: null, bombTimeSetting: null,

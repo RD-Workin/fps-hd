@@ -64,3 +64,12 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
 - Profil 10v10 (swiftshader) : 2,1 à 3,5 ms/image dont ~2,1 ms de pose des modèles, 0,25 ms de perception,
   0,2 ms de déplacement, 0,07 ms de chemins. Les colliders de la carte ne sont pas le poste dominant.
 - Banc : `/tmp` uniquement (non versionné) : parties bots seuls, joueur éliminé à chaque manche, dt 1/30.
+
+## Capture du drapeau (brain.assignCTF)
+- Rôles par équipe (stables sur la manche) : ~25 % défenseurs (moitié sur le socle via guardAround, moitié sur les lignes à
+  16-30 m de la base, regard vers l'extérieur), le reste attaque. Chaque attaquant (re)né prend la ligne la moins utilisée
+  (world.ctf.lanes, inversées côté citadelle) : toutes les rues de la carte sont parcourues.
+- Priorités : porteur bot → base (goal.push : court en tirant, sans chercher de couverture) ; 2 plus proches → drapeau au sol
+  (rendre le nôtre / prendre le leur) ; défenseurs + bots à < 35 m traquent le porteur ennemi (moitié de l'équipe max) ;
+  dès que notre camp tient le drapeau, tout bot à < 25 m du porteur (bot ou joueur) passe en escorte (formation devant,
+  flancs, arrière, goal.escort). goal.exact : pas déplacé par spreadGoals.
