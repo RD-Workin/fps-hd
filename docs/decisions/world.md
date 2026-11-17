@@ -55,3 +55,18 @@
 - GTAO at ~0.75x the CSS resolution (setSize wrapper in env.js). Dynamic resolution on HIGH/HiDPI (index.js `DR`).
 - Debug/bench handles: `world.post` (composer + passes), `world.shadows` (cache). See docs/PERF.md and scripts/perf/.
 - Pixel ratio: LOW 1.0, HIGH min(dpr,1.5). Shadow map 2048/4096. GTAO + bloom + dust on HIGH only.
+
+## Ops de nuit (night.js)
+- `world.setNight(on)` / `world.night`, choisi dans le menu (« Ambiance »), émet `'world:night' {on}` ; combinable avec tous les
+  modes : seuls l'éclairage, le ciel et l'étalonnage changent (géométrie, colliders, carte d'ombre en cache identiques).
+- Lune = le soleil existant atténué (0,22, bleuté), même direction → la cuisson d'ombre reste valable. Hémi 0,07, env 0,04,
+  rebond 0,03, exposition 1,0, brouillard 0x0b1020 densité 0,016. Dôme de nuit (dégradé, étoiles, lune) : 1 draw call.
+  Étalonnage : `uNight` (noirs bleutés, moins de relèvement, vignette + grain un peu plus forts). Poussières masquées.
+- Sources ponctuelles crédibles : les lampadaires (`lamp`) et lanternes (`lantern`) déjà posés sur la carte (34 points).
+  Leurs ampoules émissives passent à 5 (bloom). Un nombre FIXE de PointLights (HAUTE 8, BASSE 4, sans ombre) est
+  réattribué à ~10 Hz aux luminaires les plus proches de la caméra, avec fondu avant la passation (pas de pop). Tous les
+  luminaires gardent une flaque de lumière additive au sol (1 draw call instancié), atténuée quand la vraie lumière est là.
+- `world.litAt(pos)` 0..1 (lu par la perception des bots), `world.noAO` (les faux volumes de lumière y sont ajoutés).
+- Coût : le nombre de lumières change seulement au basculement (menu) et au changement de qualité → recompilation des
+  shaders, préchauffée par main.js sur `'world:night'`. En jeu : +8 lumières ponctuelles (HAUTE) + 1 spot joueur + 3 spots
+  des lampes de bots, +3 draw calls (dôme, flaques, faisceaux + reflets des bots = 2).

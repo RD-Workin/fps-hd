@@ -34,3 +34,10 @@
 - impact, blood, tracer, muzzleFlash(pos, dir, {player}), explosion; extras smoke, casing, dropMag, shake, clear (on 'round:start').
 ## TODO / ideas
 - HUD prompt still says "CLIC D RECHARGER" (reload is R now) — HUD owner.
+## Lampe torche (flashlight.js, Ops de nuit)
+- F bascule la lampe (allumée à chaque début de manche, éteinte à la mort). N'existe que la nuit (`'world:night'`).
+  `E` seul pose/désamorce désormais (F était un doublon de E dans input.js).
+- Un SpotLight sans ombre (angle 0,36 rad, pénombre 0,5, portée 36 m, légèrement plongeant) enfant de la caméra, placé devant la bouche du
+  canon (sinon il éclaire l'arme par derrière). Toujours présent la nuit (intensité 0 éteinte) : pas de recompilation.
+- Petit boîtier + lentille sous le garde-main du fusil et du fusil de précision (matériaux du viewmodel).
+- `ctx.player.lampOn` est lu par les bots (une lampe allumée se voit de loin) ; événement `'flashlight' {on}`.

@@ -51,7 +51,7 @@ export function buildAtmosphere(ctx) {
   const hemi = new THREE.HemisphereLight(0xcfe0ff, 0xb08a64, 0.95); scene.add(hemi);
   // bounce fill from the opposite side (no shadow): lifts shaded streets so soldiers stay readable
   const bounce = new THREE.DirectionalLight(0xffd9b0, 0.55); bounce.position.set(-sunDir.x * 100, 40, -sunDir.z * 100); scene.add(bounce);
-  return { sky, sun, hemi, sunDir };
+  return { sky, sun, hemi, bounce, sunDir };
 }
 
 // Hills ring, out-of-bounds skyline, landmarks (bell tower N, cranes E, water tower W). No colliders.
@@ -105,19 +105,20 @@ export function buildDust(scene, uTime) {
 }
 
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uVig: { value: 0.2 } },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uVig: { value: 0.2 }, uNight: { value: 0 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime, uVig; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime, uVig, uNight; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb;
       float l = dot(c, vec3(0.299, 0.587, 0.114));
       c = mix(vec3(l), c, 1.1);                                   // saturation
       c = mix(c, c * vec3(1.04, 1.0, 0.94), smoothstep(0.4, 1.0, l)); // warm highlights
       c = mix(c, c * vec3(0.97, 0.99, 1.03), 1.0 - smoothstep(0.0, 0.35, l)); // slight cool shadows
-      c = c + (1.0 - c) * 0.025; // shadow lift for readability
+      c = mix(c, c * vec3(0.8, 0.92, 1.25), uNight * (1.0 - smoothstep(0.0, 0.45, l))); // night: moonlit blue darks
+      c = c + (1.0 - c) * (0.025 - 0.013 * uNight); // shadow lift for readability (less at night: keep the blacks)
       c = (c - 0.5) * 1.05 + 0.5;
-      vec2 q = vUv - 0.5; c *= 1.0 - uVig * dot(q, q) * 1.6;
-      c += (h(vUv * 1000.0 + fract(uTime)) - 0.5) * 0.018;
+      vec2 q = vUv - 0.5; c *= 1.0 - (uVig + uNight * 0.3) * dot(q, q) * 1.6;
+      c += (h(vUv * 1000.0 + fract(uTime)) - 0.5) * (0.018 + 0.012 * uNight); // a touch more grain at night
       gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0); }`,
 };
 

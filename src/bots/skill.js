@@ -11,6 +11,8 @@ export const SKILLS = {
     // decisions / tactics
     coverHp: 25, coverOnReload: false, standStill: 0.4, crouchSpray: 0.2, hunt: 3, shareIntel: false,
     regroup: false, rotateWindow: 10, rotateNeed: 0.45, threatRadius: 14,
+    // Ops de nuit: sight in the dark (x NIGHT_SIGHT.dark), lamp discipline (0 always on, 1 off when holding, 2 also off when sneaking)
+    nightView: 0.8, lamp: 0,
   },
   normal: {
     label: 'NORMAL',
@@ -18,6 +20,7 @@ export const SKILLS = {
     reaction: 1, perceive: 0.12, view: 1, fov: 1, hearing: 1, peripheralMiss: 0.35, holdReact: 0.5, holdPreAim: 0.7,
     coverHp: 45, coverOnReload: true, standStill: 0, crouchSpray: 0.45, hunt: 6, shareIntel: false,
     regroup: true, rotateWindow: 20, rotateNeed: 0.3, threatRadius: 24,
+    nightView: 1, lamp: 1,
   },
   veteran: {
     label: 'VÉTÉRAN',
@@ -25,6 +28,7 @@ export const SKILLS = {
     reaction: 0.65, perceive: 0.09, view: 1.2, fov: 1.1, hearing: 1.3, peripheralMiss: 0.12, holdReact: 0.4, holdPreAim: 0.9,
     coverHp: 60, coverOnReload: true, standStill: 0, crouchSpray: 0.55, hunt: 9, shareIntel: true,
     regroup: true, rotateWindow: 25, rotateNeed: 0.2, threatRadius: 30,
+    nightView: 1.2, lamp: 2,
   },
 };
 export const SKILL_IDS = Object.keys(SKILLS);

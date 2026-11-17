@@ -4,6 +4,7 @@ import { NavGrid } from './nav.js';
 import { Bot, DIFFICULTY } from './bot.js';
 import { SKILLS, SKILL_IDS } from './skill.js';
 import { Brain } from './brain.js';
+import { createBotLamps } from './lamps.js';
 export { DIFFICULTY, SKILLS, SKILL_IDS };
 
 const _oc = new THREE.Vector3();
@@ -62,6 +63,9 @@ export function createBots(ctx) {
     },
   };
   const brain = new Brain(ctx, mgr);
+  mgr.lamps = createBotLamps(ctx, mgr); // Ops de nuit: weapon lights + night perception (lamps.js)
+  ctx.events?.on?.('world:night', e => mgr.lamps.setNight(e?.on));
+  if (ctx.world?.night) mgr.lamps.setNight(true);
 
   function ensureNav() {
     // multi-level maps export obstacles relative to the local floor (world.nav.colliders); flat maps use physics
@@ -101,7 +105,9 @@ export function createBots(ctx) {
       mgr.budget = 3; mgr.pathSpent = 0;
       brain.update(dt);
       for (const b of mgr.list) b.update(dt);
+      mgr.lamps.update(dt);
     },
+    get lamps() { return mgr.lamps; },
     // hitboxes: head sphere + torso/limb capsules from the animated bones
     raycast(origin, dir, maxDist = 1000) {
       let best = null, bt = maxDist;

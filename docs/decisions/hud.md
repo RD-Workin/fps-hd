@@ -47,3 +47,7 @@
   vies restantes par équipe) ; écran de mort avec compte à rebours de réapparition ou « éliminé pour la manche » ;
   minimap : socles, drapeaux, porteurs (ennemis compris) ; tableau : vies, ⚑ porteur, OBJ = captures + drapeaux rendus.
 - Killcam interrompue par 'player:respawn'.
+
+## Ops de nuit
+- Réglage « Ambiance » JOUR / OPS DE NUIT (`nova.hud` → `night`), appliqué en direct (`world.setNight`), sous-titre du menu
+  « VIEILLE VILLE · OPS DE NUIT ». Pastille « LAMPE F » au-dessus des munitions (allumée/éteinte), touche F dans les commandes.
