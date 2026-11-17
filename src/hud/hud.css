@@ -527,3 +527,8 @@
 .nv-sb small.lives.out { color: var(--danger); }
 .nv-bombpill.flag .nv-ico { display: none; }
 .nv-bombpill.flag::before { content: '⚑'; font-size: 18px; line-height: 1; }
+/* ---- Zombie mode ---------------------------------------------------------- */
+.nv-menu.zmode [data-sd], .nv-menu.zmode [data-only], .nv-menu:not(.zmode) [data-zm] { display: none !important; }
+.nv-hud.is-zombie .nv-wins, .nv-hud.is-zombie .nv-bombpill { display: none; }
+.nv-hud.is-zombie .nv-tm.them .sc { color: #9fd36a; }
+.nv-hud.is-zombie .nv-tm.them .side { color: #b7e08a; }

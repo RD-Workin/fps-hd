@@ -10,6 +10,7 @@ import { createBots } from './bots/index.js';
 import { createGame } from './game/index.js';
 import { createHud } from './hud/index.js';
 import { createAudio } from './audio/index.js';
+import { createGrenades } from './grenades/index.js';
 import { preloadSoldiers } from './soldiers/index.js';
 
 // ---- renderer / scene / camera (shared) ----
@@ -47,6 +48,7 @@ ctx.world = createWorld(ctx);     // map, lights, sky, post-processing, collider
 ctx.weapon = createWeapon(ctx);   // viewmodel, shooting, recoil, reload, effects
 ctx.bots = createBots(ctx);       // AI actors
 ctx.game = createGame(ctx);       // Search & Destroy rules
+ctx.grenades = createGrenades(ctx); // smoke + flash grenades (player keys G / T, bots use them too)
 ctx.audio = createAudio(ctx);     // Web Audio: weapon, steps, bomb, UI (mute: M)
 ctx.hud = createHud(ctx);         // DOM HUD, minimap, hitmarkers, menus
 
@@ -101,6 +103,7 @@ function frame() {
     ctx.game.update(dt);
   }
   ctx.world.update?.(dt);
+  ctx.grenades.update(dt);
   ctx.effects?.update?.(dt);
   ctx.audio.update?.(dt);
   ctx.hud.update(dt);

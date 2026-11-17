@@ -324,6 +324,54 @@ function explosionSub(sr, rng) {
   return finish(out, sr, 0.95, 1.5);
 }
 
+// ------------------------------------------------------------------ grenades
+function grenadePin(sr, rng) { // pin pulled + spoon spring
+  const L = N(sr, 0.4), out = new Float32Array(L);
+  scrape(L, sr, rng, 0.0, 0.07, 2500, 5200, 0.35, out);
+  click(out, sr, rng, 0.075, 3400, 0.7, 0.03);
+  addRing(out, sr, 0.08, [[2350, 1, 0.09], [3720, 0.6, 0.06], [5100, 0.3, 0.04]], 0.18, rng);
+  return finish(out, sr, 0.6);
+}
+function grenadeThrow(sr, rng) { // arm swing + cloth
+  const L = N(sr, 0.4), out = new Float32Array(L);
+  const sw = noise(L, rng); biquad(sw, sr, 'bandpass', t => 300 + 1800 * Math.sin(Math.min(1, t / 0.3) * Math.PI), 0.9); envBell(sw, sr, 0, 0.14, 0.2); mix(out, sw, 0.9);
+  const cl = noise(L, rng); bp(cl, sr, 900, 0.7); envBell(cl, sr, 0.02, 0.05, 0.12); mix(out, cl, 0.3);
+  return finish(out, sr, 0.55);
+}
+function grenadeBounce(sr, rng, heavy) { // metal canister on stone
+  const L = N(sr, 0.35), out = new Float32Array(L);
+  thump(out, sr, 0, heavy ? 180 : 260, 0.5, 0.012);
+  mix(out, hp(envExp(noise(L, rng), sr, 0.004, 0.0002), sr, 1800), 0.5);
+  const f = rng.range(heavy ? 1300 : 1900, heavy ? 1700 : 2600);
+  addRing(out, sr, 0.001, [[f, 1, 0.05], [f * 2.31, 0.6, 0.035], [f * 3.9, 0.3, 0.02]], 0.35, rng);
+  return finish(out, sr, 0.7);
+}
+function smokeHiss(sr, rng) { // pop, then a long pressurised hiss that thins out
+  const d = 6.5, L = N(sr, d), out = new Float32Array(L);
+  mix(out, lp(envExp(noise(L, rng), sr, 0.03, 0.001), sr, 900), 0.9);
+  thump(out, sr, 0, 120, 0.6, 0.03);
+  const h = noise(L, rng); biquad(h, sr, 'bandpass', t => 3200 + 1400 * Math.exp(-t / 1.5) + 300 * Math.sin(t * 7), 0.6);
+  for (let i = 0; i < L; i++) { const t = i / sr; h[i] *= Math.min(1, t / 0.08) * (0.65 * Math.exp(-t / 2.4) + 0.35 * Math.max(0, 1 - t / d)) * (0.85 + 0.15 * Math.sin(t * 31)); }
+  mix(out, h, 0.8);
+  const rum = noise(L, rng); lp(rum, sr, 400); envExp(rum, sr, 1.5, 0.05); mix(out, rum, 0.3);
+  return finish(out, sr, 0.75);
+}
+function flashBang(sr, rng) { // very sharp, loud crack with a short slap-back
+  const L = N(sr, 2.2), out = new Float32Array(L);
+  mix(out, hp(envExp(noise(L, rng), sr, 0.006, 0.0001), sr, 1200), 2.0);
+  mix(out, envExp(noise(L, rng), sr, 0.035, 0.0002), 1.0);
+  addTone(out, sr, 0, 1.2, t => 140 * Math.exp(-t / 0.05) + 55, 1.2, 0.18, { att: 0.0008 });
+  const body = noise(L, rng); biquad(body, sr, 'lowpass', t => 6000 * Math.exp(-t / 0.08) + 200, 0.7); envExp(body, sr, 0.22, 0.001); mix(out, body, 1.4);
+  addEchoes(out, sr, [[0.11, 0.4, 2200], [0.27, 0.25, 1200], [0.6, 0.15, 700]], rng);
+  return finish(out, sr, 0.99, 2.6);
+}
+function flashRing(sr) { // tinnitus after a flash: two beating tones, long
+  const L = N(sr, 5), out = new Float32Array(L);
+  addTone(out, sr, 0, 5, t => 4100 + 10 * Math.sin(t * 4), 1, 2.0, { att: 0.05 });
+  addTone(out, sr, 0, 5, 4127, 0.35, 1.6, { att: 0.05 });
+  return finish(out, sr, 0.5);
+}
+
 // ------------------------------------------------------------------ UI
 function uiHover(sr, rng) {
   const L = N(sr, 0.06), out = new Float32Array(L);
@@ -408,6 +456,13 @@ export function buildSfx(sr) {
     uiHover: [uiHover(sr, rng)],
     uiClick: [uiClick(sr, rng)],
     pickup: [pickup(sr, rng)],
+    grenadePin: v(2, () => grenadePin(sr, rng)),
+    grenadeThrow: v(2, () => grenadeThrow(sr, rng)),
+    grenadeBounce: v(3, () => grenadeBounce(sr, rng, false)),
+    smokeBounce: v(3, () => grenadeBounce(sr, rng, true)),
+    smokeHiss: [smokeHiss(sr, rng)],
+    flashBang: v(2, () => flashBang(sr, rng)),
+    flashRing: [flashRing(sr)],
   };
   return bank;
 }

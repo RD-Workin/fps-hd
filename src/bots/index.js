@@ -90,6 +90,8 @@ export function createBots(ctx) {
     // 'easy' | 'normal' | 'veteran' — live: applies from the next perception tick
     setSkill(level) { if (SKILLS[level]) mgr.level = level; return mgr.level; },
     get nav() { return mgr.nav; },
+    // Zombie mode: {targets(bot) -> zombies to perceive, goals(aliveBots) -> sets bot.goal, closeAware (m, 360° awareness)}; null = S&D
+    setZombieHooks(h) { mgr.targetsFor = h?.targets || null; mgr.goalProvider = h?.goals || null; mgr.closeAware = h?.closeAware || 0; },
     get brain() { return brain; },
     setup(roster) {
       for (const b of mgr.list) b.dispose();

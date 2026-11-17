@@ -174,6 +174,8 @@ export function createWeapon(ctx) {
       events.emit('weapon:equip', { id: d.id, name: d.name, switched });
     },
     resetForRound() { this.equip(loadout ? loadout.pref : this.current); },
+    // bring the weapon back up after a grenade throw (draw animation + sound)
+    redraw() { drawT = 0; pos.reset(); rot.reset(); events.emit('weapon:equip', { id: this.current, name: this.name, switched: true }); },
     startReload() {
       if (this.reloading || this.mag >= K.def.magSize || this.reserve <= 0 || !player.alive) return;
       this.reloading = true; reloadT = 0; emptyReload = this.mag === 0 || boltT >= 0; this.emptyReload = emptyReload;
@@ -183,7 +185,7 @@ export function createWeapon(ctx) {
     },
     canFire() {
       const ph = ctx.game?.phase;
-      return player.alive && !player.frozen && (ph === undefined || ph === 'live');
+      return player.alive && !player.frozen && !ctx.grenades?.busy && (ph === undefined || ph === 'live');
     },
     fire() {
       const def = K.def, sniper = def.id === 'sniper';
@@ -227,6 +229,7 @@ export function createWeapon(ctx) {
     },
     update(dt) {
       const inp = ctx.input, def = K.def, sniper = def.id === 'sniper';
+      if (ctx.game?.infiniteAmmo) this.reserve = def.maxReserve; // zombie mode: unlimited ammo (reloads still happen)
       syncProj();
       loadout.update();
       // bolt cycle (sniper)
@@ -241,7 +244,7 @@ export function createWeapon(ctx) {
       const moving = Math.min(1, player.moveSpeed / 5.6);
       this.bloom = Math.max(0, this.bloom - dt * (inp.fireDown ? 0.01 : 0.08));
       // aim down sights (right click held). Sniper: unscopes while the bolt is cycled.
-      this.aiming = !!inp.aimDown && player.alive && !this.reloading && drawT > 0.6 && !this.cycling;
+      this.aiming = !!inp.aimDown && player.alive && !this.reloading && drawT > 0.6 && !this.cycling && !ctx.grenades?.busy;
       this.adsK += ((this.aiming ? 1 : 0) - this.adsK) * Math.min(1, dt * (sniper ? 11 : 14));
       if (this.adsK < 0.001) this.adsK = 0;
       scopeK = sniper ? smooth(0.55, 0.95, this.adsK) : 0;
@@ -268,7 +271,7 @@ export function createWeapon(ctx) {
         }
       }
       // reload
-      if (inp.reloadPressed) this.startReload();
+      if (inp.reloadPressed && !ctx.grenades?.busy) this.startReload();
       if (this.reloading) {
         if (!player.alive) { this.reloading = false; this.reloadProgress = 0; }
         else {
@@ -375,7 +378,7 @@ export function createWeapon(ctx) {
       }
       // scope: recoil nudges the overlay; the gun is hidden behind the full-screen scope
       if (scopeK > 0) scope.setKick(pos.x.x * 6, -pos.x.y * 18 - rot.x.x * 3);
-      root.visible = player.alive && scopeK < 0.97;
+      root.visible = player.alive && scopeK < 0.97 && !ctx.grenades?.busy;
     },
   };
   const loadout = createLoadout(ctx, [WEAPONS.rifle, WEAPONS.sniper], (id) => {

@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { createBombVisuals } from './bombModel.js';
 import { createCtf } from './ctf.js';
+import { createZombieMode } from './zombie.js';
 
 export const RULES = {
   FREEZE: 4, ROUND: 105, POST: 5, PLANT: 3, DEFUSE: 6, BOMB: 40,
@@ -27,13 +28,13 @@ export function createGame(ctx, options = {}) {
   const sd = createSearchDestroy(ctx, options);
   if (options.selfTest || options.noCtf) return sd;
   const ctf = createCtf(ctx, sd, options);
-  const modes = { sd, ctf };
+  const modes = { sd, ctf, zombie: sd };
   let active = sd;
   const facade = {
-    get mode() { return active === ctf ? 'ctf' : 'sd'; },
+    get mode() { return active === ctf ? 'ctf' : sd.zmode ? 'zombie' : 'sd'; },
     pendingMode: null,
     setMode(m) {
-      m = m === 'ctf' ? 'ctf' : 'sd';
+      m = m === 'ctf' || m === 'zombie' ? m : 'sd';
       if (active.started) { this.pendingMode = m === this.mode ? null : m; return; }
       switchTo(m);
     },
@@ -43,10 +44,14 @@ export function createGame(ctx, options = {}) {
     },
   };
   function switchTo(m) {
-    const next = modes[m]; if (next === active) return;
+    const next = modes[m];
+    if (next === sd && active === sd) { sd.setZombie(m === 'zombie'); return; } // R&D <-> Zombies: same object
+    if (next === active) return;
+    if (active === sd && sd.zmode) { sd.started = false; sd.setZombie(false); }
     if (active === ctf) ctf.leave(); else sd.resetVisuals?.();
     active = next;
     if (active === ctf) { if (sd.phase === 'off') sd.init(); ctf.enter(); }
+    else if (m === 'zombie') sd.setZombie(true);
     else if (!sd.started) sd.init();
   }
   return new Proxy(facade, {
@@ -88,6 +93,18 @@ function createSearchDestroy(ctx, options = {}) {
     lastResult: null, halftimeDone: false, history: [],
     siteAt, mode: 'sd',
     resetVisuals() { visuals?.reset(); },
+    // Zombie mode (waves, see zombie.js) runs inside this object: zmode switches it on. The facade (createGame) maps
+    // game.mode 'zombie' to it.
+    zmode: false,
+    get infiniteAmmo() { return this.zmode; },
+    setZombie(on) {
+      on = !!on; if (on === this.zmode) return;
+      if (this.zmode) zombie.stop();
+      this.zmode = on; if (!this.started) this.init();
+    },
+    setZombieAllies(n) { const was = zombie.allies; zombie.setAllies(n); if (!this.started && this.zmode && was !== zombie.allies) this.init(); },
+    setZombieProgression(p) { zombie.setProgression(p); },
+    get zombie() { return zombie; },
     allyCount: TEAM_SIZE - 1, enemyCount: TEAM_SIZE,
     // round / bomb timers in seconds; null = automatic, scaled with team size (see autoTimings)
     roundTimeSetting: null, bombTimeSetting: null,
@@ -119,6 +136,10 @@ function createSearchDestroy(ctx, options = {}) {
     aliveCount(team) { return actors().filter(a => a.team === team && a.alive).length; },
 
     init() {
+      if (this.zmode) {
+        stopAllUses(); visuals?.reset(); Object.assign(bomb, { state: 'defused', carrier: null, position: null, site: null, timeLeft: 0 });
+        zombie.init(); this.phase = 'menu'; placeMenuCamera(0); return;
+      }
       const roster = [
         ...ALLY_NAMES.slice(0, this.allyCount).map(name => ({ name, team: 'ATK', ally: true })),
         ...ENEMY_NAMES.slice(0, this.enemyCount).map(name => ({ name, team: 'DEF', ally: false })),
@@ -138,6 +159,7 @@ function createSearchDestroy(ctx, options = {}) {
     start() {
       if (this.started) return;
       this.started = true;
+      if (this.zmode) { matchWinner = null; this.history = []; zombie.start(); placeCameraOnPlayer(); return; }
       this.score = { us: 0, them: 0 }; this.round = 0; matchWinner = null; this.halftimeDone = false; this.history = [];
       for (const a of actors()) { a.stats = null; ensureStats(a); }
       applySide(this.resolveSide());
@@ -147,12 +169,14 @@ function createSearchDestroy(ctx, options = {}) {
 
     restart() {
       this.started = false; // start() puts the squad back on the preferred side
+      if (this.zmode) this.init();
       const want = this.allyCount + this.enemyCount;
       if ((ctx.bots?.list?.length ?? want) !== want) this.init(); // team sizes changed in the pause menu
       this.start();
     },
 
     actorUse(actor, dt) {
+      if (this.zmode) return 0;
       if (this.phase !== 'live' || !actor || !actor.alive) return 0;
       const kind = canPlant(actor) ? 'plant' : canDefuse(actor) ? 'defuse' : null;
       if (!kind) { stopUse(actor); return 0; }
@@ -173,6 +197,7 @@ function createSearchDestroy(ctx, options = {}) {
     },
 
     update(dt) {
+      if (this.zmode) { zombie.update(dt); frame++; return; }
       for (const a of actors()) ensureStats(a);
       switch (this.phase) {
         case 'freeze':
@@ -208,6 +233,8 @@ function createSearchDestroy(ctx, options = {}) {
       visuals?.update(dt, this);
     },
   };
+
+  const zombie = createZombieMode(ctx, game, { names: ALLY_NAMES });
 
   // Put the player's squad on `side` (swaps every actor's team if needed).
   function applySide(side) {

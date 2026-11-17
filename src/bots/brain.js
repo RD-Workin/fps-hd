@@ -23,6 +23,7 @@ export class Brain {
   update(dt) {
     if ((this.t -= dt) > 0) return; this.t = 0.4;
     const { ctx } = this, game = ctx.game, nav = this.mgr.nav;
+    if (this.mgr.goalProvider) { if (nav) this.mgr.goalProvider(this.mgr.list.filter(b => b.alive)); return; } // zombie mode
     if (!game || !nav || !this.sites().length) return;
     const bots = this.mgr.list.filter(b => b.alive);
     this.updateThreat();
@@ -33,6 +34,7 @@ export class Brain {
     }
     this.assignATK(atk, game);
     this.assignDEF(def, game);
+    this.retakeUtility(def, game);
     this.spreadGoals(atk); this.spreadGoals(def);
   }
 
@@ -127,7 +129,7 @@ export class Brain {
       if (there && sq.t0 == null) sq.t0 = now;
       const contact = [...P.member].some(([b, m]) => m.sq === sq && b.alive && now - b.alertT < 1.5 && m.i >= sq.stageI);
       const regroup = this.mgr.skillForTeam?.('ATK')?.regroup ?? true;
-      if (!regroup || !alive || there >= Math.ceil(alive * 0.7) || (sq.t0 != null && now - sq.t0 > 7) || contact || (game.roundTimeLeft ?? 99) < 45) { sq.go = true; sq.goAt = now; }
+      if (!regroup || !alive || there >= Math.ceil(alive * 0.7) || (sq.t0 != null && now - sq.t0 > 7) || contact || (game.roundTimeLeft ?? 99) < 45) { sq.go = true; sq.goAt = now; if (!contact) this.pushUtility(sq); }
     }
     for (const b of rest) {
       const m = P.member.get(b);
@@ -143,6 +145,50 @@ export class Brain {
       }
       if (m.i < route.length) { const [x, z] = route[m.i]; b.goal = { x, z, tol: 2.5, speed: 'run', huntRange: 16 }; continue; }
       this.directToSite(b, tgt);
+    }
+  }
+
+  // ------------------------------------------------------------ grenades (src/grenades)
+  // Grouped push: smoke the defenders' angle on the entry, then flash the site, then go.
+  pushUtility(sq) {
+    const G = this.ctx.grenades; if (!G || !sq.stage) return;
+    const now = this.ctx.time, site = sq.site, stage = { x: sq.stage[0], z: sq.stage[1] };
+    const members = [...this.plan.member].filter(([b, m]) => m.sq === sq && b.alive && !b.hasBomb).map(([b]) => b)
+      .sort((a, b) => hd(a.position, stage) - hd(b.position, stage));
+    if (!members.length) return;
+    // freshest defenders seen around the site, closest to our entry first
+    const seen = [...this.mgr.intel.ATK].filter(([e, i]) => e.alive && now - i.t < 12 && hd(i.pos, site.center) < site.radius + 16)
+      .map(([, i]) => i.pos).sort((a, b) => hd(a, stage) - hd(b, stage));
+    const smoker = members.find(b => G.inventory(b).smoke);
+    if (smoker) {
+      let tgt = seen[0];
+      if (!tgt || hd(tgt, smoker.position) > 30) { // no intel: block the deep part of the site seen from our entry
+        const k = 0.62; tgt = this.mgr.nav.snap(stage.x + (site.center.x - stage.x) * k, stage.z + (site.center.z - stage.z) * k) || site.center;
+      }
+      smoker.requestThrow('smoke', { x: tgt.x, y: this.fy(tgt.x, tgt.z), z: tgt.z });
+    }
+    const flasher = members.find(b => b !== smoker && G.inventory(b).flash) || (smoker && G.inventory(smoker).flash && !smoker.throwPlan ? smoker : null);
+    if (flasher) {
+      const tgt = seen.find(p => hd(p, flasher.position) < 26) || site.center, y = this.fy(tgt.x, tgt.z);
+      flasher.requestThrow('flash', { x: tgt.x, y, z: tgt.z }, { victimEye: { x: tgt.x, y: y + 1.6, z: tgt.z }, delay: smoker ? 0.8 : 0, push: true });
+    }
+  }
+  // Retake of a planted bomb: flash the guards we know about, smoke the bomb for the defuser.
+  retakeUtility(list, game) {
+    const G = this.ctx.grenades, bomb = game.bomb, P = this.plan; if (!G || bomb.state !== 'planted' || !bomb.position || game.phase !== 'live') return;
+    const now = this.ctx.time;
+    const guards = [...this.mgr.intel.DEF].filter(([e, i]) => e.alive && now - i.t < 8 && hd(i.pos, bomb.position) < 14).map(([, i]) => i.pos);
+    if (!guards.length) return;
+    if (!P.retakeSmoke) {
+      const d = list.find(b => b.goal?.kind === 'defuse'), dist = d ? hd(d.position, bomb.position) : 99;
+      if (d && dist > 5 && dist < 22 && G.inventory(d).smoke && d.requestThrow('smoke', { x: bomb.position.x, y: bomb.position.y, z: bomb.position.z })) P.retakeSmoke = now;
+    }
+    if (G.teamReady('DEF', 'flash', 3.5)) {
+      for (const b of list) {
+        if (b.goal?.kind === 'defuse' || !G.inventory(b).flash) continue;
+        const tgt = guards.find(g => { const dd = hd(g, b.position); return dd > 7 && dd < 24; }); if (!tgt) continue;
+        if (b.requestThrow('flash', tgt, { victimEye: { x: tgt.x, y: (tgt.y || 0) + 1.6, z: tgt.z }, push: true })) break;
+      }
     }
   }
 

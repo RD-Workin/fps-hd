@@ -50,6 +50,45 @@ export class Bot {
     this.goal = null; this.cover = null; this.coverUntil = 0; this.strafeDir = Math.random() < 0.5 ? -1 : 1; this.strafeT = 0;
     this.crouching = false; this.crouchUntil = 0; this.using = false; this.fired = false; this.scanPhase = Math.random() * 6;
     this.aimYaw = this.yaw; this.aimPitch = 0; this.lookYaw = this.yaw; this.ready = 0.3;
+    // grenades: flash blindness, a throw being wound up, looking away from our own flash, push after a flash
+    this.blindUntil = 0; this.blindAmt = 0; this.throwPlan = null; this.avertUntil = 0; this.avertYaw = 0; this.pushUntil = 0;
+    this.lastThrowT = -100; this.nadeT = rand(0.5, 1.5);
+  }
+  get blind() { return this.ctx.time < this.blindUntil; }
+  // flash grenade (src/grenades): amount 0..1, blind until `until`
+  onFlashed(amount, until) {
+    this.blindUntil = Math.max(this.blindUntil, until); this.blindAmt = amount; this.seen.clear();
+    this.throwPlan = null; this.burstLeft = 0; this.blindJitter = rand(-1, 1);
+  }
+  // Wind up a grenade throw toward `target` ({x, y?, z}); returns false if no throw reaches it.
+  requestThrow(kind, target, opts = {}) {
+    const G = this.ctx.grenades; if (!G || !this.alive || this.throwPlan || this.blind || !G.inventory(this)[kind]) return false;
+    const s = G.solveThrow(this, kind, target, opts); if (!s) return false;
+    const t = this.ctx.time;
+    this.throwPlan = { kind, vel: s.vel, yaw: s.yaw, pitch: s.pitch, end: s.end, at: t + (opts.delay ?? 0) + rand(0.35, 0.55), expire: t + (opts.delay ?? 0) + 2.5, push: !!opts.push };
+    this.lastThrowT = t;
+    return true;
+  }
+  // Opportunistic grenades (every ~0.6 s): flash a corner where an enemy was just heard/seen before peeking it;
+  // smoke the line of fire when hurt and falling back to cover.
+  considerGrenades(engaged, goal) {
+    const G = this.ctx.grenades, t = this.ctx.time; if (!G || this.throwPlan || this.using || t - this.lastThrowT < 7) return;
+    if (goal?.kind === 'plant' && this.hasBomb) return;
+    const inv = G.inventory(this);
+    if (engaged && inv.smoke && this.health < 50 && G.teamReady(this.team, 'smoke', 6)) {
+      const tp = this.target.position, d = tp.distanceTo(this.position);
+      if (d > 10 && d < 45 && Math.random() < 0.45) {
+        const k = THREE.MathUtils.clamp(rand(0.3, 0.45), 4 / d, 0.6);
+        this.requestThrow('smoke', { x: this.position.x + (tp.x - this.position.x) * k, y: this.position.y, z: this.position.z + (tp.z - this.position.z) * k });
+      }
+      return;
+    }
+    if (!engaged && inv.flash && this.lastKnown && t - this.lastKnownT < 3 && G.teamReady(this.team, 'flash', 4) && Math.random() < 0.3) {
+      const lk = this.lastKnown, d = Math.hypot(lk.x - this.position.x, lk.z - this.position.z);
+      if (d < 7 || d > 24) return;
+      if (this.ctx.physics.lineOfSight(this.getEyePosition(_a), _b.set(lk.x, (lk.y || 0) + 1.5, lk.z))) return; // in plain sight: just shoot
+      this.requestThrow('flash', lk, { victimEye: new THREE.Vector3(lk.x, (lk.y || 0) + 1.6, lk.z), push: true });
+    }
   }
   spawn(pos, yaw, team) {
     if (team) this.team = team; this.model.setTeam(this.team); // always: teams flip at half-time / side choice
@@ -78,8 +117,10 @@ export class Bot {
   perceive() {
     const { ctx } = this, D = DIFFICULTY, S = this.skill, t = ctx.time, eye = this.getEyePosition(_a);
     const night = !!this.mgr.lamps?.night;
+    const blind = t < this.blindUntil, smoke = ctx.grenades;
     let best = null, bestScore = Infinity, bestDark = false;
-    for (const e of ctx.actors) {
+    const pool = this.mgr.targetsFor ? this.mgr.targetsFor(this) : ctx.actors; // zombie mode: nearest zombies only
+    for (const e of pool) {
       if (!e.alive || e.team === this.team) continue;
       const dx = e.position.x - this.position.x, dz = e.position.z - this.position.z, d = Math.hypot(dx, dz);
       // hearing: gunshots + running footsteps
@@ -91,17 +132,17 @@ export class Bot {
           this.lastKnownT = t; this.alertT = t;
         }
       }
-      if (d > D.view * S.view) continue;
+      if (blind || d > D.view * S.view) continue;
       const known = this.isVisible(e);
       // Ops de nuit: an unlit enemy is only noticed close by; lamps, street lights and muzzle flashes give it away
       const ns = night ? nightSight(this, e, d, dx, dz, t, S) : null;
       if (ns && d > ns.range && !(known && d < ns.range * 1.5)) continue;
-      const inFov = Math.abs(angDiff(this.aimYaw, yawTo(dx, dz))) < D.fov * S.fov / 2 || d < 2.5 || known || ns?.dazzle;
+      const inFov = Math.abs(angDiff(this.aimYaw, yawTo(dx, dz))) < D.fov * S.fov / 2 || d < Math.max(2.5, this.mgr.closeAware || 0) || known || ns?.dazzle;
       if (!inFov) continue;
       // LOS to head then chest
       const head = e.getEyePosition ? e.getEyePosition(_b) : _b.copy(e.position).setY(e.position.y + 1.6);
-      let vis = ctx.physics.lineOfSight(eye, head);
-      if (!vis) { _b.copy(e.position); _b.y += (e.height || 1.8) * 0.55; vis = ctx.physics.lineOfSight(eye, _b); }
+      let vis = ctx.physics.lineOfSight(eye, head) && !smoke?.blocksSight(eye, head);
+      if (!vis) { _b.copy(e.position); _b.y += (e.height || 1.8) * 0.55; vis = ctx.physics.lineOfSight(eye, _b) && !smoke?.blocksSight(eye, _b); }
       if (!vis) continue;
       // distant & dark: small chance to miss a target in peripheral vision
       if (!known && d > 35 * S.view && Math.random() < S.peripheralMiss) continue;
@@ -162,9 +203,24 @@ export class Bot {
     } else { this.using = false; this.useProgress = 0; }
 
     const locked = !live || (this.frozen && !this.using) || this.using;
+    const blind = t < this.blindUntil, plan = this.throwPlan;
+    if (plan && (t > plan.expire || !live)) this.throwPlan = null;
+    if (live && !locked && !blind && (this.nadeT -= dt) <= 0) { this.nadeT = rand(0.5, 0.8); this.considerGrenades(engaged, goal); }
     if (!this.using && this.mag < D.mag && this.reloadT < 0 && (this.mag === 0 || (!engaged && this.mag < D.mag / 2 && t - this.targetSeenAt > 2))) this.reloadT = 0;
 
-    if (!locked) {
+    if (!locked && blind) {
+      // flashed: back away from the last threat, crouched, firing blind at where it was
+      const lk = this.lastKnown;
+      if (lk) {
+        const dx = this.position.x - lk.x, dz = this.position.z - lk.z, n = Math.hypot(dx, dz) || 1, nav = this.mgr.nav;
+        let sx = dx / n + (this.blindJitter || 0) * 0.6, sz = dz / n;
+        if (nav && !nav.isWalkable(this.position.x + sx, this.position.z + sz)) { const tx = sx; sx = -sz; sz = tx; }
+        dest = { x: this.position.x + sx * 2, z: this.position.z + sz * 2, direct: true }; speed = D.crouch; faceMove = false;
+      }
+      crouch = this.blindAmt > 0.5;
+    } else if (!locked && this.throwPlan) {
+      dest = null; faceMove = false; // stand and throw
+    } else if (!locked) {
       if (engaged) {
         const tp = this.target.position, dist = tp.distanceTo(this.position);
         look = tp;
@@ -177,7 +233,7 @@ export class Bot {
           if (Math.hypot(this.cover.x - this.position.x, this.cover.z - this.position.z) < 0.6) { dest = null; crouch = true; }
         } else {
           // strafe (A-D) with random switching, crouch-spray at range
-          if ((this.strafeT -= dt) <= 0) { this.strafeT = rand(0.35, 1.0); this.strafeDir = Math.random() < S.standStill ? 0 : Math.random() < 0.5 ? -1 : 1; if (dist > 16 && Math.random() < S.crouchSpray) this.crouchUntil = t + rand(0.8, 2); }
+          if ((this.strafeT -= dt) <= 0) { this.strafeT = rand(0.35, 1.0); this.strafeDir = goal?.stand || Math.random() < S.standStill ? 0 : Math.random() < 0.5 ? -1 : 1; if (dist > 16 && Math.random() < S.crouchSpray) this.crouchUntil = t + rand(0.8, 2); }
           crouch = t < this.crouchUntil;
           if (!crouch && this.strafeDir) {
             const dx = tp.x - this.position.x, dz = tp.z - this.position.z, n = Math.hypot(dx, dz) || 1;
@@ -188,6 +244,10 @@ export class Bot {
             dest = { x: this.position.x + sx * 2, z: this.position.z + sz * 2, direct: true }; speed = D.walk; faceMove = false;
           }
         }
+      } else if (this.lastKnown && t < this.pushUntil) {
+        // our flash just popped: rush the flashed spot
+        dest = this.lastKnown; speed = D.run; look = this.lastKnown; faceMove = false;
+        if (this.lastKnown.distanceTo(this.position) < 1.5) this.pushUntil = 0;
       } else if (this.target && this.lastKnown && t - this.lastKnownT < S.hunt && !goal?.noHunt && this.lastKnown.distanceTo(goal?.anchor || this.position) < (goal?.huntRange ?? 25)) {
         // hunt: pre-aim and walk to the last known position
         dest = this.lastKnown; speed = D.walk; look = this.lastKnown; faceMove = false;
@@ -236,7 +296,14 @@ export class Bot {
     let wantYaw = this.aimYaw, wantPitch = 0;
     const eye = this.getEyePosition(_a);
     const scan = Math.sin(t * 0.55 + this.scanPhase) * 0.4;
-    if (engaged || look) {
+    const pl = this.throwPlan;
+    if (pl && !locked && !blind) {
+      wantYaw = pl.yaw; wantPitch = pl.pitch;
+    } else if (blind && !locked) {
+      wantYaw = this.aimYaw + Math.sin(t * 2.3 + this.scanPhase) * 0.6 * dt * 4; wantPitch = -0.15;
+    } else if (t < this.avertUntil && !engaged && !locked) {
+      wantYaw = this.avertYaw; wantPitch = -0.2;
+    } else if (engaged || look) {
       const p = engaged ? this.aimPoint(_b) : _b.set(look.x, (look.y ?? 0) + 1.3, look.z);
       wantYaw = yawTo(p.x - eye.x, p.z - eye.z); wantPitch = Math.atan2(p.y - eye.y, Math.hypot(p.x - eye.x, p.z - eye.z));
       if (!engaged && !dest && !this.using) wantYaw += scan * 0.8; // hold an angle: scan around it
@@ -250,8 +317,21 @@ export class Bot {
     this.pitch = this.aimPitch;
     this.ready += ((engaged || (look && !faceMove) || this.using ? 1 : t - this.alertT < 5 ? 0.8 : 0.25) - this.ready) * Math.min(1, dt * 5);
 
-    // --- fire
-    if (engaged && !locked && this.reloadT < 0) this.tryFire(Math.abs(dy), eye);
+    // --- throw (once turned toward the throw direction)
+    if (pl && !locked && !blind && t >= pl.at && Math.abs(angDiff(this.aimYaw, pl.yaw)) < 0.25) {
+      this.throwPlan = null;
+      if (this.ctx.grenades?.throwFrom(this, pl.kind, pl.vel)) {
+        this.ready = 0.1; this.lastThrowT = t;
+        // own flash: look away until it pops if it will be in view, then push in
+        if (pl.kind === 'flash') {
+          if (pl.end && ctx.physics.lineOfSight(eye, pl.end)) { this.avertUntil = t + 1.75; this.avertYaw = pl.yaw + Math.PI + rand(-0.5, 0.5); }
+          if (pl.push) this.pushUntil = t + 1.7 + 2.5;
+        }
+      }
+    }
+    // --- fire (a flashed bot sprays blind for a moment at where its target was)
+    if (engaged && !locked && this.reloadT < 0 && !this.throwPlan) this.tryFire(Math.abs(dy), eye);
+    else if (blind && !locked && this.reloadT < 0 && this.target?.alive && t - this.targetSeenAt < 1.2) this.tryFire(0, eye, true);
 
     this.model.pose(this.poseState(dt));
     this.updateHitboxes();
@@ -282,8 +362,9 @@ export class Bot {
     return false;
   }
 
-  tryFire(aimErr, eye) {
+  tryFire(aimErr, eye, blindFire = false) {
     const D = this.wstats, S = this.skill, t = this.ctx.time, tg = this.target, sniper = this.weapon === 'sniper';
+    if (blindFire && sniper) return;
     if (t < this.reactUntil || t < this.nextShot || this.mag <= 0) return;
     const dist = tg.position.distanceTo(this.position);
     if (aimErr > (0.1 + 0.6 / Math.max(2, dist)) * S.aimTol) return; // still turning onto the target
@@ -294,7 +375,9 @@ export class Bot {
     const moveF = this.moveSpeed > 3 ? 0.55 : this.moveSpeed > 1 ? 0.8 : this.crouching ? 1.15 : 1;
     const ts = tg.moveSpeed ?? 0; const tMoveF = ts > 4 ? 0.75 : ts > 2 ? 0.88 : 1;
     const burstF = Math.max(0.6, 1 - this.shotIdx * 0.07);
-    const p = THREE.MathUtils.clamp(D.accuracy * S.accuracy * track * distF * moveF * tMoveF * burstF, 0.03, 0.92);
+    // flash: blind fire is mostly wasted, and aim stays shaky for a second after the sight comes back
+    const flashF = blindFire ? 0.08 : t < this.blindUntil + 1.2 ? 0.55 : 1;
+    const p = THREE.MathUtils.clamp(D.accuracy * S.accuracy * track * distF * moveF * tMoveF * burstF, 0.03, 0.92) * flashF;
     const hit = Math.random() < p;
     const head = hit && this.aimHead && Math.random() < 0.5 + track * 0.3 && Math.random() < 0.45;
     const muzzle = this.model.muzzle.getWorldPosition(_d);
