@@ -243,7 +243,9 @@ export function dressZones(K) {
   // =====================================================================================================
   // QUAI EST (0 / hump +1.5)
   // =====================================================================================================
-  Floor(66, 76, 8, 42, 'concrete');
+  // one floor per level: a single slab lifted on its centre (+1.5) covered the stairs and the ground-level quay, so players
+  // walked onto a visual floor with no collider under it and sank through it (the stairs keep their own stone treads)
+  Floor(66, 76, 8, 18, 'concrete'); Floor(66, 76, 22, 30, 'concrete'); Floor(66, 76, 34, 42, 'concrete');
   Container(73.2, 35.2, false, 0x2f5f8f); Crate(67, 40.6); Crate(67, 39.4, 1.0); NetPile(74.6, 31.2); Barrel(66.6, 34.6, OCHRE);
   Stack(67.2, 26, 2); Crate(74.8, 23.2); Pallets(74.6, 27.2, 3); Boat(72.5, 14.5, R, 0xd9a230); Tyres(66.8, 16.6, 3); Lamp(75.4, 20, -R);
 
