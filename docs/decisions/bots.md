@@ -65,6 +65,18 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
   0,2 ms de déplacement, 0,07 ms de chemins. Les colliders de la carte ne sont pas le poste dominant.
 - Banc : `/tmp` uniquement (non versionné) : parties bots seuls, joueur éliminé à chaque manche, dt 1/30.
 
+## Difficulté (skill.js)
+- `SKILLS` {easy RECRUE, normal NORMAL, veteran VÉTÉRAN} : multiplicateurs/valeurs appliqués par-dessus DIFFICULTY/SNIPER.
+  `normal` = valeurs d'avant (banc équilibré). S'applique à l'équipe adverse du joueur (suit le changement de camp) ;
+  les alliés jouent toujours `normal`. API : `bots.setSkill(level)`, `bots.skill`, `mgr.skillFor(bot)` / `skillForTeam(team)`.
+- Visée : précision, chance de tête, temps d'ajustement (track), vitesse de rotation, tolérance avant de tirer, pauses de rafale.
+- Réaction / perception : temps de réaction, période de perception (0,2 / 0,12 / 0,09 s), portée de vue, champ, ouïe,
+  chance de rater une cible en périphérie, avantage du tenant d'angle.
+- Décisions / tactique : PV de repli à couvert (25 / 45 / 60), couvert pendant la recharge (pas en recrue), recrue parfois
+  immobile en duel et moins accroupie, durée de traque (3 / 6 / 9 s) ; vétéran : appels d'équipe (pré-vise la dernière
+  position ennemie signalée par un coéquipier < 40 m). ATK recrue : pas de regroupement avant l'assaut ;
+  DEF : rotation plus lente/rapide (fenêtre 10 / 20 / 25 s, seuil 45 / 30 / 20 %, rayon de menace 14 / 24 / 30 m).
+- HUD : réglage « Difficulté des ennemis » (localStorage `nova.hud.skill`), appliqué en direct.
 ## Capture du drapeau (brain.assignCTF)
 - Rôles par équipe (stables sur la manche) : ~25 % défenseurs (moitié sur le socle via guardAround, moitié sur les lignes à
   16-30 m de la base, regard vers l'extérieur), le reste attaque. Chaque attaquant (re)né prend la ligne la moins utilisée

@@ -16,7 +16,7 @@ Contrôles : ZQSD (AZERTY) se déplacer · souris viser · clic gauche tirer · 
 Espace sauter · C s'accroupir · Maj marcher · Tab scores · mort : clic/Espace allié suivant, V ou clic droit vue FPS de l'allié · M couper le son · F3 compteur de perfs · Échap pause.
 
 Modes (au choix dans le menu) :
-- Recherche & Destruction : 10 contre 10, tir allié activé, camp de départ au choix, changement de camp à la mi-temps.
+- Recherche & Destruction : 10 contre 10, tir allié activé, camp de départ et difficulté des ennemis (Recrue, Normal, Vétéran) au choix, changement de camp à la mi-temps.
 - Capture du drapeau : un drapeau côté port, un côté citadelle ; 3 captures ou meilleur score après 10 min, en BO3 (camps
   inversés en manche 2, tirés au sort en manche 3). Réapparition 3 s qui s'allonge à chaque mort (plus fort en grandes équipes),
   remise à zéro à chaque capture de son équipe ; nombre de vies limité par manche. Réglages dans le menu.

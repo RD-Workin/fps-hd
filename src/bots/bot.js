@@ -2,6 +2,8 @@
 // hunting) and executes the objective goal given by the team brain (brain.js).
 import * as THREE from 'three';
 import { SoldierModel, DIM } from '../soldiers/index.js';
+import { SKILLS } from './skill.js';
+const NORMAL = SKILLS.normal;
 
 export const DIFFICULTY = {
   reaction: [0.25, 0.55], accuracy: 0.55, trackMin: 0.35, trackTime: 1.4, damage: 25, headDamage: 60, headshotChance: 0.1,
@@ -33,6 +35,7 @@ export class Bot {
     for (let i = 0; i < 9; i++) this.hb.segs.push({ a: new THREE.Vector3(), b: new THREE.Vector3(), r: 0.08 });
     this.percT = Math.random() * 0.12; this.resetAI();
   }
+  get skill() { return this.mgr.skillFor?.(this) ?? NORMAL; }
   get wstats() { return this.weapon === 'sniper' ? SNIPER : DIFFICULTY; }
   setWeapon(id) { this.weapon = id === 'sniper' ? 'sniper' : 'rifle'; this.model.setWeapon?.(this.weapon); this.mag = this.wstats.mag; this.reloadT = -1; }
   get eyeHeight() { return this.height - 0.15; }
@@ -72,7 +75,7 @@ export class Bot {
 
   // ------------------------------------------------------------ perception
   perceive() {
-    const { ctx } = this, D = DIFFICULTY, t = ctx.time, eye = this.getEyePosition(_a);
+    const { ctx } = this, D = DIFFICULTY, S = this.skill, t = ctx.time, eye = this.getEyePosition(_a);
     let best = null, bestScore = Infinity;
     for (const e of ctx.actors) {
       if (!e.alive || e.team === this.team) continue;
@@ -80,15 +83,15 @@ export class Bot {
       // hearing: gunshots + running footsteps
       const shotAgo = t - (e.lastShotTime ?? -100);
       const spd = e.moveSpeed ?? Math.hypot(e.velocity?.x || 0, e.velocity?.z || 0);
-      if ((shotAgo < 0.25 && d < D.hearing) || (spd > 4 && d < D.stepHearing)) {
+      if ((shotAgo < 0.25 && d < D.hearing * S.hearing) || (spd > 4 && d < D.stepHearing * S.hearing)) {
         if (!this.target || !this.isVisible(this.target)) {
           this.lastKnown = e.position.clone().add(_d.set(rand(-2, 2), 0, rand(-2, 2)).multiplyScalar(Math.min(1, d / 15)));
           this.lastKnownT = t; this.alertT = t;
         }
       }
-      if (d > D.view) continue;
+      if (d > D.view * S.view) continue;
       const known = this.isVisible(e);
-      const inFov = Math.abs(angDiff(this.aimYaw, yawTo(dx, dz))) < D.fov / 2 || d < 2.5 || known;
+      const inFov = Math.abs(angDiff(this.aimYaw, yawTo(dx, dz))) < D.fov * S.fov / 2 || d < 2.5 || known;
       if (!inFov) continue;
       // LOS to head then chest
       const head = e.getEyePosition ? e.getEyePosition(_b) : _b.copy(e.position).setY(e.position.y + 1.6);
@@ -96,7 +99,7 @@ export class Bot {
       if (!vis) { _b.copy(e.position); _b.y += (e.height || 1.8) * 0.55; vis = ctx.physics.lineOfSight(eye, _b); }
       if (!vis) continue;
       // distant & dark: small chance to miss a target in peripheral vision
-      if (!known && d > 35 && Math.random() < 0.35) continue;
+      if (!known && d > 35 * S.view && Math.random() < S.peripheralMiss) continue;
       this.seen.set(e, t);
       this.mgr.report(this.team, e);
       const score = d * (e === this.target ? 0.6 : 1) * (shotAgo < 1 ? 0.8 : 1);
@@ -108,24 +111,33 @@ export class Bot {
       const fy = Math.atan2(-(best.position.x - this.position.x), -(best.position.z - this.position.z));
       let dAng = Math.abs(((fy - this.yaw) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI);
       const holding = this.moveSpeed < 0.8 && dAng < D.holdCone;
-      this.reactUntil = t + rand(...D.reaction) * (alerted ? 0.7 : 1) * (this.target ? 0.6 : 1) * (holding ? D.holdReact : 1);
-      this.trackStart = this.reactUntil - (holding ? D.trackTime * D.holdPreAim : 0); this.target = best; this.burstLeft = 0; this.shotIdx = 0;
+      this.reactUntil = t + rand(...D.reaction) * S.reaction * (alerted ? 0.7 : 1) * (this.target ? 0.6 : 1) * (holding ? S.holdReact : 1);
+      this.trackStart = this.reactUntil - (holding ? D.trackTime * S.trackTime * S.holdPreAim : 0); this.target = best; this.burstLeft = 0; this.shotIdx = 0;
     }
     if (this.target) {
       if (!this.target.alive) { this.target = null; }
       else if (this.isVisible(this.target)) { this.lastKnown = this.target.position.clone(); this.lastKnownT = t; this.targetSeenAt = t; }
       else if (t - this.targetSeenAt > 3) this.target = null;
     }
+    // team callouts (veteran): no contact of its own -> check the freshest nearby enemy position a teammate reported
+    if (S.shareIntel && !this.target && t - this.lastKnownT > 2) {
+      let bi = null, bd = 40;
+      for (const [e, info] of this.mgr.intel[this.team] || []) {
+        if (!e.alive || t - info.t > 1.5) continue;
+        const d = Math.hypot(info.pos.x - this.position.x, info.pos.z - this.position.z); if (d < bd) { bd = d; bi = info; }
+      }
+      if (bi) { this.lastKnown = bi.pos.clone(); this.lastKnownT = t; this.alertT = t; }
+    }
   }
 
   // ------------------------------------------------------------ main update
   update(dt) {
-    const { ctx } = this, t = ctx.time, game = ctx.game, D = this.wstats;
+    const { ctx } = this, t = ctx.time, game = ctx.game, D = this.wstats, S = this.skill;
     this.fired = false;
     if (!this.alive) { this.model.pose(this.poseState(dt)); this.updateHitboxes(); return; }
     const phase = game?.phase ?? 'live';
     const live = phase === 'live';
-    if ((this.percT -= dt) <= 0) { this.percT = 0.12; if (live || phase === 'post') this.perceive(); }
+    if ((this.percT -= dt) <= 0) { this.percT = S.perceive; if (live || phase === 'post') this.perceive(); }
     if (this.reloadT >= 0) { this.reloadT += dt; if (this.reloadT >= D.reload) { this.reloadT = -1; this.mag = D.mag; } }
 
     const engaged = live && this.target && this.isVisible(this.target);
@@ -150,18 +162,18 @@ export class Bot {
       if (engaged) {
         const tp = this.target.position, dist = tp.distanceTo(this.position);
         look = tp;
-        const needCover = (this.health < 45 || this.reloadT >= 0) && !goal?.noCover;
-        if (goal?.push && Math.hypot(goal.x - this.position.x, goal.z - this.position.z) > (goal.tol ?? 1)) { // objective first (flag carrier / grab): run and gun
-          dest = goal; speed = D.run; faceMove = false;
-        } else if (needCover && t > this.coverUntil) { this.cover = this.mgr.findCover(this, tp); this.coverUntil = t + 4; }
-        if (needCover && this.cover) {
+        const needCover = (this.health < S.coverHp || (S.coverOnReload && this.reloadT >= 0)) && !goal?.noCover;
+        const pushing = goal?.push && Math.hypot(goal.x - this.position.x, goal.z - this.position.z) > (goal.tol ?? 1);
+        if (pushing) { dest = goal; speed = D.run; faceMove = false; } // objective first (flag carrier / grab): run and gun
+        else if (needCover && t > this.coverUntil) { this.cover = this.mgr.findCover(this, tp); this.coverUntil = t + 4; }
+        if (pushing) { /* keep running */ } else if (needCover && this.cover) {
           dest = this.cover; speed = D.run; faceMove = false;
           if (Math.hypot(this.cover.x - this.position.x, this.cover.z - this.position.z) < 0.6) { dest = null; crouch = true; }
         } else {
           // strafe (A-D) with random switching, crouch-spray at range
-          if ((this.strafeT -= dt) <= 0) { this.strafeT = rand(0.35, 1.0); this.strafeDir = Math.random() < 0.5 ? -1 : 1; if (dist > 16 && Math.random() < 0.45) this.crouchUntil = t + rand(0.8, 2); }
+          if ((this.strafeT -= dt) <= 0) { this.strafeT = rand(0.35, 1.0); this.strafeDir = Math.random() < S.standStill ? 0 : Math.random() < 0.5 ? -1 : 1; if (dist > 16 && Math.random() < S.crouchSpray) this.crouchUntil = t + rand(0.8, 2); }
           crouch = t < this.crouchUntil;
-          if (!crouch) {
+          if (!crouch && this.strafeDir) {
             const dx = tp.x - this.position.x, dz = tp.z - this.position.z, n = Math.hypot(dx, dz) || 1;
             let sx = -dz / n * this.strafeDir, sz = dx / n * this.strafeDir;
             if (dist > 28) { sx += dx / n * 0.6; sz += dz / n * 0.6; } // close distance a bit
@@ -170,7 +182,7 @@ export class Bot {
             dest = { x: this.position.x + sx * 2, z: this.position.z + sz * 2, direct: true }; speed = D.walk; faceMove = false;
           }
         }
-      } else if (this.target && this.lastKnown && t - this.lastKnownT < 6 && !goal?.noHunt && this.lastKnown.distanceTo(goal?.anchor || this.position) < (goal?.huntRange ?? 25)) {
+      } else if (this.target && this.lastKnown && t - this.lastKnownT < S.hunt && !goal?.noHunt && this.lastKnown.distanceTo(goal?.anchor || this.position) < (goal?.huntRange ?? 25)) {
         // hunt: pre-aim and walk to the last known position
         dest = this.lastKnown; speed = D.walk; look = this.lastKnown; faceMove = false;
         if (this.lastKnown.distanceTo(this.position) < 1.5) { this.target = null; }
@@ -225,7 +237,7 @@ export class Bot {
     } else if (faceMove && this.moveSpeed > 0.5) {
       wantYaw = yawTo(this.velocity.x, this.velocity.z); this.lookYaw = wantYaw;
     } else if (!locked) wantYaw = this.lookYaw + scan;
-    const turn = D.turnRate * dt * (engaged ? 1 : 0.7);
+    const turn = D.turnRate * S.turnRate * dt * (engaged ? 1 : 0.7);
     const dy = angDiff(this.aimYaw, wantYaw); this.aimYaw += THREE.MathUtils.clamp(dy * Math.min(1, dt * 9), -turn, turn);
     this.aimPitch += THREE.MathUtils.clamp((wantPitch - this.aimPitch) * Math.min(1, dt * 8), -turn, turn);
     this.yaw = this.aimYaw;
@@ -265,18 +277,18 @@ export class Bot {
   }
 
   tryFire(aimErr, eye) {
-    const D = this.wstats, t = this.ctx.time, tg = this.target, sniper = this.weapon === 'sniper';
+    const D = this.wstats, S = this.skill, t = this.ctx.time, tg = this.target, sniper = this.weapon === 'sniper';
     if (t < this.reactUntil || t < this.nextShot || this.mag <= 0) return;
     const dist = tg.position.distanceTo(this.position);
-    if (aimErr > 0.1 + 0.6 / Math.max(2, dist)) return; // still turning onto the target
-    if (this.burstLeft <= 0) { this.burstLeft = Math.round(rand(...D.burst) + (dist < 10 && !sniper ? 3 : 0)); this.shotIdx = 0; this.aimHead = Math.random() < D.headshotChance * 2.5; }
+    if (aimErr > (0.1 + 0.6 / Math.max(2, dist)) * S.aimTol) return; // still turning onto the target
+    if (this.burstLeft <= 0) { this.burstLeft = Math.round(rand(...D.burst) + (dist < 10 && !sniper ? 3 : 0)); this.shotIdx = 0; this.aimHead = Math.random() < D.headshotChance * S.headshot * 2.5; }
     // probability-based hit model
-    const track = D.trackMin + (1 - D.trackMin) * THREE.MathUtils.clamp((t - this.trackStart) / D.trackTime, 0, 1);
+    const tMin = Math.min(0.9, D.trackMin * S.trackMin), track = tMin + (1 - tMin) * THREE.MathUtils.clamp((t - this.trackStart) / (D.trackTime * S.trackTime), 0, 1);
     const distF = sniper ? THREE.MathUtils.clamp(1.1 - dist / 120, 0.5, 1.05) * (dist < 8 ? 0.7 : 1) : THREE.MathUtils.clamp(1.15 - dist / 55, 0.3, 1.1);
     const moveF = this.moveSpeed > 3 ? 0.55 : this.moveSpeed > 1 ? 0.8 : this.crouching ? 1.15 : 1;
     const ts = tg.moveSpeed ?? 0; const tMoveF = ts > 4 ? 0.75 : ts > 2 ? 0.88 : 1;
     const burstF = Math.max(0.6, 1 - this.shotIdx * 0.07);
-    const p = THREE.MathUtils.clamp(D.accuracy * track * distF * moveF * tMoveF * burstF, 0.03, 0.92);
+    const p = THREE.MathUtils.clamp(D.accuracy * S.accuracy * track * distF * moveF * tMoveF * burstF, 0.03, 0.92);
     const hit = Math.random() < p;
     const head = hit && this.aimHead && Math.random() < 0.5 + track * 0.3 && Math.random() < 0.45;
     const muzzle = this.model.muzzle.getWorldPosition(_d);
@@ -296,7 +308,7 @@ export class Bot {
         fx?.muzzleFlash?.(muzzle.clone(), _c.subVectors(end, muzzle).normalize().clone());
         this.ctx.events.emit('bot:fire', { bot: this, origin: muzzle.clone(), hit: false, target: tg });
         this.mag--; this.lastShotTime = t; this.fired = true; this.shotIdx++; this.burstLeft--;
-        this.nextShot = t + D.shotInterval * rand(0.95, 1.15) + (this.burstLeft <= 0 ? rand(...D.pause) * (dist < 10 ? 0.5 : 1) : 0);
+        this.nextShot = t + D.shotInterval * rand(0.95, 1.15) + (this.burstLeft <= 0 ? rand(...D.pause) * S.pause * (dist < 10 ? 0.5 : 1) : 0);
         return;
       }
       const dmg = (head ? D.headDamage : D.damage) * (dist > D.falloffStart ? 0.85 : 1);
@@ -316,7 +328,7 @@ export class Bot {
     fx?.muzzleFlash?.(muzzle.clone(), _c.subVectors(end, muzzle).normalize().clone());
     this.ctx.events.emit('bot:fire', { bot: this, origin: muzzle.clone(), hit, target: tg });
     this.mag--; this.lastShotTime = t; this.fired = true; this.shotIdx++; this.burstLeft--;
-    this.nextShot = t + D.shotInterval * rand(0.95, 1.15) + (this.burstLeft <= 0 ? rand(...D.pause) * (dist < 10 ? 0.5 : 1) : 0);
+    this.nextShot = t + D.shotInterval * rand(0.95, 1.15) + (this.burstLeft <= 0 ? rand(...D.pause) * S.pause * (dist < 10 ? 0.5 : 1) : 0);
   }
 
   // follow an A* path toward dest; returns the next waypoint {x,z}

@@ -12,7 +12,9 @@
 - Lanes (interleaved, 4 routes per site): West = Montée -> Cour -> Escalier de l'Église (A). A-short = Halle -> Rue des
   Filets -> back alley -> Passage -> Maison A (A). Centre = Grand-Rue -> Place Ronde -> Grand Escalier -> Médina, then
   Galerie/cloister (A) or Corniche (B). East = Hangar -> Entrepôt yard -> gate (B), Tunnel -> yard, Quai Est (B).
-- Rotations: Rue des Filets (west<->centre), Tunnel (centre<->east), Médina (A<->B for DEF), Jardins / Bastion from the citadel.
+- Rotations: Rue des Filets (west<->centre), Tunnel (centre<->east), Médina (A<->B for DEF), Jardins / Bastion from the citadel,
+  Café back stairs x[-8,-6] z[2,4] (+1.5 -> +3: terrace / back alley -> Café -> Médina, a second way into mid that skips
+  the Grand Escalier).
 - Site A (-56,-12) r7, floor +3: church square, statue = default plant cover, balcony +4.5 overwatch, Maison A window.
   Site B (60,-6) r7, floor 0: shipyard, hull on slip + gantry crane, dock +1.5, Corniche +3 overwatch.
 - Timings (run 5 m/s): DEF->A 17 s, ATK->A 18 s, DEF->B 18 s, ATK->B 19 s. Sightlines broken every 25-35 m.
