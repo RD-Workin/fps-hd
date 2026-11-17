@@ -77,3 +77,11 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
   position ennemie signalée par un coéquipier < 40 m). ATK recrue : pas de regroupement avant l'assaut ;
   DEF : rotation plus lente/rapide (fenêtre 10 / 20 / 25 s, seuil 45 / 30 / 20 %, rayon de menace 14 / 24 / 30 m).
 - HUD : réglage « Difficulté des ennemis » (localStorage `nova.hud.skill`), appliqué en direct.
+## Capture du drapeau (brain.assignCTF)
+- Rôles par équipe (stables sur la manche) : ~25 % défenseurs (moitié sur le socle via guardAround, moitié sur les lignes à
+  16-30 m de la base, regard vers l'extérieur), le reste attaque. Chaque attaquant (re)né prend la ligne la moins utilisée
+  (world.ctf.lanes, inversées côté citadelle) : toutes les rues de la carte sont parcourues.
+- Priorités : porteur bot → base (goal.push : court en tirant, sans chercher de couverture) ; 2 plus proches → drapeau au sol
+  (rendre le nôtre / prendre le leur) ; défenseurs + bots à < 35 m traquent le porteur ennemi (moitié de l'équipe max) ;
+  dès que notre camp tient le drapeau, tout bot à < 25 m du porteur (bot ou joueur) passe en escorte (formation devant,
+  flancs, arrière, goal.escort). goal.exact : pas déplacé par spreadGoals.
