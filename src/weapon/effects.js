@@ -224,6 +224,7 @@ export function createEffects(ctx) {
     },
     explosion(pos) {
       const p = tmp.copy(pos); p.y = Math.max(p.y, 0.2);
+      lights[2].color.setHex(0xff8a3a);
       flashLight(2, V.copy(p).setY(p.y + 1.5), 900, 1.0);
       for (let k = 0; k < 26; k++) { // fireball
         vel.set(rnd(-1, 1), rnd(0.2, 1.4), rnd(-1, 1)).normalize().multiplyScalar(rnd(2, 9));
@@ -246,6 +247,29 @@ export function createEffects(ctx) {
       e.shake(Math.max(0, 1.2 - d / 40), 1.2);
     },
     // --- extras ---
+    // flash grenade: white light burst (shares the explosion light, recoloured), glare, sparks, a puff of smoke
+    flashbang(pos) {
+      const p = tmp.copy(pos);
+      lights[2].color.setHex(0xe8f0ff); flashLight(2, p, 520, 0.28);
+      add.spawn({ pos: p, life: 0.12, size: 3.5, size1: 9, color: [5, 5, 5], alpha: 1, tile: 0 });
+      add.spawn({ pos: p, life: 0.3, size: 1.2, size1: 2.4, color: [3, 3, 3.2], alpha: 1, tile: 0 });
+      for (let k = 0; k < 22; k++) {
+        vel.set(rnd(-1, 1), rnd(-0.6, 1), rnd(-1, 1)).normalize().multiplyScalar(rnd(4, 11));
+        add.spawn({ pos: p, vel, life: rnd(0.15, 0.4), size: 0.02, color: [4, 3.6, 3], alpha: 1, drag: 2, grav: 4, tile: 3, stretch: 0.02 });
+      }
+      for (let k = 0; k < 5; k++) {
+        vel.set(rnd(-1, 1), rnd(-0.2, 1), rnd(-1, 1)).multiplyScalar(rnd(0.6, 1.5));
+        alpha.spawn({ pos: p, vel, life: rnd(1.6, 2.6), size: 0.3, size1: rnd(1.4, 2.2), color: [0.72, 0.72, 0.7], alpha: 0.45, drag: 1.6, grav: -0.2, tile: 1 + (k & 1), rotVel: rnd(-0.5, 0.5), fadeIn: 0.1 });
+      }
+      camera.getWorldPosition(V); e.shake(Math.max(0, 0.4 - V.distanceTo(p) / 40), 0.3);
+    },
+    // smoke grenade popping: a jet of grey smoke from the canister (the cloud itself lives in src/grenades)
+    smokePop(pos) {
+      for (let k = 0; k < 10; k++) {
+        vel.set(rnd(-1, 1), rnd(0.4, 1.4), rnd(-1, 1)).normalize().multiplyScalar(rnd(1.5, 4));
+        alpha.spawn({ pos: V2.copy(pos).setY(pos.y + 0.15), vel, life: rnd(0.8, 1.6), size: 0.25, size1: rnd(1.2, 2), color: [0.7, 0.71, 0.72], alpha: 0.6, drag: 2.2, grav: -0.3, tile: 1 + (k & 1), rotVel: rnd(-1, 1) });
+      }
+    },
     smoke(pos, opts = {}) { // small wisp (muzzle smoke after a burst)
       alpha.spawn({ pos, vel: V.set(rnd(-0.1, 0.1), rnd(0.2, 0.45), rnd(-0.1, 0.1)), life: rnd(0.8, 1.4), size: opts.size ?? 0.05, size1: (opts.size ?? 0.05) * 6, color: [0.75, 0.75, 0.75], alpha: opts.alpha ?? 0.18, drag: 1, tile: 1 + ((Math.random() * 2) | 0), rotVel: rnd(-1, 1) });
     },

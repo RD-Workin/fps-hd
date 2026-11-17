@@ -40,9 +40,11 @@ ctx.player   Actor (see below) + yaw, pitch, velocity, moveSpeed, onGround, addR
 ctx.actors   [player, ...bots.list]  (ctx.refreshActors() rebuilds it)
 ctx.time     game clock seconds (stops while paused) ; ctx.paused
 ctx.world / ctx.weapon / ctx.bots / ctx.game / ctx.hud / ctx.effects  — see below
+ctx.grenades smoke + flash grenades (src/grenades, docs/decisions/grenades.md): busy, clouds, inventory(actor),
+             blocksSight(a, b), smokeAt(p), blindness(actor), throwFrom(actor, kind, vel), solveThrow(actor, kind, target, opts)
 ```
 Frame order (only when not paused): player.update → bots.update → weapon.update → game.update ;
-then always: world.update → effects.update → hud.update → input.endFrame → world.render.
+then always: world.update → grenades.update → effects.update → hud.update → input.endFrame → world.render.
 
 ## Actor interface (player and every bot)
 ```

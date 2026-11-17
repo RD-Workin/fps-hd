@@ -27,6 +27,7 @@ function arcPath() {
 function markup() {
   const keys = [
     ['Z Q S D', 'Se déplacer', 'wide'], ['Souris', 'Regarder', 'wide'], ['Clic G', 'Tirer', 'wide'], ['Clic D', 'Viser (ADS)', 'wide'], ['R', 'Recharger'], ['1 / 2', 'Arme (préparation)'],
+    ['G', 'Fumigène (maintenir)'], ['T', 'Flash (maintenir)'], ['Clic D', 'Lancer court', 'wide'],
     ['E', 'Poser / désamorcer'], ['Cadavre', 'Munitions', 'wide'], ['Espace', 'Sauter', 'wide'], ['C', 'S\'accroupir'], ['Maj', 'Marcher'],
     ['Tab', 'Scores'], ['M', 'Couper le son'], ['Échap', 'Pause'],
   ].map(([k, l, w]) => `<div class="nv-key"><kbd class="${w || ''}">${k}</kbd>${l}</div>`).join('');
