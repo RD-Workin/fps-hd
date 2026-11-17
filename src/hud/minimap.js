@@ -126,6 +126,12 @@ export function createMinimap(ctx, canvas, zoneEl) {
       for (const l of labels) { toMini(l.x, l.z, pt); if (Math.hypot(pt.x - C, pt.y - C) < R - 14) g.fillText(String(l.text).toUpperCase(), pt.x, pt.y); }
     }
 
+    // smoke clouds (src/grenades)
+    for (const c of ctx.grenades?.clouds || []) {
+      const dens = ctx.grenades.smokeDensity(c); if (dens <= 0.05) continue;
+      toMini(c.center.x, c.center.z, pt);
+      g.fillStyle = `rgba(200, 205, 210, ${(0.45 * dens).toFixed(2)})`; g.beginPath(); g.arc(pt.x, pt.y, ctx.grenades.smokeRadius(c) * PPM, 0, Math.PI * 2); g.fill();
+    }
     const now = ctx.time || 0;
     const actors = ctx.actors || [];
     // enemies (only while recently firing)

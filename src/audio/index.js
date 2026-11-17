@@ -199,6 +199,23 @@ export function createAudio(ctx) {
     duck('music', 0.35, 0.6, 0.8); duck('amb', 0.2, 1.5, 1.5);
     if (d < 20) { play('tinnitus', { gain: 0.35 * (1 - d / 20), bus: 'ui', send: 0, prio: 8 }); blastMuffle = 1; }
   });
+  // grenades (src/grenades)
+  E.on('grenade:pin', () => play('grenadePin', { prio: 4, max: 1, send: 0.05 }));
+  E.on('grenade:throw', p => play('grenadeThrow', me(p?.actor) ? { prio: 4, max: 2, send: 0.05 } : { pos: p.pos, gain: 0.8, prio: 2, max: 3 }));
+  E.on('grenade:bounce', p => p?.pos && play(p.kind === 'flash' ? 'grenadeBounce' : 'smokeBounce', { pos: p.pos, gain: Math.min(1, 0.25 + p.speed / 9), prio: 2, max: 4, send: 0.12 }));
+  E.on('grenade:smoke', p => p?.pos && play('smokeHiss', { pos: p.pos.clone().setY(p.pos.y + 0.3), gain: 0.9, prio: 4, max: 3, send: 0.2 }));
+  E.on('grenade:flash', p => {
+    if (!p?.pos) return; const d = camPos.distanceTo(p.pos);
+    play('flashBang', { pos: p.pos, gain: 1.4, prio: 8, max: 3, send: 0.45, occlude: false });
+    if (d < 25) duck('amb', 0.3, 0.4, 1);
+  });
+  E.on('grenade:flashed', p => {
+    if (!me(p?.actor) || !(p.amount > 0.2)) return;
+    flashMuffle = Math.max(flashMuffle, Math.min(1, p.amount * 1.2)); flashMuffleDur = 1.5 + 4 * p.amount;
+    play('flashRing', { gain: 0.25 + 0.4 * p.amount, bus: 'ui', send: 0, prio: 8, max: 1 });
+    duck('music', 0.3, 1 + 2 * p.amount, 1.5); duck('amb', 0.15, 1 + 2 * p.amount, 1.5);
+  });
+  E.on('round:start', () => { flashMuffle = 0; });
   // effects hooks (impacts, enemy tracers) — wrap ctx.effects functions once
   function hookEffects() {
     const fx = ctx.effects; if (!fx || fx.__audioHooked) return; fx.__audioHooked = true;
@@ -228,6 +245,7 @@ export function createAudio(ctx) {
 
   // ---------------- per-frame state polling
   const st = new WeakMap();
+  let flashMuffle = 0, flashMuffleDur = 3;
   let deathMuffle = 0, blastMuffle = 0, lastCut = 20000, reloadStage = 0, wasReloading = false, wasOnGround = true, minVy = 0;
   let stepAcc = 0, hbTimer = 0, breathFlip = false, bombBeepT = 0, warned = false, useT = 0, lastPhase = '';
   let errOnce = false, botUse = null, matchStung = false;
@@ -246,11 +264,13 @@ export function createAudio(ctx) {
       const p = ctx.player, w = ctx.weapon, g = ctx.game, inp = ctx.input;
       // muffle: low health, death, explosion, pause menu
       blastMuffle = Math.max(0, blastMuffle - dt / 2.5);
+      flashMuffle = Math.max(0, flashMuffle - dt / flashMuffleDur);
       let cut = 20000;
       if (ctx.paused && g?.started) cut = 900;
       if (p?.alive && p.health < 30) cut = Math.min(cut, 1500 + p.health * 40);
       if (deathMuffle) cut = Math.min(cut, 500);
       if (blastMuffle) cut = Math.min(cut, 600 + (1 - blastMuffle) * 8000);
+      if (flashMuffle) cut = Math.min(cut, 450 + Math.pow(1 - flashMuffle, 2) * 9000);
       if (Math.abs(cut - lastCut) / lastCut > 0.04) { buses.muffle.frequency.setTargetAtTime(cut, now, 0.12); lastCut = cut; }
       if (g?.phase !== lastPhase) { lastPhase = g?.phase; if (lastPhase === 'freeze') warned = false; }
       // beds: menu pad on the main menu / end screen, wind whenever a match is running
