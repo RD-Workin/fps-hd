@@ -1,6 +1,6 @@
 # Décisions — mode Zombie (src/game/zombie.js, src/zombies/index.js)
 
-Statut : FAIT (build vert). Choix dans le menu « Mode de jeu » (localStorage `nova.hud.mode`), appliqué à la partie suivante si un match tourne.
+Statut : FAIT (build vert). Choix dans le menu « Mode de jeu » (R&D / CTF / Zombies ; le mode Zombie vit dans l'objet R&D, `sd.zmode`, la façade de createGame le présente comme `game.mode === "zombie"`) (localStorage `nova.hud.mode`), appliqué à la partie suivante si un match tourne.
 ## Règles
 - Joueur + N bots alliés (curseur « Bots alliés », réglage séparé `zallies`, 3 par défaut) contre des vagues de zombies.
 - Munitions illimitées : `game.infiniteAmmo` → weapon garde `reserve = maxReserve` (on recharge toujours). HUD affiche « ∞ ».

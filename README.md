@@ -1,6 +1,6 @@
 # Opération Nova — FPS Recherche & Destruction (navigateur)
 
-FPS original jouable dans le navigateur : une carte, un mode (Recherche & Destruction, 10c10 contre des bots).
+FPS original jouable dans le navigateur : une carte, deux modes (Recherche & Destruction et Capture du drapeau, jusqu'à 20c20 contre des bots).
 Three.js 0.170 + Vite 5, 100 % gratuit (code open source, assets procéduraux ou CC0/MIT).
 
 ```bash
@@ -17,6 +17,9 @@ Espace sauter · C s'accroupir · Maj marcher · Tab scores · mort : clic/Espac
 
 Modes (au choix dans le menu) :
 - Recherche & Destruction : 10 contre 10, tir allié activé, camp de départ et difficulté des ennemis (Recrue, Normal, Vétéran) au choix, changement de camp à la mi-temps.
+- Capture du drapeau : un drapeau côté port, un côté citadelle ; 3 captures ou meilleur score après 10 min, en BO3 (camps
+  inversés en manche 2, tirés au sort en manche 3). Réapparition 3 s qui s'allonge à chaque mort (plus fort en grandes équipes),
+  remise à zéro à chaque capture de son équipe ; nombre de vies limité par manche. Réglages dans le menu.
 - Zombies : vagues de zombies sortant de la mer au port, munitions illimitées, nombre d'alliés au choix (ils vous suivent et tiennent la position avec vous), difficulté qui monte par le nombre, la vitesse ou les deux. Voir [docs/decisions/zombies.md](docs/decisions/zombies.md).
 
 ## Architecture

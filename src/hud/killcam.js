@@ -81,6 +81,7 @@ export function createKillcam(ctx, hudRoot, { esc, ICONS }) {
   ctx.events.on('actor:killed', ({ victim, headshot } = {}) => { if (victim?.isPlayer && pending) pending.hs = !!headshot; });
   const abort = () => { pending = null; stop(); };
   ctx.events.on('round:start', abort);
+  ctx.events.on('player:respawn', abort); // capture du drapeau: back in the fight
   ctx.events.on('match:end', abort);
 
   // find slot index pair around time t (buffer is short: linear scan is fine)

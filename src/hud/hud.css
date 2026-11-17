@@ -489,9 +489,39 @@
 .nv-hud.is-specfps .nv-death, .nv-hud.is-specfps .nv-dead-tint { opacity: 0 !important; transition: opacity .25s; }
 @media (max-width: 700px) { .nv-spv .card { min-width: 0; left: 3vw; right: 3vw; transform: none; } .nv-spv .keys { display: none; } }
 
+/* ---------- capture du drapeau ---------- */
+.nv-menu:not(.m-ctf) [data-only="ctf"], .nv-menu.m-ctf [data-only="sd"] { display: none; }
+.nv-seg-mode button { padding: 6px 10px; font-size: 12px; letter-spacing: .12em; }
+.nv-flags { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); display: none; gap: 10px; font-size: 12px; letter-spacing: .14em; font-weight: 600; white-space: nowrap; }
+.nv-flags.on { display: flex; }
+.nv-hud.is-mainmenu .nv-flags { display: none; }
+.nv-flags .f { display: flex; align-items: center; gap: 8px; padding: 4px 12px; background: var(--panel); min-width: 270px; }
+.nv-flags .f.us { border-left: 2px solid var(--ally); justify-content: flex-start; }
+.nv-flags .f.them { border-right: 2px solid var(--enemy); flex-direction: row-reverse; }
+.nv-flags .fi { font-style: normal; font-size: 16px; }
+.nv-flags .us .fi { color: var(--ally); } .nv-flags .them .fi { color: var(--enemy); }
+.nv-flags .l { color: var(--dim); }
+.nv-flags .v { color: #fff; flex: 1; }
+.nv-flags .them .v { text-align: right; }
+.nv-flags .v b { color: var(--gold); }
+.nv-flags .lv { color: var(--dim); font-size: 11px; }
+.nv-flags .lv b { color: #fff; font-family: var(--f-num); }
+.nv-flags .f.away .fi { animation: nv-blink .8s step-end infinite; }
+.nv-flags .us.away { background: linear-gradient(90deg, rgba(255, 59, 74, .35), var(--panel)); }
+.nv-flags .them.away { background: linear-gradient(270deg, rgba(64, 217, 255, .3), var(--panel)); }
+.nv-alive span.out { opacity: .35; }
+.nv-alive span.out .nv-ico { transform: scaleY(.45) translateY(10px); }
+.nv-death .r { font-size: 18px; letter-spacing: .1em; color: #fff; min-height: 4px; }
+.nv-death .r b { font-family: var(--f-num); color: var(--gold); }
+.nv-tag-n.flag .nm::before { content: '⚑ '; color: var(--gold); }
+.nv-bombpill.flag { background: linear-gradient(90deg, var(--ally), #8fe6ff); }
+.nv-sb .flagb { color: var(--gold); margin-left: 6px; }
+.nv-sb small.lives { margin-left: 8px; font-size: 10px; letter-spacing: .12em; color: var(--dim); }
+.nv-sb small.lives.out { color: var(--danger); }
+.nv-bombpill.flag .nv-ico { display: none; }
+.nv-bombpill.flag::before { content: '⚑'; font-size: 18px; line-height: 1; }
 /* ---- Zombie mode ---------------------------------------------------------- */
-.nv-menu.zmode [data-sd], .nv-menu:not(.zmode) [data-zm] { display: none !important; }
-.nv-menu.zmode .nv-desc-sd, .nv-menu:not(.zmode) .nv-desc-zm { display: none; }
+.nv-menu.zmode [data-sd], .nv-menu.zmode [data-only], .nv-menu:not(.zmode) [data-zm] { display: none !important; }
 .nv-hud.is-zombie .nv-wins, .nv-hud.is-zombie .nv-bombpill { display: none; }
 .nv-hud.is-zombie .nv-tm.them .sc { color: #9fd36a; }
 .nv-hud.is-zombie .nv-tm.them .side { color: #b7e08a; }

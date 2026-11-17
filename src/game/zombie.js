@@ -54,7 +54,7 @@ export function createZombieMode(ctx, game, { names }) {
       origRaycast = bots.raycast;
       bots.raycast = (o, d, max) => {
         const a = origRaycast.call(bots, o, d, max);
-        if (game.mode !== 'zombie' || !Z.horde) return a;
+        if (!game.zmode || !Z.horde) return a;
         const b = Z.horde.raycast(o, d, a ? a.distance : max);
         return b || a;
       };
@@ -67,9 +67,9 @@ export function createZombieMode(ctx, game, { names }) {
   }
   function detach() { ctx.bots?.setZombieHooks?.(null); Z.horde?.clear(); }
 
-  ctx.events?.on?.('player:damaged', () => { if (game.mode === 'zombie') lastHurt.set(ctx.player, ctx.time); });
+  ctx.events?.on?.('player:damaged', () => { if (game.zmode) lastHurt.set(ctx.player, ctx.time); });
   ctx.events?.on?.('actor:killed', ({ killer, victim } = {}) => {
-    if (game.mode !== 'zombie' || !victim) return;
+    if (!game.zmode || !victim) return;
     if (victim.isZombie) Z.kills++; // kill credit (+100) is counted by the S&D stats listener in index.js
     else if (victim.isPlayer) { if (humans().length) toast('Vous revenez à la fin de la vague'); }
     else toast(`${victim.name} est tombé`);

@@ -193,6 +193,32 @@ export function createMinimap(ctx, canvas, zoneEl) {
         g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(pt.x + ox - 3.5, pt.y + oy - 1.5, 4, 3);
       }
     }
+    // capture du drapeau: both bases, both flags; a carrier is visible to everyone
+    const flags = ctx.game?.mode === 'ctf' ? ctx.game.flags : null;
+    if (flags) {
+      for (const team of ['ATK', 'DEF']) {
+        const F = flags[team]; if (!F?.base) continue;
+        const ally = team === p.team, col = ally ? '#40d9ff' : '#ff5a3c';
+        const clampPt = (x, z, m) => { toMini(x, z, pt); const dx = pt.x - C, dy = pt.y - C, d = Math.hypot(dx, dy), lim = R - m; if (d > lim) { pt.x = C + dx / d * lim; pt.y = C + dy / d * lim; } };
+        // base pad
+        clampPt(F.base.x, F.base.z, 8);
+        g.strokeStyle = col; g.lineWidth = 1.5; g.globalAlpha = F.state === 'base' ? 0.9 : 0.45;
+        g.beginPath(); g.arc(pt.x, pt.y, 6, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1;
+        // flag (on the pad, on the ground or on its carrier)
+        const pos = F.state === 'carried' && F.carrier ? F.carrier.position : F.position; if (!pos) continue;
+        clampPt(pos.x, pos.z, 10);
+        if (F.state !== 'base') {
+          const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 140);
+          g.fillStyle = ally ? `rgba(64, 217, 255, ${0.2 + 0.25 * pulse})` : `rgba(255, 80, 50, ${0.2 + 0.25 * pulse})`;
+          g.beginPath(); g.arc(pt.x, pt.y, 8 + 3 * pulse, 0, Math.PI * 2); g.fill();
+        }
+        g.strokeStyle = 'rgba(0,0,0,.75)'; g.lineWidth = 1; g.fillStyle = col;
+        g.beginPath(); g.moveTo(pt.x - 2, pt.y + 6); g.lineTo(pt.x - 2, pt.y - 7); g.lineTo(pt.x + 6, pt.y - 4); g.lineTo(pt.x - 2, pt.y - 1); g.closePath(); g.fill(); g.stroke();
+        if (F.state === 'carried' && F.carrier && F.carrier !== p) { // carrier dot, even an enemy one
+          g.fillStyle = F.carrier.team === p.team ? '#40d9ff' : '#ff4a3a'; g.beginPath(); g.arc(pt.x - 2, pt.y + 6, 3, 0, Math.PI * 2); g.fill(); g.stroke();
+        }
+      }
+    }
     g.restore();
 
     // player arrow

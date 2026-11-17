@@ -1,6 +1,7 @@
 // Search & Destroy game mode ("Recherche et Destruction"). See ARCHITECTURE.md → Game mode contract.
 import * as THREE from 'three';
 import { createBombVisuals } from './bombModel.js';
+import { createCtf } from './ctf.js';
 import { createZombieMode } from './zombie.js';
 
 export const RULES = {
@@ -20,7 +21,47 @@ const other = t => (t === 'ATK' ? 'DEF' : 'ATK');
 const hdist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
+// Game modes: 'sd' (Recherche & Destruction) and 'ctf' (Capture du drapeau, ./ctf.js). ctx.game is a facade that forwards
+// every read / write / call to the active mode, so the HUD, bots, weapon and audio keep reading ctx.game.* as before.
+// game.mode, game.setMode(m): applied at once in the main menu, otherwise at the next restart (pendingMode).
 export function createGame(ctx, options = {}) {
+  const sd = createSearchDestroy(ctx, options);
+  if (options.selfTest || options.noCtf) return sd;
+  const ctf = createCtf(ctx, sd, options);
+  const modes = { sd, ctf, zombie: sd };
+  let active = sd;
+  const facade = {
+    get mode() { return active === ctf ? 'ctf' : sd.zmode ? 'zombie' : 'sd'; },
+    pendingMode: null,
+    setMode(m) {
+      m = m === 'ctf' || m === 'zombie' ? m : 'sd';
+      if (active.started) { this.pendingMode = m === this.mode ? null : m; return; }
+      switchTo(m);
+    },
+    restart() {
+      if (this.pendingMode) { const m = this.pendingMode; this.pendingMode = null; active.started = false; switchTo(m); }
+      active.restart();
+    },
+  };
+  function switchTo(m) {
+    const next = modes[m];
+    if (next === sd && active === sd) { sd.setZombie(m === 'zombie'); return; } // R&D <-> Zombies: same object
+    if (next === active) return;
+    if (active === sd && sd.zmode) { sd.started = false; sd.setZombie(false); }
+    if (active === ctf) ctf.leave(); else sd.resetVisuals?.();
+    active = next;
+    if (active === ctf) { if (sd.phase === 'off') sd.init(); ctf.enter(); }
+    else if (m === 'zombie') sd.setZombie(true);
+    else if (!sd.started) sd.init();
+  }
+  return new Proxy(facade, {
+    get(t, k) { return k in t ? t[k] : active[k]; },
+    set(t, k, v) { if (k in t) t[k] = v; else active[k] = v; return true; },
+    has(t, k) { return k in t || k in active; },
+  });
+}
+
+function createSearchDestroy(ctx, options = {}) {
   const R = { ...RULES, ...(options.rules || {}) };
   const ev = (n, p) => ctx.events?.emit?.(n, p);
   const toast = text => ev('hud:toast', { text });
@@ -50,19 +91,18 @@ export function createGame(ctx, options = {}) {
     roundsToWin: R.ROUNDS_TO_WIN, started: false, rules: R,
     bomb, useProgress: 0, useLabel: '', useAction: null,
     lastResult: null, halftimeDone: false, history: [],
-    siteAt,
-    // game mode: 'sd' (Recherche & Destruction) or 'zombie' (waves, see zombie.js). Chosen in the menu; while a match
-    // runs the change waits for the next restart.
-    mode: 'sd', pendingMode: null,
-    get infiniteAmmo() { return this.mode === 'zombie'; },
-    setMode(m) {
-      m = m === 'zombie' ? 'zombie' : 'sd';
-      if (this.started) { this.pendingMode = m === this.mode ? null : m; return; }
-      if (m === this.mode) return;
-      if (this.mode === 'zombie') zombie.stop();
-      this.mode = m; this.pendingMode = null; this.init();
+    siteAt, mode: 'sd',
+    resetVisuals() { visuals?.reset(); },
+    // Zombie mode (waves, see zombie.js) runs inside this object: zmode switches it on. The facade (createGame) maps
+    // game.mode 'zombie' to it.
+    zmode: false,
+    get infiniteAmmo() { return this.zmode; },
+    setZombie(on) {
+      on = !!on; if (on === this.zmode) return;
+      if (this.zmode) zombie.stop();
+      this.zmode = on; if (!this.started) this.init();
     },
-    setZombieAllies(n) { const was = zombie.allies; zombie.setAllies(n); if (!this.started && this.mode === 'zombie' && was !== zombie.allies) this.init(); },
+    setZombieAllies(n) { const was = zombie.allies; zombie.setAllies(n); if (!this.started && this.zmode && was !== zombie.allies) this.init(); },
     setZombieProgression(p) { zombie.setProgression(p); },
     get zombie() { return zombie; },
     allyCount: TEAM_SIZE - 1, enemyCount: TEAM_SIZE,
@@ -96,7 +136,7 @@ export function createGame(ctx, options = {}) {
     aliveCount(team) { return actors().filter(a => a.team === team && a.alive).length; },
 
     init() {
-      if (this.mode === 'zombie') {
+      if (this.zmode) {
         stopAllUses(); visuals?.reset(); Object.assign(bomb, { state: 'defused', carrier: null, position: null, site: null, timeLeft: 0 });
         zombie.init(); this.phase = 'menu'; placeMenuCamera(0); return;
       }
@@ -119,7 +159,7 @@ export function createGame(ctx, options = {}) {
     start() {
       if (this.started) return;
       this.started = true;
-      if (this.mode === 'zombie') { matchWinner = null; this.history = []; zombie.start(); placeCameraOnPlayer(); return; }
+      if (this.zmode) { matchWinner = null; this.history = []; zombie.start(); placeCameraOnPlayer(); return; }
       this.score = { us: 0, them: 0 }; this.round = 0; matchWinner = null; this.halftimeDone = false; this.history = [];
       for (const a of actors()) { a.stats = null; ensureStats(a); }
       applySide(this.resolveSide());
@@ -129,15 +169,14 @@ export function createGame(ctx, options = {}) {
 
     restart() {
       this.started = false; // start() puts the squad back on the preferred side
-      if (this.pendingMode) { const m = this.pendingMode; this.pendingMode = null; if (this.mode === 'zombie') zombie.stop(); this.mode = m; this.init(); }
-      else if (this.mode === 'zombie') this.init();
+      if (this.zmode) this.init();
       const want = this.allyCount + this.enemyCount;
       if ((ctx.bots?.list?.length ?? want) !== want) this.init(); // team sizes changed in the pause menu
       this.start();
     },
 
     actorUse(actor, dt) {
-      if (this.mode === 'zombie') return 0;
+      if (this.zmode) return 0;
       if (this.phase !== 'live' || !actor || !actor.alive) return 0;
       const kind = canPlant(actor) ? 'plant' : canDefuse(actor) ? 'defuse' : null;
       if (!kind) { stopUse(actor); return 0; }
@@ -158,7 +197,7 @@ export function createGame(ctx, options = {}) {
     },
 
     update(dt) {
-      if (this.mode === 'zombie') { zombie.update(dt); frame++; return; }
+      if (this.zmode) { zombie.update(dt); frame++; return; }
       for (const a of actors()) ensureStats(a);
       switch (this.phase) {
         case 'freeze':
