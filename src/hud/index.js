@@ -92,18 +92,19 @@ function markup() {
       <div class="nv-card nv-stats"><h3>VOTRE MATCH <small>JOUEUR</small></h3><div class="nv-statgrid"></div></div>
       <div class="nv-card nv-c-keys"><h3>COMMANDES <small>AZERTY</small></h3><div class="nv-keys">${keys}</div></div>
       <div class="nv-card"><h3>RÉGLAGES</h3><div class="nv-set">
-        <label>Mode de jeu</label><div class="nv-seg nv-seg-mode" data-set="mode"><button data-v="sd">RECHERCHE &amp; DESTRUCTION</button><button data-v="ctf">CAPTURE DU DRAPEAU</button></div>
+        <label>Mode de jeu</label><div class="nv-seg nv-seg-mode" data-set="mode"><button data-v="sd">RECHERCHE &amp; DESTRUCTION</button><button data-v="ctf">CAPTURE DU DRAPEAU</button><button data-v="zombie">ZOMBIES</button></div>
+        <label data-zm>Difficulté qui monte par</label><div class="nv-seg" data-zm data-set="zprog"><button data-v="count">NOMBRE</button><button data-v="speed">VITESSE</button><button data-v="both">LES DEUX</button></div>
         <label>Bots alliés</label><div class="nv-range"><input type="range" data-set="allies" min="0" max="19" step="1"><output></output></div>
-        <label>Bots adverses</label><div class="nv-range"><input type="range" data-set="enemies" min="1" max="20" step="1"><output></output></div>
-        <div class="nv-perfwarn"></div>
-        <label>Difficulté des ennemis</label><div class="nv-seg" data-set="skill"><button data-v="easy">RECRUE</button><button data-v="normal">NORMAL</button><button data-v="veteran">VÉTÉRAN</button></div>
+        <label data-sd>Bots adverses</label><div class="nv-range" data-sd><input type="range" data-set="enemies" min="1" max="20" step="1"><output></output></div>
+        <div class="nv-perfwarn" data-sd></div>
+        <label data-sd>Difficulté des ennemis</label><div class="nv-seg" data-sd data-set="skill"><button data-v="easy">RECRUE</button><button data-v="normal">NORMAL</button><button data-v="veteran">VÉTÉRAN</button></div>
         <label data-only="sd">Durée de manche</label><div data-only="sd" class="nv-range"><input type="range" data-set="rtime" min="45" max="300" step="15"><output></output></div>
         <label data-only="sd">Minuterie de la bombe</label><div data-only="sd" class="nv-range"><input type="range" data-set="btime" min="20" max="90" step="5"><output></output></div>
         <label data-only="ctf">Captures pour gagner</label><div data-only="ctf" class="nv-range"><input type="range" data-set="ccaps" min="1" max="7" step="1"><output></output></div>
         <label data-only="ctf">Durée de manche</label><div data-only="ctf" class="nv-range"><input type="range" data-set="cmin" min="3" max="20" step="1"><output></output></div>
         <label data-only="ctf">Pénalité par mort</label><div data-only="ctf" class="nv-range"><input type="range" data-set="cstep" min="0" max="12" step="1"><output></output></div>
         <label data-only="ctf">Vies par manche</label><div data-only="ctf" class="nv-range"><input type="range" data-set="clives" min="0" max="15" step="1"><output></output></div>
-        <label>Camp de départ</label><div class="nv-seg" data-set="side"><button data-v="ATK">ATTAQUE</button><button data-v="DEF">DÉFENSE</button><button data-v="RND">ALÉATOIRE</button></div>
+        <label data-sd>Camp de départ</label><div class="nv-seg" data-sd data-set="side"><button data-v="ATK">ATTAQUE</button><button data-v="DEF">DÉFENSE</button><button data-v="RND">ALÉATOIRE</button></div>
         <label>Qualité graphique</label><div class="nv-seg" data-set="quality"><button data-v="low">BASSE</button><button data-v="high">HAUTE</button></div>
         <label>Sensibilité souris</label><div class="nv-range"><input type="range" data-set="sens" min="0.4" max="6" step="0.1"><output></output></div>
         <label>Volume</label><div class="nv-range"><input type="range" data-set="vol" min="0" max="100" step="1"><output></output><button class="nv-mute" data-sfx title="Couper le son (M)">${ICONS.speaker}</button></div>
@@ -140,7 +141,7 @@ export function createHud(ctx) {
     sbEnd: $('.nv-sb-end'), sbEndMeta: $('.nv-sb-end .meta'), sbEndTb: $('.nv-sb-end .tb'), scoresBtn: $('[data-act="scores"]'),
     result: $('.nv-result'), statgrid: $('.nv-statgrid'), playBtn: $('[data-act="play"]'), restartBtn: $('[data-act="restart"]'),
     mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), side: $('[data-set="side"]'), skill: $('[data-set="skill"]'), allies: $('[data-set="allies"]'), enemies: $('[data-set="enemies"]'), perfwarn: $('.nv-perfwarn'), rtime: $('[data-set="rtime"]'), btime: $('[data-set="btime"]'),
-    mode: $('[data-set="mode"]'), ccaps: $('[data-set="ccaps"]'), cmin: $('[data-set="cmin"]'), cstep: $('[data-set="cstep"]'), clives: $('[data-set="clives"]'),
+    mode: $('[data-set="mode"]'), zprog: $('[data-set="zprog"]'), ccaps: $('[data-set="ccaps"]'), cmin: $('[data-set="cmin"]'), cstep: $('[data-set="cstep"]'), clives: $('[data-set="clives"]'),
     flags: $('.nv-flags'), flagUs: $('.nv-flags .us'), flagThem: $('.nv-flags .them'), deathK: $('.nv-death .k'), deathR: $('.nv-death .r'),
     bombLb: $('.nv-bombpill .lb'), tagLine: $('.nv-tag'), desc: $('.nv-desc'), legObj: $('.nv-sb-leg .obj'),
   };
@@ -157,7 +158,7 @@ export function createHud(ctx) {
   const op = (el, v) => { v = Math.round(v * 100) / 100; if (memo(el, 'op', v)) el.style.opacity = v; };
 
   // ---------------------------------------------------------------- state
-  const settings = { skill: 'normal', mode: 'sd', ccaps: 3, cmin: 10, cstep: 0, clives: 0, rtime: 0, btime: 0, allies: 9, enemies: 10, side: 'ATK', quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
+  const settings = { skill: 'normal', mode: 'sd', zallies: 3, zprog: 'both', ccaps: 3, cmin: 10, cstep: 0, clives: 0, rtime: 0, btime: 0, allies: 9, enemies: 10, side: 'ATK', quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
   let lastSpec = '';
   const tally = new Map(); // actor -> {kills, deaths}  (fallback when actor.stats missing)
   const me = { shots: 0, hits: 0, hs: 0, kills: 0, deaths: 0, roundKills: 0 };
@@ -178,12 +179,14 @@ export function createHud(ctx) {
   ev.on('round:start', ({ round } = {}) => { hurtBy.clear(); if ((round ?? ctx.game?.round) === 1) extra.clear(); });
 
   // ---------------------------------------------------------------- settings
+  const zmode = () => (ctx.game?.mode ?? settings.mode) === 'zombie';
   function applySettings() {
     if (input) input.sensitivity = settings.sens * 0.001;
+    try { ctx.game?.setMode?.(settings.mode); ctx.game?.setZombieProgression?.(settings.zprog); ctx.game?.setZombieAllies?.(settings.zallies); } catch (e) { console.warn('[hud] mode', e); }
     try { ctx.world?.setQuality?.(settings.quality); } catch (e) { console.warn('[hud] setQuality', e); }
     for (const b of E.quality.children) b.classList.toggle('on', b.dataset.v === settings.quality);
     try { ctx.game?.setTeamSizes?.(settings.allies, settings.enemies); } catch (e) { console.warn('[hud] team sizes', e); }
-    for (const [el, v, mn, mx] of [[E.allies, settings.allies, 0, 19], [E.enemies, settings.enemies, 1, 20]]) {
+    for (const [el, v, mn, mx] of [[E.allies, settings.mode === 'zombie' ? settings.zallies : settings.allies, 0, 19], [E.enemies, settings.enemies, 1, 20]]) {
       el.value = v; el.nextElementSibling.value = v; el.style.setProperty('--p', ((v - mn) / (mx - mn) * 100) + '%');
     }
     { const n = settings.allies + settings.enemies + 1; const t = `${settings.allies + 1} contre ${settings.enemies}`;
@@ -222,6 +225,14 @@ export function createHud(ctx) {
     const rows = [[E.ccaps, settings.ccaps, 1, 7, v => String(v)], [E.cmin, settings.cmin, 3, 20, v => v + ' min'],
       [E.cstep, settings.cstep, 0, 12, v => (v ? `+${v} s` : `AUTO +${auto.step} s`)], [E.clives, settings.clives, 0, 15, v => (v ? String(v) : `AUTO ${auto.lives}`)]];
     for (const [el, v, mn, mx, f] of rows) { el.value = v; el.nextElementSibling.value = f(v); el.style.setProperty('--p', ((v - mn) / (mx - mn) * 100) + '%'); }
+    // Zombies: own texts, S&D/CTF-only rows hidden (CSS .zmode), wave progression buttons
+    const z = settings.mode === 'zombie';
+    E.menu.classList.toggle('zmode', z);
+    for (const b of E.zprog.children) b.classList.toggle('on', b.dataset.v === settings.zprog);
+    if (z) {
+      E.tagLine.textContent = `ZOMBIES · SURVIE PAR VAGUES · ${settings.zallies + 1} HUMAIN${settings.zallies ? 'S' : ''}`;
+      E.desc.textContent = 'Les morts sortent de la mer et envahissent la ville par le port, par vagues, toujours plus nombreux ou plus rapides. Munitions illimitées. Vos alliés vous suivent et tiennent la position avec vous : choisissez bien où vous arrêter. Tenez le plus de vagues possible.';
+    }
     if (g?.pendingMode && g.started) E.note.textContent = 'Mode appliqué à la prochaine partie (Recommencer)';
   }
   function reflectAudio() {
@@ -233,8 +244,9 @@ export function createHud(ctx) {
   E.quality.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.quality = v; save(settings); applySettings(); } });
   E.side.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.side = v; save(settings); applySettings(); if (ctx.game?.started) toast('Camp appliqué à la prochaine partie'); } });
   E.skill.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { settings.skill = b.dataset.v; save(settings); applySettings(); if (ctx.game?.started) toast(`Difficulté des ennemis : ${b.textContent}`); } });
+  E.zprog.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.zprog = v; save(settings); applySettings(); if (ctx.game?.started && zmode()) toast('Appliqué à partir de la prochaine vague'); } });
   E.sens.addEventListener('input', () => { settings.sens = +E.sens.value; save(settings); applySettings(); });
-  for (const k of ['allies', 'enemies']) E[k].addEventListener('change', () => { settings[k] = +E[k].value; save(settings); applySettings(); if (ctx.game?.started) toast('Effectifs appliqués à la prochaine partie (Recommencer)'); });
+  for (const k of ['allies', 'enemies']) E[k].addEventListener('change', () => { settings[k === 'allies' && settings.mode === 'zombie' ? 'zallies' : k] = +E[k].value; save(settings); applySettings(); if (ctx.game?.started) toast('Effectifs appliqués à la prochaine partie (Recommencer)'); });
   for (const k of ['allies', 'enemies']) E[k].addEventListener('input', () => { E[k].nextElementSibling.value = E[k].value; });
   for (const [k, auto] of [['rtime', 45], ['btime', 20]]) E[k].addEventListener('input', () => { const v = +E[k].value; settings[k] = v <= auto ? 0 : v; save(settings); applySettings(); });
   for (const k of ['rtime', 'btime']) E[k].addEventListener('change', () => { if (ctx.game?.started) toast('Durées appliquées à la prochaine manche'); });
@@ -265,7 +277,8 @@ export function createHud(ctx) {
     } else if (mode === 'pause') {
       E.playBtn.querySelector('span').textContent = 'REPRENDRE'; E.restartBtn.classList.remove('hide');
       E.restartBtn.querySelector('span').textContent = 'RECOMMENCER';
-      E.pinfo.innerHTML = `MANCHE <b>${g?.round ?? 1}</b> &nbsp;·&nbsp; SCORE <b class="u">${g?.score?.us ?? 0}</b> — <b class="t">${g?.score?.them ?? 0}</b>` +
+      if (zmode()) E.pinfo.innerHTML = `VAGUE <b>${g?.zombie?.wave ?? 0}</b> &nbsp;·&nbsp; ZOMBIES ÉLIMINÉS <b>${g?.zombie?.kills ?? 0}</b>`;
+      else E.pinfo.innerHTML = `MANCHE <b>${g?.round ?? 1}</b> &nbsp;·&nbsp; SCORE <b class="u">${g?.score?.us ?? 0}</b> — <b class="t">${g?.score?.them ?? 0}</b>` +
         (isCtf() ? ` &nbsp;·&nbsp; CAPTURES <b class="u">${g?.caps?.us ?? 0}</b> — <b class="t">${g?.caps?.them ?? 0}</b> &nbsp;·&nbsp; CÔTÉ <b>${ctx.player?.team === 'DEF' ? 'CITADELLE' : 'PORT'}</b>`
           : ` &nbsp;·&nbsp; CAMP <b>${ctx.player?.team === 'DEF' ? 'DÉFENSE' : 'ATTAQUE'}</b>`);
     } else if (mode === 'end') {
@@ -275,6 +288,11 @@ export function createHud(ctx) {
       E.result.querySelector('.u').textContent = g?.score?.us ?? 0;
       E.result.querySelector('.t').textContent = g?.score?.them ?? 0;
       E.result.querySelector('.note').textContent = won ? 'MISSION ACCOMPLIE — LA VILLE EST À VOUS' : 'L\'ESCOUADE ADVERSE L\'EMPORTE';
+      if (zmode()) {
+        E.result.className = 'nv-result lose zm'; E.result.querySelector('.r').textContent = 'SUBMERGÉS';
+        E.result.querySelector('.u').textContent = g?.zombie?.wave ?? 0; E.result.querySelector('.t').textContent = g?.zombie?.kills ?? 0;
+        E.result.querySelector('.note').textContent = `VAGUE ATTEINTE · ZOMBIES ÉLIMINÉS`;
+      }
       E.playBtn.querySelector('span').textContent = 'REJOUER'; E.restartBtn.classList.add('hide');
       const p = ctx.player, s = p ? stat(p) : me, kills = s.kills ?? me.kills, deaths = s.deaths ?? me.deaths;
       const cells = [
@@ -307,7 +325,8 @@ export function createHud(ctx) {
   ev.on('game:resumed', () => showMenu(null));
   ev.on('match:end', ({ weWon } = {}) => {
     endWon = !!weWon;
-    banner(weWon ? 'win' : 'lose', 'FIN DU MATCH', weWon ? 'VICTOIRE' : 'DÉFAITE', `Score final <b>${ctx.game?.score?.us ?? 0} — ${ctx.game?.score?.them ?? 0}</b>`, 3.2, true);
+    if (zmode()) banner('lose', 'FIN DE PARTIE', 'SUBMERGÉS', `Vague <b>${ctx.game?.zombie?.wave ?? 0}</b> · <b>${ctx.game?.zombie?.kills ?? 0}</b> zombies éliminés`, 3.2, true);
+    else banner(weWon ? 'win' : 'lose', 'FIN DU MATCH', weWon ? 'VICTOIRE' : 'DÉFAITE', `Score final <b>${ctx.game?.score?.us ?? 0} — ${ctx.game?.score?.them ?? 0}</b>`, 3.2, true);
     setTimeout(() => { if (document.pointerLockElement) document.exitPointerLock(); else showMenu('end'); }, 3400);
   });
   showMenu('main');
@@ -371,6 +390,7 @@ export function createHud(ctx) {
   // ---------------------------------------------------------------- killfeed / death / tally
   ev.on('actor:killed', ({ killer, victim, headshot } = {}) => {
     if (!victim) return;
+    if (victim.isZombie && !killer?.isPlayer) { if (killer) { let t = tally.get(killer); if (!t) tally.set(killer, t = { kills: 0, deaths: 0 }); t.kills++; } return; } // zombie mode: feed only shows the player's kills
     if (killer && headshot) ex(killer).hs++;
     for (const a of hurtBy.get(victim) || []) if (a !== killer && a.team !== victim.team) ex(a).assists++;
     hurtBy.delete(victim);
@@ -389,6 +409,7 @@ export function createHud(ctx) {
   });
   ev.on('player:died', ({ killer } = {}) => {
     html(E.deathT, killer && !killer.isPlayer ? `Éliminé par <b>${esc(killer.name)}</b>` : killer?.isPlayer ? 'Tué par vous-même' : 'Tué par l\'explosion');
+    if (killer?.isZombie) { html(E.deathH, 'Vous revenez quand la vague est repoussée — observez vos coéquipiers'); return; }
     html(E.deathH, killer?.alive ? `Santé restante de l'adversaire : <b>${Math.max(0, Math.round(killer.health))}</b>` : isCtf() ? '' : 'Observez vos coéquipiers jusqu\'à la fin de la manche');
   });
 
@@ -416,10 +437,11 @@ export function createHud(ctx) {
     void E.banner.offsetWidth; E.banner.classList.add('on'); bOn = true; bTimer = b.dur;
   }
   ev.on('hud:toast', ({ text: t } = {}) => t && toast(t));
-  ev.on('round:start', ({ round, playerTeam } = {}) => {
+  ev.on('round:start', ({ round, playerTeam, mode } = {}) => {
     const g = ctx.game, atk = (playerTeam || ctx.player?.team) === 'ATK';
     me.roundKills = 0; killerName = ''; hpGhost = lastHp = 100;
     for (const d of dmg) { d.from = null; op(d.el, 0); }
+    if (mode === 'zombie') { banner('alert', 'MODE ZOMBIES', 'TENEZ LA VILLE', 'Ils sortent de la mer, au <b>port</b> — trouvez une position', 2.8); return; }
     const mp = g?.isMatchPoint ? ' · <b>BALLE DE MATCH</b>' : '';
     if (isCtf()) {
       banner(atk ? 'atk' : 'def', `MANCHE ${round ?? g?.round ?? ''} / 3`, atk ? 'CÔTÉ PORT' : 'CÔTÉ CITADELLE',
@@ -434,6 +456,8 @@ export function createHud(ctx) {
     banner(weWon ? 'win' : 'lose', esc(reason || 'FIN DE MANCHE').toUpperCase(), weWon ? 'MANCHE GAGNÉE' : 'MANCHE PERDUE',
       (isCtf() && caps ? `Captures <b>${caps.us} — ${caps.them}</b>${mvp ? ' · ' : ''}` : '') + (mvp ? `MVP : <b>${esc(mvp.name)}</b>` : ''), 3.2, true);
   });
+  ev.on('zombie:wave', ({ wave, count, speed } = {}) => { me.roundKills = 0; banner('alert', `VAGUE ${wave}`, 'ILS ARRIVENT', `<b>${count}</b> zombies · vitesse <b>${(speed / 5.6 * 100).toFixed(0)} %</b> d'un humain`, 2.6, true); });
+  ev.on('zombie:cleared', ({ wave, next } = {}) => banner('win', `VAGUE ${wave} REPOUSSÉE`, 'RÉPIT', `Vos coéquipiers tombés reviennent · prochaine vague dans <b>${next}</b> s`, 3, true));
   ev.on('sides:swap', () => isCtf() ? banner('gold', 'NOUVELLE MANCHE', 'CHANGEMENT DE CAMP', 'Les équipes échangent le port et la citadelle', 2.6)
     : banner('gold', 'MI-TEMPS', 'CHANGEMENT DE CAMP', 'Les équipes échangent attaque et défense', 2.6));
   // ---------------------------------------------------------------- capture du drapeau
@@ -504,6 +528,8 @@ export function createHud(ctx) {
   function buildPips(n) { pipsN = n; E.pips.innerHTML = '<i></i>'.repeat(Math.min(n, 40)); }
   function updateTop() {
     const g = ctx.game, p = ctx.player; if (!g || !p) return;
+    cls(root, 'is-zombie', g.mode === 'zombie');
+    if (g.mode === 'zombie') return updateTopZombie(g, p);
     const ctf = isCtf();
     const rtw = g.roundsToWin ?? 4;
     if (winsN !== rtw) { winsN = rtw; for (const t of [E.us, E.them]) t.querySelector('.nv-wins').innerHTML = '<i></i>'.repeat(rtw); }
@@ -542,6 +568,21 @@ export function createHud(ctx) {
     const ph = ctf ? ({ freeze: `PRÉPARATION · ${Math.max(1, Math.ceil(g.phaseTimeLeft ?? 0))}`, post: 'FIN DE MANCHE', over: 'FIN DU MATCH' }[g.phase]
       || (g.overtime ? 'PROLONGATION' : g.round === 3 ? `DÉCISIVE · ${g.capsToWin} CAPTURES` : `PREMIER À ${g.capsToWin}`)) : { freeze: `PRÉPARATION · ${Math.max(1, Math.ceil(g.freezeTimeLeft ?? g.phaseTimeLeft ?? 0))}`, post: 'FIN DE MANCHE', over: 'FIN DU MATCH' }[g.phase] || (planted ? `SITE ${g.bomb.site || ''}` : (g.isMatchPoint ? 'BALLE DE MATCH' : ''));
     text(E.ph, ph);
+  }
+
+  function updateTopZombie(g, p) {
+    const Z = g.zombie, actors = ctx.actors || [], ours = actors.filter(a => !a.isZombie);
+    text(E.us.querySelector('.side'), 'ESCOUADE'); text(E.them.querySelector('.side'), 'ZOMBIES');
+    text(E.us.querySelector('.sc'), String(ours.filter(a => a.alive).length));
+    text(E.them.querySelector('.sc'), String(Z?.remaining ?? 0));
+    const sig = 'z' + ours.map(a => (a.isPlayer ? 'p' : '') + (a.alive ? 1 : 0)).join('');
+    if (sig !== aliveSig) { aliveSig = sig; E.us.querySelector('.nv-alive').innerHTML = ours.map(a => `<span class="${a.alive ? '' : 'dead'} ${a.isPlayer ? 'me' : ''}">${ICONS.person}</span>`).join(''); E.them.querySelector('.nv-alive').innerHTML = ''; }
+    cls(E.clock, 'planted', false);
+    const brk = Z?.state === 'break' || g.phase === 'freeze';
+    text(E.rd, Z?.wave ? `VAGUE ${Z.wave}` : 'ZOMBIES');
+    if (brk && g.phase === 'live') { text(E.tm, fmtTime(Z.timer)); cls(E.tm, 'low', Z.timer < 4); text(E.ph, `PROCHAINE VAGUE`); }
+    else if (g.phase === 'freeze') { text(E.tm, fmtTime(g.phaseTimeLeft)); cls(E.tm, 'low', false); text(E.ph, `PRÉPARATION · ${Math.max(1, Math.ceil(g.phaseTimeLeft || 0))}`); }
+    else { text(E.tm, String(Z?.remaining ?? 0)); cls(E.tm, 'low', false); text(E.ph, g.phase === 'over' ? 'FIN DE PARTIE' : 'ZOMBIES RESTANTS'); }
   }
 
   // CTF: state of both flags + lives left per team, under the score
@@ -645,7 +686,7 @@ export function createHud(ctx) {
       const ms = w.magSize || 30;
       if (ms !== pipsN) buildPips(ms);
       text(E.wn, w.name || 'NV-4');
-      text(E.mag, String(w.mag ?? 0)); text(E.res, String(w.reserve ?? 0));
+      text(E.mag, String(w.mag ?? 0)); text(E.res, ctx.game?.infiniteAmmo ? '∞' : String(w.reserve ?? 0));
       if (memo(E.pips, 'm', w.mag)) [...E.pips.children].forEach((i, k) => i.classList.toggle('e', k >= ms - (w.mag ?? 0) ? false : true));
       cls(E.am, 'low', (w.mag ?? 0) <= ms * 0.25); cls(E.am, 'reloading', !!w.reloading);
     }

@@ -117,7 +117,8 @@ export class Bot {
     const { ctx } = this, D = DIFFICULTY, S = this.skill, t = ctx.time, eye = this.getEyePosition(_a);
     const blind = t < this.blindUntil, smoke = ctx.grenades;
     let best = null, bestScore = Infinity;
-    for (const e of ctx.actors) {
+    const pool = this.mgr.targetsFor ? this.mgr.targetsFor(this) : ctx.actors; // zombie mode: nearest zombies only
+    for (const e of pool) {
       if (!e.alive || e.team === this.team) continue;
       const dx = e.position.x - this.position.x, dz = e.position.z - this.position.z, d = Math.hypot(dx, dz);
       // hearing: gunshots + running footsteps
@@ -131,7 +132,7 @@ export class Bot {
       }
       if (blind || d > D.view * S.view) continue;
       const known = this.isVisible(e);
-      const inFov = Math.abs(angDiff(this.aimYaw, yawTo(dx, dz))) < D.fov * S.fov / 2 || d < 2.5 || known;
+      const inFov = Math.abs(angDiff(this.aimYaw, yawTo(dx, dz))) < D.fov * S.fov / 2 || d < Math.max(2.5, this.mgr.closeAware || 0) || known;
       if (!inFov) continue;
       // LOS to head then chest
       const head = e.getEyePosition ? e.getEyePosition(_b) : _b.copy(e.position).setY(e.position.y + 1.6);
@@ -226,7 +227,7 @@ export class Bot {
           if (Math.hypot(this.cover.x - this.position.x, this.cover.z - this.position.z) < 0.6) { dest = null; crouch = true; }
         } else {
           // strafe (A-D) with random switching, crouch-spray at range
-          if ((this.strafeT -= dt) <= 0) { this.strafeT = rand(0.35, 1.0); this.strafeDir = Math.random() < S.standStill ? 0 : Math.random() < 0.5 ? -1 : 1; if (dist > 16 && Math.random() < S.crouchSpray) this.crouchUntil = t + rand(0.8, 2); }
+          if ((this.strafeT -= dt) <= 0) { this.strafeT = rand(0.35, 1.0); this.strafeDir = goal?.stand || Math.random() < S.standStill ? 0 : Math.random() < 0.5 ? -1 : 1; if (dist > 16 && Math.random() < S.crouchSpray) this.crouchUntil = t + rand(0.8, 2); }
           crouch = t < this.crouchUntil;
           if (!crouch && this.strafeDir) {
             const dx = tp.x - this.position.x, dz = tp.z - this.position.z, n = Math.hypot(dx, dz) || 1;

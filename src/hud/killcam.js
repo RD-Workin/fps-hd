@@ -73,7 +73,7 @@ export function createKillcam(ctx, hudRoot, { esc, ICONS }) {
   let kc = null;
   let pending = null, jumpHeld = false;
   ctx.events.on('player:died', ({ killer } = {}) => {
-    if (!killer || killer.isPlayer || !killer.position || ctx.game?.phase === 'over') return;
+    if (!killer || killer.isPlayer || killer.isZombie || !killer.position || ctx.game?.phase === 'over') return;
     const d = Math.round(killer.position.distanceTo(ctx.player.position));
     pending = { killer, at: ctx.time, wait: DELAY, dist: d, hp: Math.max(0, Math.round(killer.health ?? 100)), hs: false };
     rig.getKits(); getStand(); // build during the post-death delay, not on the first replayed frame
