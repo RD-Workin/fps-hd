@@ -9,7 +9,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { SoldierModel as ProceduralSoldier, DIM } from '../bots/model.js';
+import { SoldierModel as ProceduralSoldier, DIM, RIM_K } from '../bots/model.js';
 
 export { DIM };
 export const TEAM_COLORS = { ATK: 0xc8372d, DEF: 0x2f7fe0 };
@@ -59,9 +59,9 @@ function prepare(gltf) {
     if (mats.Soldier && RIM_STRENGTH > 0) {
       const m = mats.Soldier.clone(), rim = new THREE.Color(...RIM[t]);
       m.onBeforeCompile = sh => {
-        sh.uniforms.uRim = { value: rim };
-        sh.fragmentShader = 'uniform vec3 uRim;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
-          `#include <emissivemap_fragment>\n float rimF = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2);\n totalEmissiveRadiance += uRim * rimF * ${RIM_STRENGTH.toFixed(2)};`);
+        sh.uniforms.uRim = { value: rim }; sh.uniforms.uRimK = RIM_K;
+        sh.fragmentShader = 'uniform vec3 uRim; uniform float uRimK;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
+          `#include <emissivemap_fragment>\n float rimF = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2);\n totalEmissiveRadiance += uRim * rimF * ${RIM_STRENGTH.toFixed(2)} * uRimK;`);
       };
       m.customProgramCacheKey = () => 'soldierRim' + t;
       bodyMats[t] = m;

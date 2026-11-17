@@ -6,6 +6,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 // ---------------------------------------------------------------- dimensions (meters)
+// team rim strength multiplier, shared by every soldier material (Ops de nuit lowers it: an emissive rim would glow in the dark)
+export const RIM_K = { value: 1 };
 export const DIM = {
   hipsY: 0.96, thighX: 0.1, thighY: -0.04, thighLen: 0.43, shinLen: 0.42,
   spineY: 0.08, neckY: 0.53, shoulderX: 0.2, shoulderY: 0.46, upperLen: 0.29, foreLen: 0.27,
@@ -98,9 +100,9 @@ export function getMaterial(team) {
     // readability: team-coloured fresnel rim so soldiers pop out of shaded streets
     const rim = team === 'DEF' ? new THREE.Color(0.18, 0.42, 0.95) : new THREE.Color(0.95, 0.42, 0.16);
     shared.mats[team].onBeforeCompile = (sh) => {
-      sh.uniforms.uRim = { value: rim };
-      sh.fragmentShader = 'uniform vec3 uRim;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
-        '#include <emissivemap_fragment>\n float rimF = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2);\n totalEmissiveRadiance += uRim * rimF * 0.9 + uRim * 0.04;');
+      sh.uniforms.uRim = { value: rim }; sh.uniforms.uRimK = RIM_K;
+      sh.fragmentShader = 'uniform vec3 uRim; uniform float uRimK;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n float rimF = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2);\n totalEmissiveRadiance += (uRim * rimF * 0.9 + uRim * 0.04) * uRimK;');
     };
     shared.mats[team].customProgramCacheKey = () => 'botrim' + team;
   }

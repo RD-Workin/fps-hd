@@ -39,3 +39,6 @@
 ## Notes for others
 - round:end reason string is shown as-is (uppercased). Hit points shown are cosmetic (+150 HS), real score comes from game stats.
 - Bots' names only from actor.name.
+## Ops de nuit
+- Réglage « Ambiance » JOUR / OPS DE NUIT (`nova.hud` → `night`), appliqué en direct (`world.setNight`), sous-titre du menu
+  « VIEILLE VILLE · OPS DE NUIT ». Pastille « LAMPE F » au-dessus des munitions (allumée/éteinte), touche F dans les commandes.

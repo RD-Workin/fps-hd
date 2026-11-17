@@ -11,6 +11,7 @@ import { dressZones } from './zones.js';
 import { extendKit } from './kit2.js';
 import { buildAtmosphere, buildDistant, buildDust, buildComposer } from './env.js';
 import { createShadowCache } from './shadowCache.js';
+import { createNight } from './night.js';
 
 export function createWorld(ctx) {
   const { scene, physics, renderer } = ctx;
@@ -86,6 +87,7 @@ export function createWorld(ctx) {
   const dust = buildDust(scene, uTime);
   noAO.push(atm.sky, dust);
   const post = buildComposer(ctx, { noAO });
+  const night = createNight(ctx, { atm, dust, post, glowMat: MAT.glow, lights: K.lights, floorAt: T.floorAt, noAO });
   scene.traverse(o => { if (o.isMesh && !o.isInstancedMesh) { o.updateMatrix(); o.updateMatrixWorld(true); } if (o.isMesh) o.userData.static = true; });
 
   // ---------- shadows: static map cached; dynamic casters (soldiers, bomb) composited over it at a capped rate on HIGH ----------
@@ -116,7 +118,8 @@ export function createWorld(ctx) {
     DR.reset(maxPR); applyPixelRatio(maxPR);
     const sz = hi ? 4096 : 2048;
     if (atm.sun.shadow.mapSize.x !== sz) { atm.sun.shadow.mapSize.set(sz, sz); atm.sun.shadow.map?.dispose(); atm.sun.shadow.map = null; }
-    SH.reset(); dust.visible = hi; shadowDirty = true;
+    SH.reset(); dust.visible = night.dustVisible(hi); shadowDirty = true;
+    if (night.on) night.set(true, quality); // lamp light slots follow the quality (4 / 8)
     world.quality = quality;
   }
   // ---------- dynamic resolution (HIGH on HiDPI screens only): never below 1.0 (native CSS resolution) ----------
@@ -145,7 +148,15 @@ export function createWorld(ctx) {
     nav: { ...NAV, colliders: navColliders, floorAt: T.floorAt, grid: { x0: GX0, z0: GZ0, w: GW, h: GH, cell: CELL, rows: T.g.map(r => r.join('')) } },
     sun: atm.sun, quality, post, shadows: SH, // post / shadows: debug & perf bench access
     setQuality,
+    // Ops de nuit: night lighting variant (see night.js). Changing it changes the light count -> shaders recompile:
+    // call from the menu (main.js warms the shaders up again on 'world:night').
+    get night() { return night.on; },
+    nightRig: night,
+    noAO, // transparent / fake-volume meshes other modules add (flashlight beams) must stay out of the AO pre-pass
+    setNight(on) { night.set(on, quality); dust.visible = night.dustVisible(quality === 'high'); return night.on; },
+    litAt: (p) => night.litAt(p),
     update(dt) {
+      night.update(dt);
       uTime.value += dt;
       if (waterMat?.normalMap) waterMat.normalMap.offset.set(uTime.value * 0.02, uTime.value * 0.013);
       seaMat.normalMap.offset.set(uTime.value * 0.004, uTime.value * 0.006);

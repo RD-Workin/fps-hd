@@ -77,3 +77,15 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
   position ennemie signalée par un coéquipier < 40 m). ATK recrue : pas de regroupement avant l'assaut ;
   DEF : rotation plus lente/rapide (fenêtre 10 / 20 / 25 s, seuil 45 / 30 / 20 %, rayon de menace 14 / 24 / 30 m).
 - HUD : réglage « Difficulté des ennemis » (localStorage `nova.hud.skill`), appliqué en direct.
+
+## Ops de nuit (lamps.js)
+- Perception (`nightSight`) quand `world.night` : un ennemi non éclairé n'est remarqué qu'à 16 m (× `nightView` :
+  0,8 / 1 / 1,2) ; dans la flaque d'un lampadaire jusqu'à 45 m ; dans le faisceau de la propre lampe du bot (cône 0,3 rad)
+  jusqu'à 30 m ; lampe allumée ou tir (flash de bouche, 0,5 s) : portée normale. Une lampe braquée sur le bot (< 45 m,
+  cône 0,4) le fait repérer même hors de son champ de vision. Cible dans le noir : réaction × 1,25 et 30 % de chances
+  par tick de la rater au-delà de 8 m tant qu'elle n'a pas été vue. L'ouïe ne change pas.
+- Discipline de lampe (`skill.lamp`) : RECRUE toujours allumée ; NORMAL éteinte à l'arrêt (> 2 s hors combat) ;
+  VÉTÉRAN éteinte à l'arrêt (> 0,8 s), en marche lente / traque, et en tenant un angle long en combat (> 18 m).
+- Rendu : faisceau = cône additif coupé au premier mur (raycast) + reflet de lentille fort quand la lampe vise la
+  caméra, 2 draw calls instanciés pour tous les bots. Les 3 lampes les plus proches de la caméra (BASSE : 1) ont un vrai
+  SpotLight (nombre fixe la nuit). `actor._lit` (0..1, éclairage des lampadaires) recalculé à 10 Hz.

@@ -151,7 +151,8 @@ export function extendKit(K) {
       if (ax === 'x') G.paint.box(p + s * 0.36 - 0.05, y, t, p + s * 0.36 + 0.05, y + hh, t + 0.09, cc, 'ny'); else G.paint.box(t, y, p + s * 0.36 - 0.05, t + 0.09, y + hh, p + s * 0.36 + 0.05, cc, 'ny'); }
     solid(x0, 0, z0, x1, h, z1, 'wood'); };
   const pillar = (x, z, h = 3.6, s = 0.5, geo = 'stone') => { G[geo].box(x - s / 2, 0, z - s / 2, x + s / 2, h, z + s / 2, col(0xe2d3b8), 'ny py'); G[geo].box(x - s / 2 - 0.08, 0, z - s / 2 - 0.08, x + s / 2 + 0.08, 0.3, z + s / 2 + 0.08, col(0xd8cbb4), 'ny'); G[geo].box(x - s / 2 - 0.08, h - 0.3, z - s / 2 - 0.08, x + s / 2 + 0.08, h, z + s / 2 + 0.08, col(0xd8cbb4), 'py'); solid(x - s / 2, 0, z - s / 2, x + s / 2, h, z + s / 2, 'concrete'); };
-  const lantern = (x, y, z) => { G.metal.add(CYL8, mat4(x, y + 0.2, z, 0, 0.012, 0.4, 0.012), col(0x2b2d2e)); G.glow.add(new THREE.CylinderGeometry(0.1, 0.13, 0.26, 6), mat4(x, y - 0.1, z), col(0xffc27a)); G.metal.add(new THREE.ConeGeometry(0.2, 0.12, 6), mat4(x, y + 0.08, z), col(0x2b2d2e)); };
+  const lantern = (x, y, z) => { G.metal.add(CYL8, mat4(x, y + 0.2, z, 0, 0.012, 0.4, 0.012), col(0x2b2d2e)); G.glow.add(new THREE.CylinderGeometry(0.1, 0.13, 0.26, 6), mat4(x, y - 0.1, z), col(0xffc27a)); G.metal.add(new THREE.ConeGeometry(0.2, 0.12, 6), mat4(x, y + 0.08, z), col(0x2b2d2e));
+    K.lights?.push({ x, y: y - 0.22, z, floor: null, kind: 'lantern' }); };
   // thin floor overlay (interiors, plazas): kind 'wood' | 'tile' | 'concrete' | 'stone'
   const floor = (x0, x1, z0, z1, kind = 'wood', hex = null, y = 0.014) => { const g = kind === 'wood' ? G.wood : kind === 'stone' ? G.stone : G.concrete;
     g.box(x0, 0, z0, x1, y, z1, col(hex ?? (kind === 'wood' ? 0xa07a50 : kind === 'tile' ? 0xe6dccb : kind === 'stone' ? 0xe9dcc2 : 0xb7b0a4)), 'ny px nx pz nz', kind === 'wood' ? 1.6 : kind === 'stone' ? 3 : 4); };

@@ -1,6 +1,6 @@
 // Input: physical key codes (event.code) so ZQSD on AZERTY == WASD on QWERTY.
 // Z/W = forward, S = back, Q/A = left, D = right, Shift = walk slowly, Space = jump, C/Ctrl = crouch,
-// E (hold) = plant / defuse. Left click = fire, right click (hold) = aim down sights, R = reload. Pointer lock on click.
+// E (hold) = plant / defuse, F = flashlight (night). Left click = fire, right click (hold) = aim down sights, R = reload. Pointer lock on click.
 export class Input {
   constructor(dom) {
     this.dom = dom;
@@ -34,7 +34,7 @@ export class Input {
   get jump() { return this.down('Space'); }
   get crouch() { return this.down('KeyC', 'ControlLeft'); }
   get walk() { return this.down('ShiftLeft', 'ShiftRight'); }
-  get use() { return this.down('KeyE', 'KeyF'); }
+  get use() { return this.down('KeyE'); } // F = flashlight (Ops de nuit, weapon/flashlight.js)
   get scoreboard() { return this.down('Tab'); }
   endFrame() { this.mouseDX = 0; this.mouseDY = 0; this.firePressed = false; this.reloadPressed = false; }
 }

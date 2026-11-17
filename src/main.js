@@ -61,6 +61,7 @@ window.__ctx = ctx; // debug
 const warmShaders = () => { try { renderer.compileAsync(scene, camera).catch(() => {}); } catch { /* old three */ } };
 setTimeout(warmShaders, 0);
 preloadSoldiers(renderer)?.then(() => setTimeout(warmShaders, 500));
+ctx.events.on('world:night', () => setTimeout(warmShaders, 0)); // Ops de nuit changes the light count: recompile in the menu
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();

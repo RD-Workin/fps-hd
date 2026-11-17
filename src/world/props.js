@@ -22,6 +22,7 @@ export function createKit(G, Tx, T, physics, addSolid, scene) {
   };
   const r = rng(4242), W = [1, 1, 1];
   const crates = [], barrels = [], bags = []; let waterMat = null;
+  const lights = []; // light fixtures (street lamps, lanterns): world positions of the bulbs, used by the night mode (night.js)
 
   // ---------- primitives ----------
   const crate = (x, z, s = 1.2, lvl = 0, base = 0) => { const y = base + lvl * s; crates.push([x, y + s / 2, z, s, (r() - 0.5) * 0.06]); solid(x - s / 2, y, z - s / 2, x + s / 2, y + s, z + s / 2, 'wood'); };
@@ -116,6 +117,7 @@ export function createKit(G, Tx, T, physics, addSolid, scene) {
     const ax = Math.sin(ang) * 0.6, az = Math.cos(ang) * 0.6;
     G.metal.box(x + Math.min(0, ax) - 0.04, 4.0, z + Math.min(0, az) - 0.04, x + Math.max(0, ax) + 0.04, 4.08, z + Math.max(0, az) + 0.04, col(0x2b2d2e));
     G.glow.add(new THREE.CylinderGeometry(0.12, 0.17, 0.36, 6), mat4(x + ax, 3.78, z + az), col(0xffc27a));
+    lights.push({ x: x + ax, y: curY + 3.66, z: z + az, floor: curY, kind: 'lamp' });
     G.metal.add(new THREE.ConeGeometry(0.26, 0.2, 6), mat4(x + ax, 4.04, z + az), col(0x2b2d2e));
     solid(x - 0.1, 0, z - 0.1, x + 0.1, 4.2, z + 0.1, 'metal');
   };
@@ -209,7 +211,7 @@ export function createKit(G, Tx, T, physics, addSolid, scene) {
   for (const m of out) { m.castShadow = m.receiveShadow = true; m.instanceMatrix.needsUpdate = true; scene.add(m); }
     return { waterMat };
   };
-  return { G, Tx, T, F, physics, addSolid, scene, r, W, solid, lift, mat4, col, crate, stack, barrel, sandbags, jersey, lowWall, container, car, truck, tyre, decal, wallDecal,
+  return { lights, G, Tx, T, F, physics, addSolid, scene, r, W, solid, lift, mat4, col, crate, stack, barrel, sandbags, jersey, lowWall, container, car, truck, tyre, decal, wallDecal,
     lamp, wire, bunting, laundry, stall, palm, arcade, fountain, slab, Crate, Stack, Barrel, Sandbags, Jersey, LowWall, Container, Car, Truck, Stall, Palm, Lamp, Decal, GDecal, P, finish,
     get waterMat() { return waterMat; } };
 }

@@ -213,6 +213,13 @@
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); }
 .nv-bombpill.on { opacity: 1; transform: none; }
 .nv-bombpill .nv-ico { width: 20px; height: 20px; }
+.nv-lamp { position: absolute; right: 20px; bottom: 132px; display: flex; align-items: center; gap: 8px; padding: 5px 10px 5px 12px; font-size: 13px; font-weight: 700;
+  letter-spacing: .22em; color: var(--dim); background: var(--panel); border-radius: 3px; opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s, color .15s; }
+.nv-lamp.on { opacity: 1; transform: none; }
+.nv-lamp i { width: 9px; height: 9px; border-radius: 50%; background: #3a3d42; box-shadow: inset 0 0 0 1px #ffffff30; transition: background .15s, box-shadow .15s; }
+.nv-lamp.lit { color: #fff3dc; }
+.nv-lamp.lit i { background: #ffe9b8; box-shadow: 0 0 10px 2px #ffd88a99; }
+.nv-lamp kbd { font: 700 11px/1 inherit; letter-spacing: 0; padding: 3px 6px; border-radius: 3px; background: #ffffff14; color: #fff; }
 
 .nv-sound { position: absolute; left: 330px; bottom: 22px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
   background: var(--panel); color: var(--danger); font-size: 18px; opacity: 0; transition: opacity .3s; border-radius: 4px; }

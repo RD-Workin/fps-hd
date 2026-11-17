@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { SoldierModel, DIM } from '../soldiers/index.js';
 import { SKILLS } from './skill.js';
+import { nightSight, NIGHT_SIGHT } from './lamps.js';
 const NORMAL = SKILLS.normal;
 
 export const DIFFICULTY = {
@@ -76,7 +77,8 @@ export class Bot {
   // ------------------------------------------------------------ perception
   perceive() {
     const { ctx } = this, D = DIFFICULTY, S = this.skill, t = ctx.time, eye = this.getEyePosition(_a);
-    let best = null, bestScore = Infinity;
+    const night = !!this.mgr.lamps?.night;
+    let best = null, bestScore = Infinity, bestDark = false;
     for (const e of ctx.actors) {
       if (!e.alive || e.team === this.team) continue;
       const dx = e.position.x - this.position.x, dz = e.position.z - this.position.z, d = Math.hypot(dx, dz);
@@ -91,7 +93,10 @@ export class Bot {
       }
       if (d > D.view * S.view) continue;
       const known = this.isVisible(e);
-      const inFov = Math.abs(angDiff(this.aimYaw, yawTo(dx, dz))) < D.fov * S.fov / 2 || d < 2.5 || known;
+      // Ops de nuit: an unlit enemy is only noticed close by; lamps, street lights and muzzle flashes give it away
+      const ns = night ? nightSight(this, e, d, dx, dz, t, S) : null;
+      if (ns && d > ns.range && !(known && d < ns.range * 1.5)) continue;
+      const inFov = Math.abs(angDiff(this.aimYaw, yawTo(dx, dz))) < D.fov * S.fov / 2 || d < 2.5 || known || ns?.dazzle;
       if (!inFov) continue;
       // LOS to head then chest
       const head = e.getEyePosition ? e.getEyePosition(_b) : _b.copy(e.position).setY(e.position.y + 1.6);
@@ -100,10 +105,11 @@ export class Bot {
       if (!vis) continue;
       // distant & dark: small chance to miss a target in peripheral vision
       if (!known && d > 35 * S.view && Math.random() < S.peripheralMiss) continue;
+      if (ns && !ns.lit && !known && d > 8 && Math.random() < NIGHT_SIGHT.darkMiss) continue; // a shape in the dark takes longer to pick out
       this.seen.set(e, t);
       this.mgr.report(this.team, e);
       const score = d * (e === this.target ? 0.6 : 1) * (shotAgo < 1 ? 0.8 : 1);
-      if (score < bestScore) { bestScore = score; best = e; }
+      if (score < bestScore) { bestScore = score; best = e; bestDark = !!ns && !ns.lit; }
     }
     if (best && best !== this.target) {
       const alerted = t - this.alertT < 4;
@@ -111,7 +117,7 @@ export class Bot {
       const fy = Math.atan2(-(best.position.x - this.position.x), -(best.position.z - this.position.z));
       let dAng = Math.abs(((fy - this.yaw) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI);
       const holding = this.moveSpeed < 0.8 && dAng < D.holdCone;
-      this.reactUntil = t + rand(...D.reaction) * S.reaction * (alerted ? 0.7 : 1) * (this.target ? 0.6 : 1) * (holding ? S.holdReact : 1);
+      this.reactUntil = t + rand(...D.reaction) * S.reaction * (alerted ? 0.7 : 1) * (this.target ? 0.6 : 1) * (holding ? S.holdReact : 1) * (bestDark ? NIGHT_SIGHT.darkReact : 1);
       this.trackStart = this.reactUntil - (holding ? D.trackTime * S.trackTime * S.holdPreAim : 0); this.target = best; this.burstLeft = 0; this.shotIdx = 0;
     }
     if (this.target) {

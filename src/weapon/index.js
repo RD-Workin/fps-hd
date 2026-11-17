@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { buildViewmodel, VM_PROJ } from './viewmodel.js';
 import { buildSniper } from './sniper.js';
 import { createScope } from './scope.js';
+import { createFlashlight } from './flashlight.js';
 import { createLoadout } from './loadout.js';
 import { createEffects } from './effects.js';
 
@@ -141,6 +142,7 @@ export function createWeapon(ctx) {
   const effects = createEffects(ctx);
   ctx.effects = effects;
   const scope = createScope();
+  const flashlight = createFlashlight(ctx, kits); // Ops de nuit: weapon light (F)
 
   // springs: position (m) and rotation (rad) offsets of the whole viewmodel
   const pos = new Spring(240, 22), rot = new Spring(220, 18), sway = new Spring(120, 16), land = new Spring(160, 14);
@@ -158,7 +160,7 @@ export function createWeapon(ctx) {
   const w = {
     name: 'NV-4', current: 'rifle', mag: 30, magSize: 30, reserve: 90, reloading: false, reloadProgress: 0, spread: 0.004, aiming: false, adsK: 0,
     scoped: false, sensScale: 1, bloom: 0, shotIndex: 0, cycling: false, defs: WEAPONS,
-    get viewmodel() { return vm; }, effects, emptyReload: false, get _base() { return K.BASE; }, get _brot() { return K.BROT; },
+    get viewmodel() { return vm; }, effects, flashlight, emptyReload: false, get _base() { return K.BASE; }, get _brot() { return K.BROT; },
     // switch weapon (full ammo, draw animation). Used by the loadout picker during the freeze and at round reset.
     equip(id, switched = false) {
       const k = kits[id] || kits.rifle;
