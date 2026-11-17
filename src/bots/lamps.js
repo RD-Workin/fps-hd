@@ -113,7 +113,8 @@ export function createBotLamps(ctx, mgr) {
     // lamp discipline per skill: 0 = always on, 1 = off when holding still, 2 = also off when sneaking (walking)
     decide(b, dt) {
       if (!night || !b.alive) { b.lampOn = false; b._stillT = 0; return; }
-      const disc = b.skill?.lamp ?? 1, engaged = b.target && b.isVisible(b.target);
+      // Zombies: no point hiding from a horde, lamps stay on
+      const disc = ctx.game?.mode === 'zombie' ? 0 : b.skill?.lamp ?? 1, engaged = b.target && b.isVisible(b.target);
       b._stillT = b.moveSpeed < 0.8 ? (b._stillT || 0) + dt : 0;
       let on = true;
       if (disc >= 1 && b._stillT > (disc >= 2 ? 0.8 : 2) && !engaged) on = false;
