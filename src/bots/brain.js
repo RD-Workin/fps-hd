@@ -187,7 +187,7 @@ export class Brain {
     if (!list.length) return;
     const nav = this.mgr.nav, flags = game.flags, own = flags?.[team], foe = flags?.[team === 'ATK' ? 'DEF' : 'ATK'];
     if (!own?.base || !foe?.base) return;
-    const P = this.plan, C = P.ctf ||= { role: new Map(), lane: new Map(), shift: Math.floor(Math.random() * 6) };
+    const P = this.plan, C = P.ctf ||= { role: new Map(), lane: new Map(), shift: Math.floor(Math.random() * 6), next: {} };
     const lanes = (this.ctx.world?.ctf?.lanes || []).map(l => (team === 'ATK' ? l : [...l].reverse()));
     const now = this.ctx.time, rest = new Set(list);
     const mates = (this.ctx.actors || []).filter(a => a.team === team);
@@ -249,8 +249,10 @@ export class Brain {
     for (const b of rest) {
       let m = C.lane.get(b);
       if (lanes.length && (!m || m.at !== b.spawnedAt || m.team !== team)) { // (re)spawned: pick the least used lane
-        let k = -1; for (let j = 0; j < lanes.length; j++) { const jj = (j + C.shift) % lanes.length; if (k < 0 || used[jj] < used[k]) k = jj; }
-        used[k]++; m = { k, i: 0, at: b.spawnedAt, team }; C.lane.set(b, m);
+        // ties go round-robin (C.next), so with fewer attackers than lanes every lane still gets its turn
+        const start = C.next[team] ??= C.shift;
+        let k = -1; for (let j = 0; j < lanes.length; j++) { const jj = (j + start) % lanes.length; if (k < 0 || used[jj] < used[k]) k = jj; }
+        C.next[team] = k + 1; used[k]++; m = { k, i: 0, at: b.spawnedAt, team }; C.lane.set(b, m);
       }
       const route = m ? lanes[m.k] : null;
       if (route) while (m.i < route.length && (hd(b.position, { x: route[m.i][0], z: route[m.i][1] }) < 3.5 ||
