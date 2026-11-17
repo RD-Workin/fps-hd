@@ -187,6 +187,11 @@ export function createAudio(ctx) {
   for (const n of ['bomb:plantCancel', 'bomb:defuseCancel', 'bomb:defused', 'bomb:exploded']) E.on(n, () => { botUse = null; });
   E.on('bomb:defused', () => { play('wireCut', { prio: 5, bus: 'ui' }); play('keypad', { bus: 'ui', delay: 0.1, rate: 1.3 }); });
   E.on('bomb:pickup', p => { if (me(p?.actor)) play('pickup', { bus: 'ui', prio: 3 }); });
+  // capture du drapeau
+  E.on('player:respawn', () => { deathMuffle = 0; play('draw', { delay: 0.1, prio: 3 }); });
+  E.on('flag:taken', p => { if (me(p?.actor)) play('pickup', { bus: 'ui', prio: 4 }); else if (p?.team === P()?.team) play('keypad', { bus: 'ui', rate: 0.7, prio: 4 }); });
+  E.on('flag:returned', p => { if (p?.actor && me(p.actor)) play('pickup', { bus: 'ui', prio: 3 }); });
+  E.on('flag:captured', p => stinger(p?.weScored ? 'mus:roundWin' : 'mus:roundLoss', { gain: 0.6 }));
   E.on('bomb:exploded', p => {
     const pos = p?.position || ctx.game?.bomb?.position; const d = pos ? camPos.distanceTo(pos) : 30;
     play('explosion', { pos: pos ? pos.clone().setY(1) : null, gain: 1.4, prio: 9, send: 0.5, occlude: false, max: 2 });

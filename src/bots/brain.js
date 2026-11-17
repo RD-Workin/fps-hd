@@ -1,4 +1,4 @@
-// Team brain: turns the Search & Destroy state (ctx.game) into one goal per bot every 0.4 s.
+// Team brain: turns the game state (ctx.game: Search & Destroy or Capture du drapeau) into one goal per bot every 0.4 s.
 // Goal = {x, z, tol, speed:'run'|'walk', look?:{x,z}, crouch?, use?, kind?:'plant'|'defuse', anchor?, huntRange?, noHunt?}
 const rand = (a, b) => a + Math.random() * (b - a);
 const hd = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -27,6 +27,10 @@ export class Brain {
     const bots = this.mgr.list.filter(b => b.alive);
     this.updateThreat();
     const atk = bots.filter(b => b.team === 'ATK'), def = bots.filter(b => b.team === 'DEF');
+    if (game.mode === 'ctf') { // Capture du drapeau
+      if (game.phase === 'live') { this.assignCTF(atk, 'ATK', game); this.assignCTF(def, 'DEF', game); this.spreadGoals(atk); this.spreadGoals(def); }
+      return;
+    }
     this.assignATK(atk, game);
     this.assignDEF(def, game);
     this.retakeUtility(def, game);
@@ -40,7 +44,7 @@ export class Brain {
     const sorted = [...list].sort((a, b) => (a.goal?.use || a.goal?.noHunt ? 0 : 1) - (b.goal?.use || b.goal?.noHunt ? 0 : 1) || (a.id < b.id ? -1 : 1));
     for (const b of sorted) {
       const g = b.goal; if (!g) continue;
-      if (g.use || g.noHunt || g.anchor === b.position) { taken.push(g); continue; } // plant/defuse/pickup/escort: exact
+      if (g.use || g.noHunt || g.exact || g.anchor === b.position) { taken.push(g); continue; } // plant/defuse/pickup/escort: exact
       const free = p => taken.every(t => hd(t, p) >= MIN_GAP);
       if (free(g)) { taken.push(g); b._spread = null; continue; }
       const key = Math.round(g.x) + ',' + Math.round(g.z);
@@ -56,14 +60,15 @@ export class Brain {
 
   updateThreat() {
     const now = this.ctx.time, sites = this.sites(), seen = {};
+    const S = this.mgr.skillForTeam?.('DEF') ?? { threatRadius: 24, rotateNeed: 0.3 };
     for (const [e, info] of this.mgr.intel.DEF) {
       if (now - info.t > 4 || !e.alive) continue;
-      for (const s of sites) if (hd(info.pos, s.center) < s.radius + 24) this.threat[s.name] = Math.max(this.threat[s.name] ?? -100, info.t + (e.hasBomb ? 8 : 0));
+      for (const s of sites) if (hd(info.pos, s.center) < s.radius + S.threatRadius) this.threat[s.name] = Math.max(this.threat[s.name] ?? -100, info.t + (e.hasBomb ? 8 : 0));
       // reading the push: attackers spotted on one site's side of the map, well before they reach it
       let near = null, nd = 1e9, far = 1e9; for (const s of sites) { const d = hd(info.pos, s.center); if (d < nd) { far = nd; nd = d; near = s; } else if (d < far) far = d; }
       if (near && nd < 62 && far - nd > 18) (seen[near.name] ||= []).push(info.t + (e.hasBomb ? 8 : 0));
     }
-    const need = Math.max(3, Math.round((this.mgr.list.length / 2) * 0.3));
+    const need = Math.max(3, Math.round((this.mgr.list.length / 2) * S.rotateNeed));
     for (const k in seen) if (seen[k].length >= need) this.threat[k] = Math.max(this.threat[k] ?? -100, Math.max(...seen[k]));
   }
 
@@ -122,7 +127,8 @@ export class Brain {
       for (const [b, m] of P.member) if (m.sq === sq && b.alive) { alive++; if (m.i >= sq.stageI && hd(b.position, { x: sq.stage[0], z: sq.stage[1] }) < 9) there++; }
       if (there && sq.t0 == null) sq.t0 = now;
       const contact = [...P.member].some(([b, m]) => m.sq === sq && b.alive && now - b.alertT < 1.5 && m.i >= sq.stageI);
-      if (!alive || there >= Math.ceil(alive * 0.7) || (sq.t0 != null && now - sq.t0 > 7) || contact || (game.roundTimeLeft ?? 99) < 45) { sq.go = true; sq.goAt = now; if (!contact) this.pushUtility(sq); }
+      const regroup = this.mgr.skillForTeam?.('ATK')?.regroup ?? true;
+      if (!regroup || !alive || there >= Math.ceil(alive * 0.7) || (sq.t0 != null && now - sq.t0 > 7) || contact || (game.roundTimeLeft ?? 99) < 45) { sq.go = true; sq.goAt = now; if (!contact) this.pushUtility(sq); }
     }
     for (const b of rest) {
       const m = P.member.get(b);
@@ -219,6 +225,103 @@ export class Brain {
     return p || { x: to.x, z: to.z };
   }
 
+  // ------------------------------------------------------------ capture the flag
+  // Roles per team: ~25 % defenders around the own flag (half on the pad, half on the lanes ~20 m out), the rest attack,
+  // each one on the least used lane so every street of the map gets traffic. Overrides, in order: our bot carrier runs
+  // home; 2 closest return our dropped flag / grab the dropped enemy flag; bots near the enemy carrier hunt him; bots
+  // near our carrier (bot or player) escort him.
+  assignCTF(list, team, game) {
+    if (!list.length) return;
+    const nav = this.mgr.nav, flags = game.flags, own = flags?.[team], foe = flags?.[team === 'ATK' ? 'DEF' : 'ATK'];
+    if (!own?.base || !foe?.base) return;
+    const P = this.plan, C = P.ctf ||= { role: new Map(), lane: new Map(), shift: Math.floor(Math.random() * 6), next: {} };
+    const lanes = (this.ctx.world?.ctf?.lanes || []).map(l => (team === 'ATK' ? l : [...l].reverse()));
+    const now = this.ctx.time, rest = new Set(list);
+    const mates = (this.ctx.actors || []).filter(a => a.team === team);
+    const fpos = F => (F.state === 'carried' && F.carrier ? F.carrier.position : F.position);
+    // roles: stable for the round, topped up / rebalanced as bots die for good
+    const nDef = list.length >= 3 ? Math.max(1, Math.round(mates.length * 0.25)) : list.length === 2 ? 1 : 0;
+    let defs = list.filter(b => C.role.get(b) === 'def');
+    for (const b of list) if (!C.role.has(b)) C.role.set(b, defs.length < nDef ? (defs.push(b), 'def') : 'atk');
+    while (defs.length > nDef) C.role.set(defs.pop(), 'atk');
+    if (defs.length < nDef) for (const b of list) { if (defs.length >= nDef) break; if (C.role.get(b) === 'atk' && hd(b.position, own.base) < 30) { C.role.set(b, 'def'); defs.push(b); } }
+
+    // 1. our bot carrier: straight home (and hide near the base if our flag is not there)
+    const ourCarrier = foe.state === 'carried' && foe.carrier?.team === team ? foe.carrier : null;
+    if (ourCarrier && rest.has(ourCarrier)) {
+      if (own.state === 'base') ourCarrier.goal = { x: own.base.x, z: own.base.z, tol: 0.4, speed: 'run', noHunt: true, push: true, exact: true, noCover: hd(ourCarrier.position, own.base) < 12 };
+      else { const s = this.guardAround(own.base, 'def'); const p = s[0]; ourCarrier.goal = { x: p.x, z: p.z, tol: 1, speed: 'run', crouch: true, anchor: p, huntRange: 6, look: own.base }; }
+      rest.delete(ourCarrier);
+    }
+    const closest = (pos, n) => [...rest].sort((a, b) => hd(a.position, pos) - hd(b.position, pos)).slice(0, n);
+    // 2. dropped flags: ours -> return it (touch), theirs -> grab it
+    for (const F of [own, foe]) if (F.state === 'dropped' && F.position) {
+      for (const b of closest(F.position, 2)) { if (hd(b.position, F.position) > 70) continue; b.goal = { x: F.position.x, z: F.position.z, tol: 0.3, speed: 'run', exact: true, noHunt: hd(b.position, F.position) < 15, push: hd(b.position, F.position) < 8 }; rest.delete(b); }
+    }
+    // 3. the enemy carries our flag: defenders and every bot within 35 m chase him (up to half the team)
+    const theirCarrier = own.state === 'carried' ? own.carrier : null;
+    if (theirCarrier?.alive) {
+      const cp = theirCarrier.position, max = Math.max(1, Math.ceil(list.length / 2));
+      const hunters = [...rest].filter(b => C.role.get(b) === 'def' || hd(b.position, cp) < 35).sort((a, b) => hd(a.position, cp) - hd(b.position, cp)).slice(0, max);
+      for (const b of hunters) { b.goal = { x: cp.x, z: cp.z, tol: 2, speed: 'run', anchor: cp, huntRange: 40 }; rest.delete(b); }
+    }
+    // 4. escort: as soon as our side holds the flag, bots near the carrier (bot or player) form up around him
+    const carrierAny = foe.state === 'carried' && foe.carrier?.team === team ? foe.carrier : null;
+    if (carrierAny?.alive) {
+      const cp = carrierAny.position, v = carrierAny.velocity || { x: 0, z: 0 }, sp = Math.hypot(v.x, v.z);
+      const fx = sp > 0.5 ? v.x / sp : 0, fz = sp > 0.5 ? v.z / sp : -1;
+      const near = [...rest].filter(b => hd(b.position, cp) < 25).sort((a, b) => hd(a.position, cp) - hd(b.position, cp));
+      // formation: one ahead, two on the flanks, the others behind (relative to the carrier's motion)
+      const slots = [[4.5, 0], [1, -2.8], [1, 2.8], [-3, -1.8], [-3, 1.8], [-5.5, 0], [6.5, -2.5], [6.5, 2.5]];
+      near.forEach((b, i) => {
+        const [f, s] = slots[i % slots.length];
+        const p = nav.snap(cp.x + fx * f - fz * s, cp.z + fz * f + fx * s) || cp;
+        b.goal = { x: p.x, z: p.z, tol: 1.4, speed: 'run', anchor: cp, huntRange: 18, escort: true };
+        rest.delete(b);
+      });
+    }
+    // 5. defenders: half on the pad, half on the lanes ~20 m out, looking away from the base
+    const defList = [...rest].filter(b => C.role.get(b) === 'def');
+    const pad = this.guardAround(own.base, 'def'), outs = this.laneHolds(team, lanes, own.base);
+    defList.forEach((b, i) => {
+      const s = i % 2 === 0 || !outs.length ? pad[(i >> 1) % pad.length] : outs[(i >> 1) % outs.length];
+      if (!P.crouch.has(b)) P.crouch.set(b, Math.random() < 0.5);
+      b.goal = { x: s.x, z: s.z, tol: 0.8, speed: 'run', look: s.look || own.base, crouch: P.crouch.get(b), anchor: s, huntRange: 14 };
+      rest.delete(b);
+    });
+    // 6. attackers: one lane each (least used first), then the enemy flag (base or wherever it lies)
+    const target = fpos(foe);
+    const used = new Array(lanes.length).fill(0);
+    for (const [b, m] of C.lane) if (b.alive && b.team === team && rest.has(b) && m.at === b.spawnedAt) used[m.k]++;
+    for (const b of rest) {
+      let m = C.lane.get(b);
+      if (lanes.length && (!m || m.at !== b.spawnedAt || m.team !== team)) { // (re)spawned: pick the least used lane
+        // ties go round-robin (C.next), so with fewer attackers than lanes every lane still gets its turn
+        const start = C.next[team] ??= C.shift;
+        let k = -1; for (let j = 0; j < lanes.length; j++) { const jj = (j + start) % lanes.length; if (k < 0 || used[jj] < used[k]) k = jj; }
+        C.next[team] = k + 1; used[k]++; m = { k, i: 0, at: b.spawnedAt, team }; C.lane.set(b, m);
+      }
+      const route = m ? lanes[m.k] : null;
+      if (route) while (m.i < route.length && (hd(b.position, { x: route[m.i][0], z: route[m.i][1] }) < 3.5 ||
+        hd(b.position, foe.base) < hd({ x: route[m.i][0], z: route[m.i][1] }, foe.base) - 2)) m.i++;
+      const close = target && hd(b.position, target) < 22;
+      if (route && m.i < route.length - 1 && !close && foe.state === 'base') { const [x, z] = route[m.i]; b.goal = { x, z, tol: 2.5, speed: 'run', huntRange: 16 }; continue; }
+      if (target) b.goal = { x: target.x, z: target.z, tol: 0.3, speed: 'run', exact: foe.state !== 'carried', huntRange: 14, noHunt: hd(b.position, target) < 6, push: foe.state !== 'carried' && hd(b.position, target) < 8 };
+    }
+  }
+  // spots on each lane ~16-24 m out of the base, looking down the lane (cached per team)
+  laneHolds(team, lanes, base) {
+    const key = 'ctfhold' + team; if (this.spotCache.has(key)) return this.spotCache.get(key);
+    const res = [];
+    for (const l of lanes) {
+      for (let i = 1; i < l.length; i++) {
+        const p = { x: l[i][0], z: l[i][1] }, d = hd(p, base);
+        if (d > 16 && d < 30) { const n = l[Math.min(l.length - 1, i + 1)]; const q = this.mgr.nav.snap(p.x, p.z) || p; if (res.every(r => hd(r, q) > 5)) res.push({ x: q.x, z: q.z, look: { x: n[0], z: n[1] } }); break; }
+      }
+    }
+    this.spotCache.set(key, res); return res;
+  }
+
   // ------------------------------------------------------------ defenders
   assignDEF(list, game) {
     if (!list.length) return;
@@ -239,7 +342,8 @@ export class Brain {
       P.anchors = new Set(['A', 'B'].map(r => sorted.find(b => roles.get(b) === r)).filter(Boolean));
     }
     // rotation toward a threatened site
-    let hot = null; for (const s of this.sites()) if (now - this.threat[s.name] < 20 && (!hot || this.threat[s.name] > this.threat[hot])) hot = s.name;
+    const win = this.mgr.skillForTeam?.('DEF')?.rotateWindow ?? 20;
+    let hot = null; for (const s of this.sites()) if (now - this.threat[s.name] < win && (!hot || this.threat[s.name] > this.threat[hot])) hot = s.name;
     const counters = {};
     list.forEach((b, i) => {
       let role = P.roles.get(b) || 'mid';

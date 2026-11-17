@@ -52,19 +52,20 @@ function markup() {
     <div class="nv-clock"><span class="rd">MANCHE 1</span><span class="tm nv-num">1:45</span><span class="bt nv-num">${ICONS.bomb}<span>40.0</span></span><span class="ph"></span></div>
     <div class="nv-tm them"><div class="row"><span class="side">ENNEMIS</span><div class="nv-wins"></div><span class="sc nv-num">0</span></div><div class="nv-alive"></div></div>
   </div>
+  <div class="nv-flags nv-shadow"><div class="f us"></div><div class="f them"></div></div>
   <div class="nv-kf nv-shadow"></div>
   <div class="nv-toasts"></div>
   <div class="nv-banner"><div class="band"><div class="k"></div><div class="t"></div><div class="s"></div></div></div>
   <div class="nv-freeze nv-shadow"><div class="l">DÉBUT DE LA MANCHE DANS</div><div class="n nv-num">4</div></div>
   <div class="nv-mm"><div class="nv-mm-wrap"><canvas></canvas><div class="nv-mm-n"><span>N</span></div></div><div class="nv-mm-zone nv-shadow"></div></div>
-  <div class="nv-bombpill nv-alive-only">${ICONS.bomb}<span>BOMBE</span></div>
+  <div class="nv-bombpill nv-alive-only">${ICONS.bomb}<span class="lb">BOMBE</span></div>
   <div class="nv-hp nv-alive-only nv-shadow"><div class="num nv-num">${ICONS.cross}<span>100</span></div>
     <div class="lbl"><span>SANTÉ</span><span class="st"></span></div><div class="bar"><i class="ghost"></i><i class="fill"></i><i class="ticks"></i></div></div>
   <div class="nv-sound">${ICONS.speaker}</div>
   <div class="nv-am nv-alive-only nv-shadow"><div class="top">${ICONS.rifle}<span class="wn">NV-4</span></div>
     <div class="main"><span class="mag nv-num">30</span><span class="res nv-num"><small>/</small><span>90</span></span></div><div class="nv-pips"></div></div>
   <div class="nv-use nv-alive-only nv-shadow"><div class="lab"></div><div class="bar"><i></i></div><div class="pct">0 %</div></div>
-  <div class="nv-death nv-shadow"><div class="band"><div class="k">VOUS ÊTES MORT</div><div class="t"></div><div class="h"></div></div></div>
+  <div class="nv-death nv-shadow"><div class="band"><div class="k">VOUS ÊTES MORT</div><div class="t"></div><div class="r"></div><div class="h"></div></div></div>
   <div class="nv-sb"><div class="hd"><h2>TABLEAU DES SCORES</h2><div class="meta"></div></div><div class="tb"></div></div>
 </div>
 <div class="nv-menu">
@@ -76,9 +77,7 @@ function markup() {
       <div class="nv-tag">RECHERCHE &amp; DESTRUCTION · 5 CONTRE 5</div>
       <h1 class="nv-title"><span class="a">OPÉRATION</span><span class="b">NOVA</span></h1>
       <div class="nv-sub"><i></i><span class="sub-t">VIEILLE VILLE</span></div>
-      <p class="nv-desc">Les attaquants doivent poser la charge sur le site A ou B et la protéger jusqu'à l'explosion.
-        Les défenseurs doivent éliminer l'escouade adverse ou désamorcer la charge. Pas de réapparition : chaque balle compte.
-        Première équipe à 4 manches.</p>
+      <p class="nv-desc"></p>
       <div class="nv-result"><div class="r">VICTOIRE</div>
         <div class="fs nv-num"><span class="u">0</span><span class="sep">—</span><span class="t">0</span></div><div class="note"></div></div>
       <div class="nv-pinfo"></div>
@@ -93,11 +92,17 @@ function markup() {
       <div class="nv-card nv-stats"><h3>VOTRE MATCH <small>JOUEUR</small></h3><div class="nv-statgrid"></div></div>
       <div class="nv-card nv-c-keys"><h3>COMMANDES <small>AZERTY</small></h3><div class="nv-keys">${keys}</div></div>
       <div class="nv-card"><h3>RÉGLAGES</h3><div class="nv-set">
+        <label>Mode de jeu</label><div class="nv-seg nv-seg-mode" data-set="mode"><button data-v="sd">RECHERCHE &amp; DESTRUCTION</button><button data-v="ctf">CAPTURE DU DRAPEAU</button></div>
         <label>Bots alliés</label><div class="nv-range"><input type="range" data-set="allies" min="0" max="19" step="1"><output></output></div>
         <label>Bots adverses</label><div class="nv-range"><input type="range" data-set="enemies" min="1" max="20" step="1"><output></output></div>
         <div class="nv-perfwarn"></div>
-        <label>Durée de manche</label><div class="nv-range"><input type="range" data-set="rtime" min="45" max="300" step="15"><output></output></div>
-        <label>Minuterie de la bombe</label><div class="nv-range"><input type="range" data-set="btime" min="20" max="90" step="5"><output></output></div>
+        <label>Difficulté des ennemis</label><div class="nv-seg" data-set="skill"><button data-v="easy">RECRUE</button><button data-v="normal">NORMAL</button><button data-v="veteran">VÉTÉRAN</button></div>
+        <label data-only="sd">Durée de manche</label><div data-only="sd" class="nv-range"><input type="range" data-set="rtime" min="45" max="300" step="15"><output></output></div>
+        <label data-only="sd">Minuterie de la bombe</label><div data-only="sd" class="nv-range"><input type="range" data-set="btime" min="20" max="90" step="5"><output></output></div>
+        <label data-only="ctf">Captures pour gagner</label><div data-only="ctf" class="nv-range"><input type="range" data-set="ccaps" min="1" max="7" step="1"><output></output></div>
+        <label data-only="ctf">Durée de manche</label><div data-only="ctf" class="nv-range"><input type="range" data-set="cmin" min="3" max="20" step="1"><output></output></div>
+        <label data-only="ctf">Pénalité par mort</label><div data-only="ctf" class="nv-range"><input type="range" data-set="cstep" min="0" max="12" step="1"><output></output></div>
+        <label data-only="ctf">Vies par manche</label><div data-only="ctf" class="nv-range"><input type="range" data-set="clives" min="0" max="15" step="1"><output></output></div>
         <label>Camp de départ</label><div class="nv-seg" data-set="side"><button data-v="ATK">ATTAQUE</button><button data-v="DEF">DÉFENSE</button><button data-v="RND">ALÉATOIRE</button></div>
         <label>Qualité graphique</label><div class="nv-seg" data-set="quality"><button data-v="low">BASSE</button><button data-v="high">HAUTE</button></div>
         <label>Sensibilité souris</label><div class="nv-range"><input type="range" data-set="sens" min="0.4" max="6" step="0.1"><output></output></div>
@@ -105,7 +110,7 @@ function markup() {
       </div></div>
     </div>
   </div>
-  <div class="nv-sb nv-sb-end"><div class="hd"><h2>TABLEAU FINAL</h2><div class="meta"></div><button class="nv-sb-x" data-sfx title="Fermer (Échap)">✕</button></div><div class="tb"></div><div class="nv-sb-leg">É éliminations · A assistances · M morts · TÊTE éliminations à la tête · OBJ poses + désamorçages · MVP manches MVP</div></div>
+  <div class="nv-sb nv-sb-end"><div class="hd"><h2>TABLEAU FINAL</h2><div class="meta"></div><button class="nv-sb-x" data-sfx title="Fermer (Échap)">✕</button></div><div class="tb"></div><div class="nv-sb-leg">É éliminations · A assistances · M morts · TÊTE éliminations à la tête · <span class="obj">OBJ poses + désamorçages</span> · MVP manches MVP</div></div>
   <div class="nv-foot">OPÉRATION NOVA · PROJET PERSONNEL · CODE ET VISUELS ORIGINAUX</div>
 </div>`;
 }
@@ -134,7 +139,10 @@ export function createHud(ctx) {
     sb: $('.nv-sb'), sbMeta: $('.nv-sb .meta'), sbTb: $('.nv-sb .tb'), menu: $('.nv-menu'), note: $('.nv-note'), pinfo: $('.nv-pinfo'),
     sbEnd: $('.nv-sb-end'), sbEndMeta: $('.nv-sb-end .meta'), sbEndTb: $('.nv-sb-end .tb'), scoresBtn: $('[data-act="scores"]'),
     result: $('.nv-result'), statgrid: $('.nv-statgrid'), playBtn: $('[data-act="play"]'), restartBtn: $('[data-act="restart"]'),
-    mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), side: $('[data-set="side"]'), allies: $('[data-set="allies"]'), enemies: $('[data-set="enemies"]'), perfwarn: $('.nv-perfwarn'), rtime: $('[data-set="rtime"]'), btime: $('[data-set="btime"]'),
+    mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), side: $('[data-set="side"]'), skill: $('[data-set="skill"]'), allies: $('[data-set="allies"]'), enemies: $('[data-set="enemies"]'), perfwarn: $('.nv-perfwarn'), rtime: $('[data-set="rtime"]'), btime: $('[data-set="btime"]'),
+    mode: $('[data-set="mode"]'), ccaps: $('[data-set="ccaps"]'), cmin: $('[data-set="cmin"]'), cstep: $('[data-set="cstep"]'), clives: $('[data-set="clives"]'),
+    flags: $('.nv-flags'), flagUs: $('.nv-flags .us'), flagThem: $('.nv-flags .them'), deathK: $('.nv-death .k'), deathR: $('.nv-death .r'),
+    bombLb: $('.nv-bombpill .lb'), tagLine: $('.nv-tag'), desc: $('.nv-desc'), legObj: $('.nv-sb-leg .obj'),
   };
   const RC = 2 * Math.PI * 26;
   E.reloadFg.style.strokeDasharray = RC;
@@ -149,7 +157,7 @@ export function createHud(ctx) {
   const op = (el, v) => { v = Math.round(v * 100) / 100; if (memo(el, 'op', v)) el.style.opacity = v; };
 
   // ---------------------------------------------------------------- state
-  const settings = { rtime: 0, btime: 0, allies: 9, enemies: 10, side: 'ATK', quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
+  const settings = { skill: 'normal', mode: 'sd', ccaps: 3, cmin: 10, cstep: 0, clives: 0, rtime: 0, btime: 0, allies: 9, enemies: 10, side: 'ATK', quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
   let lastSpec = '';
   const tally = new Map(); // actor -> {kills, deaths}  (fallback when actor.stats missing)
   const me = { shots: 0, hits: 0, hs: 0, kills: 0, deaths: 0, roundKills: 0 };
@@ -186,10 +194,35 @@ export function createHud(ctx) {
       for (const [el, v, mn, mx, a, f] of [[E.rtime, settings.rtime, 45, 300, auto.round, mmss], [E.btime, settings.btime, 20, 90, auto.bomb, v => v + ' s']]) {
         el.value = v || mn; el.nextElementSibling.value = v ? f(v) : `AUTO ${f(a)}`; el.style.setProperty('--p', (((v || mn) - mn) / (mx - mn) * 100) + '%');
       } }
+    try { settings.skill = ctx.bots?.setSkill?.(settings.skill) ?? settings.skill; } catch (e) { console.warn('[hud] skill', e); }
+    for (const b of E.skill.children) b.classList.toggle('on', b.dataset.v === settings.skill);
     try { ctx.game?.setPreferredSide?.(settings.side); } catch (e) { console.warn('[hud] side', e); }
     for (const b of E.side.children) b.classList.toggle('on', b.dataset.v === settings.side);
+    applyMode();
     E.sens.value = settings.sens; E.sens.nextElementSibling.value = settings.sens.toFixed(1);
     E.sens.style.setProperty('--p', ((settings.sens - 0.4) / 5.6 * 100) + '%');
+  }
+  // game mode (Recherche & Destruction / Capture du drapeau): menu texts, CTF settings rows, side labels
+  const isCtf = () => ctx.game?.mode === 'ctf';
+  function applyMode() {
+    try { ctx.game?.setMode?.(settings.mode); } catch (e) { console.warn('[hud] mode', e); }
+    try { ctx.game?.setCtfSettings?.({ caps: settings.ccaps, minutes: settings.cmin, step: settings.cstep || null, lives: settings.clives || null }); } catch (e) { console.warn('[hud] ctf', e); }
+    const ctf = settings.mode === 'ctf';
+    for (const b of E.mode.children) b.classList.toggle('on', b.dataset.v === settings.mode);
+    E.menu.classList.toggle('m-ctf', ctf); root.classList.toggle('m-ctf', ctf);
+    const [b0, b1] = E.side.children; b0.textContent = ctf ? 'PORT' : 'ATTAQUE'; b1.textContent = ctf ? 'CITADELLE' : 'DÉFENSE';
+    const n = Math.max(settings.allies + 1, settings.enemies);
+    E.tagLine.textContent = ctf ? `CAPTURE DU DRAPEAU · ${settings.allies + 1} CONTRE ${settings.enemies} · BO3` : `RECHERCHE & DESTRUCTION · ${settings.allies + 1} CONTRE ${settings.enemies}`;
+    E.desc.textContent = ctf
+      ? `Un drapeau côté port, un côté citadelle. Ramenez le drapeau adverse à votre base pour marquer, le vôtre doit y être. ${settings.ccaps} captures ou le meilleur score après ${settings.cmin} min gagnent la manche, en deux manches gagnantes. Chaque mort allonge la réapparition et coûte une vie : sans vie, on est éliminé jusqu'à la fin de la manche.`
+      : 'Les attaquants doivent poser la charge sur le site A ou B et la protéger jusqu\'à l\'explosion. Les défenseurs doivent éliminer l\'escouade adverse ou désamorcer la charge. Pas de réapparition : chaque balle compte. Première équipe à 4 manches.';
+    E.legObj.textContent = ctf ? 'OBJ captures + drapeaux rendus' : 'OBJ poses + désamorçages';
+    // CTF sliders (0 = automatic from the team size)
+    const g = ctx.game, auto = { step: Math.round(2 * n / 5 * 10) / 10, lives: Math.max(3, Math.round(9.5 - 0.27 * n)) };
+    const rows = [[E.ccaps, settings.ccaps, 1, 7, v => String(v)], [E.cmin, settings.cmin, 3, 20, v => v + ' min'],
+      [E.cstep, settings.cstep, 0, 12, v => (v ? `+${v} s` : `AUTO +${auto.step} s`)], [E.clives, settings.clives, 0, 15, v => (v ? String(v) : `AUTO ${auto.lives}`)]];
+    for (const [el, v, mn, mx, f] of rows) { el.value = v; el.nextElementSibling.value = f(v); el.style.setProperty('--p', ((v - mn) / (mx - mn) * 100) + '%'); }
+    if (g?.pendingMode && g.started) E.note.textContent = 'Mode appliqué à la prochaine partie (Recommencer)';
   }
   function reflectAudio() {
     const a = ctx.audio, muted = !!a?.muted, v = Math.round((a?.volume ?? 1) * 100);
@@ -199,12 +232,18 @@ export function createHud(ctx) {
   }
   E.quality.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.quality = v; save(settings); applySettings(); } });
   E.side.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.side = v; save(settings); applySettings(); if (ctx.game?.started) toast('Camp appliqué à la prochaine partie'); } });
+  E.skill.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { settings.skill = b.dataset.v; save(settings); applySettings(); if (ctx.game?.started) toast(`Difficulté des ennemis : ${b.textContent}`); } });
   E.sens.addEventListener('input', () => { settings.sens = +E.sens.value; save(settings); applySettings(); });
   for (const k of ['allies', 'enemies']) E[k].addEventListener('change', () => { settings[k] = +E[k].value; save(settings); applySettings(); if (ctx.game?.started) toast('Effectifs appliqués à la prochaine partie (Recommencer)'); });
   for (const k of ['allies', 'enemies']) E[k].addEventListener('input', () => { E[k].nextElementSibling.value = E[k].value; });
   for (const [k, auto] of [['rtime', 45], ['btime', 20]]) E[k].addEventListener('input', () => { const v = +E[k].value; settings[k] = v <= auto ? 0 : v; save(settings); applySettings(); });
   for (const k of ['rtime', 'btime']) E[k].addEventListener('change', () => { if (ctx.game?.started) toast('Durées appliquées à la prochaine manche'); });
   E.vol.addEventListener('input', () => { ctx.audio?.setVolume?.(E.vol.value / 100); reflectAudio(); });
+  E.mode.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (!v) return; settings.mode = v; save(settings); applySettings(); if (ctx.game?.started) toast('Mode appliqué à la prochaine partie (Recommencer)'); });
+  for (const k of ['ccaps', 'cmin', 'cstep', 'clives']) {
+    E[k].addEventListener('input', () => { settings[k] = +E[k].value; save(settings); applyMode(); });
+    E[k].addEventListener('change', () => { if (ctx.game?.started) toast('Réglage appliqué à la prochaine manche'); });
+  }
   for (const b of E.mutes) b.addEventListener('click', () => { ctx.audio?.toggleMute?.(); reflectAudio(); });
   ev.on('audio:muted', ({ muted } = {}) => { reflectAudio(); if (!ctx.paused) toast(muted ? 'Son coupé' : 'Son activé', muted ? 'warn' : ''); });
   ev.on('audio:volume', reflectAudio);
@@ -227,7 +266,8 @@ export function createHud(ctx) {
       E.playBtn.querySelector('span').textContent = 'REPRENDRE'; E.restartBtn.classList.remove('hide');
       E.restartBtn.querySelector('span').textContent = 'RECOMMENCER';
       E.pinfo.innerHTML = `MANCHE <b>${g?.round ?? 1}</b> &nbsp;·&nbsp; SCORE <b class="u">${g?.score?.us ?? 0}</b> — <b class="t">${g?.score?.them ?? 0}</b>` +
-        ` &nbsp;·&nbsp; CAMP <b>${ctx.player?.team === 'DEF' ? 'DÉFENSE' : 'ATTAQUE'}</b>`;
+        (isCtf() ? ` &nbsp;·&nbsp; CAPTURES <b class="u">${g?.caps?.us ?? 0}</b> — <b class="t">${g?.caps?.them ?? 0}</b> &nbsp;·&nbsp; CÔTÉ <b>${ctx.player?.team === 'DEF' ? 'CITADELLE' : 'PORT'}</b>`
+          : ` &nbsp;·&nbsp; CAMP <b>${ctx.player?.team === 'DEF' ? 'DÉFENSE' : 'ATTAQUE'}</b>`);
     } else if (mode === 'end') {
       const won = !!(g?.lastResult ? (g.score?.us ?? 0) > (g.score?.them ?? 0) : endWon);
       E.result.className = 'nv-result ' + (won ? 'win' : 'lose');
@@ -348,8 +388,8 @@ export function createHud(ctx) {
     if (victim.isPlayer) { me.deaths++; killerName = killer?.name || ''; }
   });
   ev.on('player:died', ({ killer } = {}) => {
-    html(E.deathT, killer && !killer.isPlayer ? `Éliminé par <b>${esc(killer.name)}</b>` : 'Tué par l\'explosion');
-    html(E.deathH, killer?.alive ? `Santé restante de l'adversaire : <b>${Math.max(0, Math.round(killer.health))}</b>` : 'Observez vos coéquipiers jusqu\'à la fin de la manche');
+    html(E.deathT, killer && !killer.isPlayer ? `Éliminé par <b>${esc(killer.name)}</b>` : killer?.isPlayer ? 'Tué par vous-même' : 'Tué par l\'explosion');
+    html(E.deathH, killer?.alive ? `Santé restante de l'adversaire : <b>${Math.max(0, Math.round(killer.health))}</b>` : isCtf() ? '' : 'Observez vos coéquipiers jusqu\'à la fin de la manche');
   });
 
   // ---------------------------------------------------------------- toasts & banners
@@ -381,15 +421,37 @@ export function createHud(ctx) {
     me.roundKills = 0; killerName = ''; hpGhost = lastHp = 100;
     for (const d of dmg) { d.from = null; op(d.el, 0); }
     const mp = g?.isMatchPoint ? ' · <b>BALLE DE MATCH</b>' : '';
+    if (isCtf()) {
+      banner(atk ? 'atk' : 'def', `MANCHE ${round ?? g?.round ?? ''} / 3`, atk ? 'CÔTÉ PORT' : 'CÔTÉ CITADELLE',
+        `Ramenez le drapeau ${atk ? 'de la citadelle' : 'du port'} à votre base · premier à <b>${g?.capsToWin ?? 3}</b>` + (round === 3 ? ' · <b>MANCHE DÉCISIVE</b>' : mp), 3);
+      return;
+    }
     banner(atk ? 'atk' : 'def', `MANCHE ${round ?? g?.round ?? ''}`, atk ? 'ATTAQUE' : 'DÉFENSE',
       (atk ? 'Posez la charge sur le site <b>A</b> ou <b>B</b>' : 'Protégez les sites <b>A</b> et <b>B</b>') + mp, 2.8);
   });
-  ev.on('round:end', ({ weWon, reason, mvp, matchOver } = {}) => {
+  ev.on('round:end', ({ weWon, reason, mvp, matchOver, caps } = {}) => {
     if (matchOver) return; // match:end shows its own banner
     banner(weWon ? 'win' : 'lose', esc(reason || 'FIN DE MANCHE').toUpperCase(), weWon ? 'MANCHE GAGNÉE' : 'MANCHE PERDUE',
-      mvp ? `MVP : <b>${esc(mvp.name)}</b>` : '', 3.2, true);
+      (isCtf() && caps ? `Captures <b>${caps.us} — ${caps.them}</b>${mvp ? ' · ' : ''}` : '') + (mvp ? `MVP : <b>${esc(mvp.name)}</b>` : ''), 3.2, true);
   });
-  ev.on('sides:swap', () => banner('gold', 'MI-TEMPS', 'CHANGEMENT DE CAMP', 'Les équipes échangent attaque et défense', 2.6));
+  ev.on('sides:swap', () => isCtf() ? banner('gold', 'NOUVELLE MANCHE', 'CHANGEMENT DE CAMP', 'Les équipes échangent le port et la citadelle', 2.6)
+    : banner('gold', 'MI-TEMPS', 'CHANGEMENT DE CAMP', 'Les équipes échangent attaque et défense', 2.6));
+  // ---------------------------------------------------------------- capture du drapeau
+  const who = a => (a?.isPlayer ? 'Vous' : esc(a?.name || '?'));
+  ev.on('flag:taken', ({ team, actor } = {}) => {
+    if (actor?.isPlayer) { toast('Vous avez le drapeau ennemi — ramenez-le à votre base !', 'gold'); return; }
+    if (team === ctx.player?.team) toast(`${actor?.name || 'Un ennemi'} a pris votre drapeau !`, 'warn');
+    else toast(`${actor?.name || 'Un allié'} a pris le drapeau ennemi`, 'gold');
+  });
+  ev.on('flag:dropped', ({ team } = {}) => toast(team === ctx.player?.team ? 'Votre drapeau est au sol — touchez-le pour le renvoyer' : 'Le drapeau ennemi est au sol !', team === ctx.player?.team ? 'warn' : ''));
+  ev.on('flag:returned', ({ team, actor, auto } = {}) => toast(team === ctx.player?.team ? (auto ? 'Votre drapeau est revenu à la base' : `${actor?.isPlayer ? 'Vous avez' : (actor?.name || 'Un allié') + ' a'} renvoyé votre drapeau`) : 'Le drapeau ennemi est revenu à sa base'));
+  ev.on('flag:captured', ({ actor, weScored, caps } = {}) => {
+    const c = caps || ctx.game?.caps || { us: 0, them: 0 };
+    banner(weScored ? 'win' : 'lose', weScored ? 'DRAPEAU CAPTURÉ' : 'DRAPEAU PERDU', weScored ? 'CAPTURE ALLIÉE' : 'CAPTURE ENNEMIE',
+      `${who(actor)} · <b>${c.us} — ${c.them}</b>`, 2.4, true);
+  });
+  ev.on('ctf:overtime', () => banner('gold', 'TEMPS ÉCOULÉ', 'PROLONGATION', 'La prochaine capture l\'emporte', 2.6, true));
+  ev.on('ctf:out', ({ actor } = {}) => { if (actor && !actor.isPlayer) toast(`${actor.name} n'a plus de vie`, isAlly(actor) ? 'warn' : ''); });
   ev.on('bomb:planted', ({ site } = {}) => banner('alert', 'ALERTE', 'CHARGE POSÉE', site ? `Site <b>${esc(site)}</b> — ${ctx.player?.team === 'DEF' ? 'désamorcez-la !' : 'défendez-la !'}` : '', 2.4, true));
   ev.on('bomb:defused', () => toast('Charge désamorcée', 'gold'));
   ev.on('bomb:pickup', ({ actor } = {}) => { if (actor?.isPlayer) toast('Vous portez la charge', 'gold'); else if (isAlly(actor)) toast(`${actor.name} porte la charge`); });
@@ -409,15 +471,16 @@ export function createHud(ctx) {
     const row = a => {
       const s = stat(a), x = extra.get(a) || { assists: 0, hs: 0 }, isMvp = a === mvp;
       return `<tr class="${a.alive || final ? '' : 'dead'} ${a.isPlayer ? 'me' : ''} ${isMvp ? 'mvp' : ''}"><td class="n"><div class="nm"><span class="st"></span><span class="nmt">${esc(a.name)}</span>` +
-        `${isMvp ? '<b class="mvpb">MVP</b>' : ''}${!final && a.hasBomb && isAlly(a) ? ICONS.bomb : ''}</div></td>` +
+        `${isMvp ? '<b class="mvpb">MVP</b>' : ''}${!final && a.hasBomb && isAlly(a) ? ICONS.bomb : ''}${!final && a.hasFlag ? '<b class="flagb">⚑</b>' : ''}` +
+        `${!final && a.ctf ? `<small class="lives${a.ctf.out ? ' out' : ''}">${a.ctf.out ? 'ÉLIMINÉ' : a.ctf.lives + ' VIE' + (a.ctf.lives > 1 ? 'S' : '')}</small>` : ''}</div></td>` +
         `<td class="num">${s.kills}</td><td class="num">${x.assists}</td><td class="num">${s.deaths}</td><td class="num">${x.hs}</td>` +
-        `<td class="num">${(s.plants || 0) + (s.defuses || 0)}</td><td class="num">${s.mvps || 0}</td><td class="num sc">${scoreOf(a)}</td></tr>`;
+        `<td class="num">${(s.plants || 0) + (s.defuses || 0) + (s.captures || 0) + (s.returns || 0)}</td><td class="num">${s.mvps || 0}</td><td class="num sc">${scoreOf(a)}</td></tr>`;
     };
     const tbl = (k, name, list) => `<table class="${k}"><tr><th class="team">${name}</th><th>É</th><th>A</th><th>M</th><th>TÊTE</th><th>OBJ</th><th>MVP</th><th>SCORE</th></tr>${list.map(row).join('')}</table>`;
-    const side = t => (t === 'DEF' ? 'DÉFENSE' : 'ATTAQUE');
+    const side = t => (isCtf() ? (t === 'DEF' ? 'CITADELLE' : 'PORT') : t === 'DEF' ? 'DÉFENSE' : 'ATTAQUE');
     const lbl = final ? ['ALLIÉS', 'ENNEMIS'] : [`ALLIÉS · ${side(p?.team)}`, `ENNEMIS · ${side(p?.team === 'ATK' ? 'DEF' : 'ATK')}`];
     html(metaEl, (final ? (mvp ? `MVP DU MATCH <b class="g">${esc(mvp.name)}</b> &nbsp; ` : '') : `MANCHE <b>${g?.round ?? 1}</b> &nbsp; `) +
-      `<b class="u">${g?.score?.us ?? 0}</b> — <b class="t">${g?.score?.them ?? 0}</b>`);
+      `<b class="u">${g?.score?.us ?? 0}</b> — <b class="t">${g?.score?.them ?? 0}</b>` + (isCtf() && !final ? ` &nbsp; CAPTURES <b class="u">${g.caps.us}</b> — <b class="t">${g.caps.them}</b>` : ''));
     html(tbEl, `<div class="cols">${tbl('us', lbl[0], ours)}${tbl('them', lbl[1], theirs)}</div>`);
   }
   function toggleEndScores(on) {
@@ -441,26 +504,32 @@ export function createHud(ctx) {
   function buildPips(n) { pipsN = n; E.pips.innerHTML = '<i></i>'.repeat(Math.min(n, 40)); }
   function updateTop() {
     const g = ctx.game, p = ctx.player; if (!g || !p) return;
+    const ctf = isCtf();
     const rtw = g.roundsToWin ?? 4;
     if (winsN !== rtw) { winsN = rtw; for (const t of [E.us, E.them]) t.querySelector('.nv-wins').innerHTML = '<i></i>'.repeat(rtw); }
-    for (const [el, sc] of [[E.us, g.score?.us ?? 0], [E.them, g.score?.them ?? 0]]) {
-      text(el.querySelector('.sc'), String(sc));
+    // CTF: big number = captures of the round, diamonds = rounds won (BO3)
+    for (const [el, sc, big] of [[E.us, g.score?.us ?? 0, ctf ? g.caps?.us : null], [E.them, g.score?.them ?? 0, ctf ? g.caps?.them : null]]) {
+      text(el.querySelector('.sc'), String(big ?? sc));
       el.querySelectorAll('.nv-wins i').forEach((i, k) => cls(i, 'on', k < sc));
     }
-    text(E.us.querySelector('.side'), p.team === 'DEF' ? 'DÉFENSE' : 'ATTAQUE');
-    text(E.them.querySelector('.side'), p.team === 'DEF' ? 'ATTAQUE' : 'DÉFENSE');
+    const sideName = t => (ctf ? (t === 'DEF' ? 'CITADELLE' : 'PORT') : t === 'DEF' ? 'DÉFENSE' : 'ATTAQUE');
+    text(E.us.querySelector('.side'), sideName(p.team));
+    text(E.them.querySelector('.side'), sideName(p.team === 'DEF' ? 'ATK' : 'DEF'));
+    cls(E.flags, 'on', ctf && g.phase !== 'over');
+    if (ctf) updateFlags(g, p);
     const actors = ctx.actors || [];
     const ours = actors.filter(isAlly), theirs = actors.filter(a => !isAlly(a));
-    const sig = ours.map(a => (a.isPlayer ? 'p' : '') + (a.alive ? 1 : 0)).join('') + '|' + theirs.map(a => (a.alive ? 1 : 0)).join('');
+    const st = a => (a.alive ? 1 : a.ctf?.out ? 2 : 0);
+    const sig = ours.map(a => (a.isPlayer ? 'p' : '') + st(a)).join('') + '|' + theirs.map(st).join('');
     if (sig !== aliveSig) {
       aliveSig = sig;
-      const ic = (a) => `<span class="${a.alive ? '' : 'dead'} ${a.isPlayer ? 'me' : ''}">${ICONS.person}</span>`;
+      const ic = (a) => `<span class="${a.alive ? '' : 'dead'} ${a.ctf?.out ? 'out' : ''} ${a.isPlayer ? 'me' : ''}">${ICONS.person}</span>`;
       E.us.querySelector('.nv-alive').innerHTML = ours.map(ic).join('');
       E.them.querySelector('.nv-alive').innerHTML = theirs.map(ic).join('');
     }
     // clock
     const planted = g.bomb?.state === 'planted';
-    text(E.rd, `MANCHE ${g.round ?? 1}`);
+    text(E.rd, ctf ? `MANCHE ${g.round ?? 1} / 3` : `MANCHE ${g.round ?? 1}`);
     cls(E.clock, 'planted', planted);
     if (planted) {
       const bt = Math.max(0, g.bomb.timeLeft ?? 0);
@@ -469,9 +538,35 @@ export function createHud(ctx) {
     }
     const rt = g.roundTimeLeft ?? 0;
     text(E.tm, fmtTime(rt));
-    cls(E.tm, 'low', g.phase === 'live' && !planted && rt < 10);
-    const ph = { freeze: `PRÉPARATION · ${Math.max(1, Math.ceil(g.freezeTimeLeft ?? g.phaseTimeLeft ?? 0))}`, post: 'FIN DE MANCHE', over: 'FIN DU MATCH' }[g.phase] || (planted ? `SITE ${g.bomb.site || ''}` : (g.isMatchPoint ? 'BALLE DE MATCH' : ''));
+    cls(E.tm, 'low', g.phase === 'live' && !planted && rt < (ctf ? 30 : 10));
+    const ph = ctf ? ({ freeze: `PRÉPARATION · ${Math.max(1, Math.ceil(g.phaseTimeLeft ?? 0))}`, post: 'FIN DE MANCHE', over: 'FIN DU MATCH' }[g.phase]
+      || (g.overtime ? 'PROLONGATION' : g.round === 3 ? `DÉCISIVE · ${g.capsToWin} CAPTURES` : `PREMIER À ${g.capsToWin}`)) : { freeze: `PRÉPARATION · ${Math.max(1, Math.ceil(g.freezeTimeLeft ?? g.phaseTimeLeft ?? 0))}`, post: 'FIN DE MANCHE', over: 'FIN DU MATCH' }[g.phase] || (planted ? `SITE ${g.bomb.site || ''}` : (g.isMatchPoint ? 'BALLE DE MATCH' : ''));
     text(E.ph, ph);
+  }
+
+  // CTF: state of both flags + lives left per team, under the score
+  function flagState(F, ours) {
+    if (!F) return '';
+    if (F.state === 'base') return 'À LA BASE';
+    if (F.state === 'carried') return F.carrier?.isPlayer ? 'C\'EST VOUS QUI LE PORTEZ' : `PRIS PAR <b>${esc(F.carrier?.name || '?')}</b>`;
+    return `AU SOL · <b>${Math.max(0, Math.ceil(F.returnLeft || 0))} s</b>`;
+  }
+  function updateFlags(g, p) {
+    const mine = p.team, theirs = mine === 'ATK' ? 'DEF' : 'ATK', F = g.flags || {};
+    for (const [el, team, lbl] of [[E.flagUs, mine, 'NOTRE DRAPEAU'], [E.flagThem, theirs, 'DRAPEAU ENNEMI']]) {
+      const f = F[team];
+      html(el, `<i class="fi">⚑</i><span class="l">${lbl}</span><span class="v">${flagState(f)}</span><span class="lv">VIES <b>${g.livesLeft?.(team) ?? 0}</b></span>`);
+      cls(el, 'away', f?.state !== 'base'); cls(el, 'drop', f?.state === 'dropped');
+    }
+  }
+  // death screen: respawn countdown / out of lives
+  function updateRespawn(g, p) {
+    const s = isCtf() && g?.started ? p?.ctf : null;
+    if (!s || p.alive) { html(E.deathR, ''); text(E.deathK, 'VOUS ÊTES MORT'); return; }
+    if (s.out) { text(E.deathK, 'ÉLIMINÉ POUR LA MANCHE'); html(E.deathR, 'Plus de vie — attendez la manche suivante'); return; }
+    text(E.deathK, 'VOUS ÊTES MORT');
+    if (s.respawnAt != null) html(E.deathR, `Réapparition dans <b>${Math.max(0, ctx.time < s.respawnAt ? (s.respawnAt - ctx.time) : 0).toFixed(1)} s</b> · ${s.lives} vie${s.lives > 1 ? 's' : ''} restante${s.lives > 1 ? 's' : ''}`);
+    else html(E.deathR, '');
   }
 
   // ---------------------------------------------------------------- ally name tags (projected above heads)
@@ -492,7 +587,7 @@ export function createHud(ctx) {
         el.innerHTML = `<span class="nm"></span><i></i>`; tagsEl.appendChild(el);
         tags.set(a, t = { el, nm: el.firstChild, los: true, losT: Math.random() * 0.2 });
       }
-      text(t.nm, a.name || 'Allié'); cls(t.el, 'bomb', !!a.hasBomb);
+      text(t.nm, a.name || 'Allié'); cls(t.el, 'bomb', !!a.hasBomb); cls(t.el, 'flag', !!a.hasFlag);
       tv.set(a.position.x, a.position.y + (a.height || 1.8) + 0.32, a.position.z);
       const d = tv.distanceTo(eye);
       if ((t.losT -= dt) <= 0) { t.losT = 0.2; t.los = ctx.physics?.lineOfSight ? !!ctx.physics.lineOfSight(eye, tv) : true; }
@@ -516,6 +611,7 @@ export function createHud(ctx) {
     if (menuMode === 'main' && !g?.started) return;
     const alive = !!p?.alive;
     cls(root, 'is-dead', !!g?.started && !alive && g.phase !== 'over');
+    updateRespawn(g, p);
     // spectator first-person view (before the name tags: they must be projected with the camera that gets rendered)
     if (!ctx.paused) { try { specView?.update(dt, { killcam: !!killcam?.active }); } catch (e) { console.warn('[hud] specview', e); } }
     { const sp = !alive ? ctx.player?.spectating : null; const key = sp ? sp.name + '|' + (specView?.mode || '') : '';
@@ -565,7 +661,8 @@ export function createHud(ctx) {
       cls(E.hp, 'low', h < 30); cls(E.hp, 'mid', h >= 30 && h < 60);
       op(E.vignette, alive && h < 60 ? (60 - h) / 60 * 0.95 : 0);
       cls(E.vignette, 'pulse', alive && h < 30);
-      cls(E.bombpill, 'on', alive && !!p.hasBomb);
+      cls(E.bombpill, 'on', alive && (!!p.hasBomb || !!p.hasFlag));
+      text(E.bombLb, p.hasFlag ? 'DRAPEAU' : 'BOMBE'); cls(E.bombpill, 'flag', !!p.hasFlag);
     }
 
     // use / plant / defuse

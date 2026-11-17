@@ -72,6 +72,7 @@ export class Player {
       this.height += (targetH - this.height) * Math.min(1, dt * 12);
       let speed = crouch ? 2.6 : input.walk ? 3.0 : 5.6;
       if (this.ctx.weapon?.aiming) speed *= 0.8;
+      speed *= this.speedMul ?? 1; // game mode: e.g. flag carrier (no sprint)
       const fx = input.forward - input.back, sx = input.right - input.left;
       const wish = new THREE.Vector3();
       if (!this.frozen && (fx || sx)) {

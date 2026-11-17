@@ -429,6 +429,8 @@ export function createGrenades(ctx) {
   }
   events.on('round:start', reset);
   events.on('sides:swap', () => inv.clear());
+  // CTF: a respawned soldier comes back with a full set
+  for (const n of ['player:respawn', 'actor:respawn']) events.on(n, e => { if (e?.actor) inv.delete(e.actor); });
   events.on('player:died', () => { flashFx.dur = 0; });
 
   const api = {
