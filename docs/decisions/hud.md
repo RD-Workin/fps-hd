@@ -39,6 +39,15 @@
 ## Notes for others
 - round:end reason string is shown as-is (uppercased). Hit points shown are cosmetic (+150 HS), real score comes from game stats.
 - Bots' names only from actor.name.
+
+## Capture du drapeau
+- Menu : « Mode de jeu » (R&D / Capture du drapeau), réglages CTF (captures, durée, pénalité par mort, vies ; 0 = AUTO),
+  lignes data-only="sd|ctf" masquées selon le mode, camp PORT / CITADELLE. settings.mode persisté (nova.hud).
+- En jeu : grand chiffre = captures de la manche, losanges = manches (BO3) ; bandeau .nv-flags (état des deux drapeaux +
+  vies restantes par équipe) ; écran de mort avec compte à rebours de réapparition ou « éliminé pour la manche » ;
+  minimap : socles, drapeaux, porteurs (ennemis compris) ; tableau : vies, ⚑ porteur, OBJ = captures + drapeaux rendus.
+- Killcam interrompue par 'player:respawn'.
+
 ## Ops de nuit
 - Réglage « Ambiance » JOUR / OPS DE NUIT (`nova.hud` → `night`), appliqué en direct (`world.setNight`), sous-titre du menu
   « VIEILLE VILLE · OPS DE NUIT ». Pastille « LAMPE F » au-dessus des munitions (allumée/éteinte), touche F dans les commandes.

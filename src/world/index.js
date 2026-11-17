@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { buildTextures } from './textures.js';
 import { Geo, grime, sway, groundMaterial } from './build.js';
-import { BOUNDS, SPAWNS, SITES, LABELS, NAV, GX0, GZ0, GW, GH, CELL } from './layout.js';
+import { BOUNDS, SPAWNS, SITES, LABELS, NAV, CTF, GX0, GZ0, GW, GH, CELL } from './layout.js';
 import { createTerrain, buildTerrain } from './terrain.js';
 import { buildBuildings } from './buildings.js';
 import { createKit } from './props.js';
@@ -144,6 +144,7 @@ export function createWorld(ctx) {
     bounds: { ...BOUNDS },
     spawns: { ATK: SPAWNS.ATK.map(s => ({ pos: V3(s.x, s.z), yaw: s.yaw })), DEF: SPAWNS.DEF.map(s => ({ pos: V3(s.x, s.z), yaw: s.yaw })) },
     bombSites: SITES.map(s => ({ name: s.name, center: V3(s.x, s.z), radius: s.radius })),
+    ctf: { bases: { ATK: V3(...CTF.bases.ATK), DEF: V3(...CTF.bases.DEF) }, lanes: CTF.lanes }, // Capture du drapeau
     minimap: { labels: LABELS, colliders: navColliders, floorAt: T.floorAt },
     nav: { ...NAV, colliders: navColliders, floorAt: T.floorAt, grid: { x0: GX0, z0: GZ0, w: GW, h: GH, cell: CELL, rows: T.g.map(r => r.join('')) } },
     sun: atm.sun, quality, post, shadows: SH, // post / shadows: debug & perf bench access

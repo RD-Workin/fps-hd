@@ -61,6 +61,7 @@ export function createFlashlight(ctx, kits) {
   });
   events.on('world:night', ({ on }) => fl.setAvailable(on));
   events.on('round:start', () => { if (fl.available) fl.set(true, true); });
+  events.on('player:respawn', () => { if (fl.available) fl.set(true, true); }); // capture du drapeau: back in the fight, lamp on
   events.on('player:died', () => fl.set(false, true));
   return fl;
 }

@@ -169,8 +169,10 @@ export class Bot {
         const tp = this.target.position, dist = tp.distanceTo(this.position);
         look = tp;
         const needCover = (this.health < S.coverHp || (S.coverOnReload && this.reloadT >= 0)) && !goal?.noCover;
-        if (needCover && t > this.coverUntil) { this.cover = this.mgr.findCover(this, tp); this.coverUntil = t + 4; }
-        if (needCover && this.cover) {
+        const pushing = goal?.push && Math.hypot(goal.x - this.position.x, goal.z - this.position.z) > (goal.tol ?? 1);
+        if (pushing) { dest = goal; speed = D.run; faceMove = false; } // objective first (flag carrier / grab): run and gun
+        else if (needCover && t > this.coverUntil) { this.cover = this.mgr.findCover(this, tp); this.coverUntil = t + 4; }
+        if (pushing) { /* keep running */ } else if (needCover && this.cover) {
           dest = this.cover; speed = D.run; faceMove = false;
           if (Math.hypot(this.cover.x - this.position.x, this.cover.z - this.position.z) < 0.6) { dest = null; crouch = true; }
         } else {
@@ -207,7 +209,7 @@ export class Bot {
       if (wp) {
         want.set(wp.x - this.position.x, 0, wp.z - this.position.z);
         const jump = wp.jump === 'up'; if (jump) crouch = false; // ledge shortcut: full speed, jump as soon as the feet touch
-        const l = want.length(); if (l > 0.05) want.multiplyScalar((jump ? D.run : crouch ? D.crouch : speed) / l); else want.set(0, 0, 0);
+        const l = want.length(); if (l > 0.05) want.multiplyScalar((jump ? D.run : crouch ? D.crouch : speed) * (this.speedMul ?? 1) / l); else want.set(0, 0, 0);
         if (jump && this.onGround && l > 0.3) { this.velocity.y = 7.2; this.velocity.x = want.x; this.velocity.z = want.z; }
         this.jumpWp = wp.jump ? wp : null;
       }
