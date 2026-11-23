@@ -1,16 +1,17 @@
 // Team brain: turns the game state (ctx.game: Search & Destroy or Capture du drapeau) into one goal per bot every 0.4 s.
 // Goal = {x, z, tol, speed:'run'|'walk', look?:{x,z}, crouch?, use?, kind?:'plant'|'defuse', anchor?, huntRange?, noHunt?}
+import { Squads } from './squads.js';
 const rand = (a, b) => a + Math.random() * (b - a);
 const hd = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 export class Brain {
-  constructor(ctx, mgr) { this.ctx = ctx; this.mgr = mgr; this.t = 0; this.spotCache = new Map(); this.roundStart(); }
+  constructor(ctx, mgr) { this.ctx = ctx; this.mgr = mgr; this.t = 0; this.squads = new Squads(this); this.spotCache = new Map(); this.roundStart(); }
 
   roundStart() {
     const sites = this.sites();
     this.plan = { liveAt: null, squads: null, member: new Map(), site: sites.length ? sites[Math.random() * sites.length | 0].name : null, via: new Map(), viaDone: new Set(), plantPt: null, roles: null, crouch: new Map() };
     this.threat = {}; for (const s of sites) this.threat[s.name] = -100; this.guardCache = new Map();
-    for (const b of this.mgr?.list || []) b.squad = undefined;
+    for (const b of this.mgr?.list || []) { b.squad = undefined; b._lurk = null; }
   }
   sites() { return this.ctx.world?.bombSites || []; }
   fy(x, z) { return this.ctx.world?.nav?.floorAt?.(x, z) ?? 0; }
@@ -76,15 +77,33 @@ export class Brain {
   // ------------------------------------------------------------ attackers
   assignATK(list, game) {
     if (!list.length) return;
-    const bomb = game.bomb, nav = this.mgr.nav, P = this.plan;
+    const bomb = game.bomb, nav = this.mgr.nav, P = this.plan, now = this.ctx.time;
     if (bomb.state === 'planted' || bomb.state === 'exploded' || bomb.state === 'defused') {
+      // post-plant: spread around the bomb, half crouched, covering the retake lanes rather than all staring at the bomb
       const spots = this.guardAround(bomb.position, 'atk');
-      list.forEach((b, i) => { const s = spots[i % spots.length]; b.goal = { ...s, tol: 0.8, speed: i % 2 ? 'walk' : 'run', look: bomb.position, crouch: i % 2 === 0, anchor: s, huntRange: 12 }; });
+      // half watch the retake lanes (outward, where the defenders come from), half deny the defuse (look at the bomb)
+      list.forEach((b, i) => {
+        // far away (pressure teams on the big map): don't cross the map one by one; hold and cut the rotations there
+        if (bomb.state === 'planted' && hd(b.position, bomb.position) > 60) {
+          b._lurk ||= { x: b.position.x, z: b.position.z };
+          b.goal = { x: b._lurk.x, z: b._lurk.z, tol: 2, speed: 'tac', look: bomb.position, crouch: true, anchor: b._lurk, huntRange: 14 };
+          return;
+        }
+        const s = spots[i % spots.length], dx = s.x - bomb.position.x, dz = s.z - bomb.position.z, L = Math.hypot(dx, dz) || 1;
+        const look = i % 2 === 0 ? { x: s.x + dx / L * 12, z: s.z + dz / L * 12 } : bomb.position;
+        b.goal = { ...s, tol: 0.8, speed: 'run', look, crouch: i % 2 === 0, anchor: s, huntRange: 10 };
+      });
       return;
     }
     // choose the site: follow the player carrier if he is heading somewhere
-    let siteName = P.site;
     const carrier = bomb.state === 'carried' ? bomb.carrier : null;
+    // big map: the main target is one the bomb can reach (nearest site to the carrier's insertion 70 %, 2nd nearest 30 %)
+    if (!P.siteChosen && carrier && game.phase === 'live') {
+      P.siteChosen = true;
+      const by = [...this.sites()].sort((a, b) => hd(carrier.position, a.center) - hd(carrier.position, b.center));
+      if (by.length) P.site = (by.length > 1 && Math.random() < 0.3 && hd(carrier.position, by[1].center) < hd(carrier.position, by[0].center) * 1.6 ? by[1] : by[0]).name;
+    }
+    let siteName = P.site;
     if (carrier?.isPlayer) { let best = 30; for (const s of this.sites()) { const d = hd(carrier.position, s.center); if (d < best) { best = d; siteName = s.name; } } }
     const site = this.site(siteName);
     if (!P.plantPt || P.plantSite !== site.name) {
@@ -92,22 +111,15 @@ export class Brain {
       P.plantPt = { x: p.x, z: p.z }; P.plantSite = site.name;
     }
     const rest = new Set(list);
-    if (game.phase === 'live' && P.liveAt == null) P.liveAt = this.ctx.time;
-    if (carrier && !carrier.isPlayer && rest.has(carrier)) {
-      carrier.goal = { x: P.plantPt.x, z: P.plantPt.z, tol: 0.5, speed: 'run', kind: 'plant', use: true, noCover: hd(carrier.position, site.center) < site.radius + 3, noHunt: true };
-      // the bomb comes in behind the first squad: wait at its staging point until the push has started
-      const sq = P.squads?.[0], now = this.ctx.time;
-      if (sq && sq.site === site && sq.stage && !(sq.go && now > sq.goAt + 1.2) && [...P.member].some(([b, m]) => m.sq === sq && b.alive)
-        && hd(carrier.position, site.center) > site.radius + 6 && (game.roundTimeLeft ?? 99) > 40)
-        carrier.goal = { x: sq.stage[0], z: sq.stage[1], tol: 2.5, speed: 'run', noHunt: true, crouch: true, look: site.center };
-      rest.delete(carrier);
-    }
+    if (game.phase === 'live' && P.liveAt == null) P.liveAt = now;
+    const botCarrier = carrier && !carrier.isPlayer && rest.has(carrier) ? carrier : null;
+    if (botCarrier) rest.delete(botCarrier);
     if (bomb.state === 'dropped' && bomb.position) {
       const near = [...rest].sort((a, b) => hd(a.position, bomb.position) - hd(b.position, bomb.position)).slice(0, 2);
       for (const b of near) { b.goal = { x: bomb.position.x, z: bomb.position.z, tol: 0.2, speed: 'run', noHunt: true }; rest.delete(b); }
     }
-    // escorts: 2 closest follow the carrier (bot or player)
-    if (carrier) {
+    // player carrier: the 2 closest bots escort him (bot carriers walk inside their fire-team instead)
+    if (carrier?.isPlayer) {
       const near = [...rest].sort((a, b) => hd(a.position, carrier.position) - hd(b.position, carrier.position)).slice(0, 2);
       near.forEach((b, i) => {
         const v = carrier.velocity || { x: 0, z: 0 }, sp = Math.hypot(v.x, v.z) || 1, back = -3.2, side = i ? 1.8 : -1.8;
@@ -117,44 +129,26 @@ export class Brain {
         rest.delete(b);
       });
     }
-    // others: squads of <= 5, each on its own lane (world.nav.routes), departures staggered so stairs and
-    // chokes don't jam. With 3+ squads the last one pressures the other site.
-    if (!P.squads || P.squadSite !== site.name) this.buildSquads([...rest], site);
-    const now = this.ctx.time;
-    // grouped push: a squad gathers at its staging point (last route point out of the site's sight) and enters together
-    for (const sq of P.squads) {
-      if (sq.go || !sq.stage) continue;
-      let alive = 0, there = 0;
-      for (const [b, m] of P.member) if (m.sq === sq && b.alive) { alive++; if (m.i >= sq.stageI && hd(b.position, { x: sq.stage[0], z: sq.stage[1] }) < 9) there++; }
-      if (there && sq.t0 == null) sq.t0 = now;
-      const contact = [...P.member].some(([b, m]) => m.sq === sq && b.alive && now - b.alertT < 1.5 && m.i >= sq.stageI);
-      const regroup = this.mgr.skillForTeam?.('ATK')?.regroup ?? true;
-      if (!regroup || !alive || there >= Math.ceil(alive * 0.7) || (sq.t0 != null && now - sq.t0 > 7) || contact || (game.roundTimeLeft ?? 99) < 45) { sq.go = true; sq.goAt = now; if (!contact) this.pushUtility(sq); }
-    }
-    for (const b of rest) {
-      const m = P.member.get(b);
-      if (!m) { this.directToSite(b, site); continue; }
-      if (P.liveAt == null || now < P.liveAt + m.delay) { b.goal = null; continue; } // wait for its turn to leave
-      const route = m.route, tgt = m.site;
-      while (m.i < route.length && (hd(b.position, { x: route[m.i][0], z: route[m.i][1] }) < 3.5 ||
-        hd(b.position, tgt.center) < hd({ x: route[m.i][0], z: route[m.i][1] }, tgt.center) - 2)) m.i++;
-      const sq = m.sq;
-      if (sq.stage && !sq.go && m.i >= sq.stageI) { // hold at the staging point, weapon toward the site
-        b.goal = { x: sq.stage[0], z: sq.stage[1], tol: 2.5, speed: 'run', look: tgt.center, crouch: true, anchor: { x: sq.stage[0], z: sq.stage[1] }, huntRange: 10 };
-        continue;
-      }
-      if (m.i < route.length) { const [x, z] = route[m.i]; b.goal = { x, z, tol: 2.5, speed: 'run', huntRange: 16 }; continue; }
-      this.directToSite(b, tgt);
+    // fire-teams (squads.js): formation, pincer staging, synchronized execute, contact drill
+    this.squads.update([...rest], site, game, botCarrier);
+    if (botCarrier) {
+      const t = P.member.get(botCarrier), mates = t ? t.members.filter(b => b !== botCarrier && b.alive && rest.has(b)) : [];
+      const plant = { x: P.plantPt.x, z: P.plantPt.z, tol: 0.5, speed: 'run', kind: 'plant', use: true, noCover: hd(botCarrier.position, site.center) < site.radius + 3, noHunt: true };
+      const inSite = hd(botCarrier.position, site.center) < site.radius + 6, late = (game.roundTimeLeft ?? 99) < 40;
+      if (!t || t.site !== site || !mates.length || inSite || late || (t.state === 'go' && now > t.goAt + 1.2)) botCarrier.goal = plant;
+      else if (t.state === 'stage' || t.state === 'go') { // the bomb comes in behind the first wave
+        const s = t.stage || site.center;
+        botCarrier.goal = { x: s.x, z: s.z, tol: 2.5, speed: 'run', noHunt: true, crouch: true, look: site.center, exact: true };
+      } else if (!botCarrier.goal?.formation) botCarrier.goal = plant; // (moving: squads.follow placed it in the column)
     }
   }
 
   // ------------------------------------------------------------ grenades (src/grenades)
-  // Grouped push: smoke the defenders' angle on the entry, then flash the site, then go.
-  pushUtility(sq) {
-    const G = this.ctx.grenades; if (!G || !sq.stage) return;
-    const now = this.ctx.time, site = sq.site, stage = { x: sq.stage[0], z: sq.stage[1] };
-    const members = [...this.plan.member].filter(([b, m]) => m.sq === sq && b.alive && !b.hasBomb).map(([b]) => b)
-      .sort((a, b) => hd(a.position, stage) - hd(b.position, stage));
+  // Grouped push of a fire-team: smoke the defenders' angle on its entry, then flash the site, then go.
+  pushUtility(t) {
+    const G = this.ctx.grenades; if (!G || !t.stage) return;
+    const now = this.ctx.time, site = t.site, stage = t.stage;
+    const members = t.members.filter(b => b.alive && !b.hasBomb).sort((a, b) => hd(a.position, stage) - hd(b.position, stage));
     if (!members.length) return;
     // freshest defenders seen around the site, closest to our entry first
     const seen = [...this.mgr.intel.ATK].filter(([e, i]) => e.alive && now - i.t < 12 && hd(i.pos, site.center) < site.radius + 16)
@@ -395,6 +389,8 @@ export class Brain {
     if (!list.length) return;
     const bomb = game.bomb, P = this.plan, now = this.ctx.time;
     if (bomb.state === 'planted' && bomb.position) {
+      // grouped retake (squads.retake): gather out of sight of the bomb, then go in together; bots already on the site hold
+      if (this.squads.retake(list, game)) return;
       const defuser = [...list].sort((a, b) => hd(a.position, bomb.position) - hd(b.position, bomb.position))[0];
       defuser.goal = { x: bomb.position.x, z: bomb.position.z, tol: 0.6, speed: 'run', kind: 'defuse', use: true, noCover: bomb.timeLeft < 12, noHunt: bomb.timeLeft < 15 };
       const spots = this.guardAround(bomb.position, 'def');
@@ -426,10 +422,48 @@ export class Brain {
         b.goal = { x: s.x, z: s.z, tol: 0.8, speed: 'run', look: s.look, anchor: s, huntRange: 12, crouch: false };
         return;
       }
-      const spots = this.holdSpots(role); const k = counters[role] = (counters[role] ?? -1) + 1; const s = spots[k % spots.length];
+      const spots = this.holdSpots(role); const k = counters[role] = (counters[role] ?? -1) + 1;
+      // the site's 2nd (and 5th) defender takes an upper-floor window / roof overlooking the site: crossfire from above
+      // (who: the closest non-anchor defender of that site, chosen once per round)
+      const hs = this.highSpots(role); P.high ||= new Map();
+      for (let j = 0; j < Math.min(2, hs.length); j++) {
+        const key = role + j, cur = P.high.get(key);
+        if (cur?.alive && cur.team === 'DEF') continue;
+        const cands = list.filter(o => P.roles.get(o) === role && !P.anchors?.has(o) && ![...P.high.values()].includes(o));
+        if (cands.length) P.high.set(key, cands.sort((a, c) => hd(a.position, hs[j]) - hd(c.position, hs[j]))[0]);
+      }
+      let high = null; for (let j = 0; j < 2; j++) if (P.high.get(role + j) === b && hs[j]) high = hs[j];
+      if (high && role !== P.roles.get(b)) high = null; // rotating to another site: leave the window
+      if (high) {
+        b.goal = { x: high.x, z: high.z, y: high.y, tol: 0.7, speed: 'run', look: high.look, crouch: !high.roof && Math.random() < 0.3, anchor: high, huntRange: 3, noCover: true };
+        return;
+      }
+      const s = spots[k % spots.length];
       if (!P.crouch.has(b)) P.crouch.set(b, Math.random() < 0.7);
       b.goal = { x: s.x, z: s.z, tol: 0.7, speed: hot === role ? 'run' : 'run', look: s.look, crouch: P.crouch.get(b), anchor: s, huntRange: 10 };
     });
+  }
+
+  // upper-floor windows and roof corners (world.nav.holdsHigh) that see the site: scored by sight on the site centre and
+  // on the attackers' entries, best first (cached per site)
+  highSpots(name) {
+    const key = 'high' + name; if (this.spotCache.has(key)) return this.spotCache.get(key);
+    const list = this.ctx.world?.nav?.holdsHigh?.[name] || [], site = this.site(name), phys = this.ctx.physics, V = this.ctx.THREE.Vector3;
+    const res = [];
+    if (list.length && site) {
+      const c = new V(site.center.x, this.fy(site.center.x, site.center.z) + 1, site.center.z), ents = this.entries(site);
+      for (const h of list) {
+        const eye = new V(h.x, h.y + 1.5, h.z);
+        let seeC = 0; // centre + a ring over the site (the plant can be anywhere in it)
+        for (let k = 0; k < 9; k++) { const a = k / 8 * Math.PI * 2, r = k ? site.radius * 0.7 : 0; if (phys.lineOfSight(eye, new V(c.x + Math.cos(a) * r, c.y, c.z + Math.sin(a) * r))) seeC++; }
+        const seeE = ents.filter(e => phys.lineOfSight(eye, new V(e.x, this.fy(e.x, e.z) + 1.2, e.z))).length;
+        if (!seeC && !seeE) continue;
+        res.push({ x: h.x, z: h.z, y: h.y, roof: !!h.roof, look: { x: site.center.x, y: c.y - 1, z: site.center.z }, score: seeC / 3 + seeE - hd(h, site.center) / 40 });
+      }
+      res.sort((a, b) => b.score - a.score);
+      for (let i = res.length - 1; i > 0; i--) if (res.slice(0, i).some(r => hd(r, res[i]) < 3)) res.splice(i, 1);
+    }
+    this.spotCache.set(key, res); return res;
   }
 
   midSpots() {
