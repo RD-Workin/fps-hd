@@ -52,3 +52,14 @@ régulièrement (`git fetch origin claude/project-thread-h6ui6r && git merge FET
   partent à < 30 m de l'escouade, sinon `autoRoutes`. Chaque escouade part de la position moyenne de ses membres.
 - DEF : rôles par proximité (chaque site actif prend à tour de rôle son défenseur le plus proche), ~20 % de rôdeurs sur
   les chokes à < 70 m d'un site actif. `threat` indexé par nom de site (générique).
+
+## Tactiques d'escouade (thread « Organiser les bots en escouades tactiques », branche `claude/project-thread-g60da6`)
+- Fichiers : `src/bots/squads.js` (nouveau), `brain.assignATK` / `pushUtility` / branche « bombe posée » d'`assignDEF`,
+  `bot.js` (champ d'objectif `goal.watch` + allure `'tac'` 3,6 m/s). `autoRoutes` et les rôles DEF par proximité : inchangés.
+- Lit seulement : `world.bombSites`, `world.nav.routes|holds|chokes|floorAt`, `brain.autoRoutes`, `nav.findPath|snap|randomPointNear|clearance|los`.
+  Prêt pour `holds[i].high` / `world.nav.entries[site]` quand la carte les fournit (pas encore utilisés).
+- `goal` (contrat brain → bot) gagne : `watch:{x,z}` (arme pointée vers ce secteur en marchant), `speed:'tac'`, `formation`.
+- Attaque : équipes de 2-4 formées **par point d'insertion** (grappes à < 30 m), site principal = le plus proche du porteur
+  (70 %) ; une équipe à > 110 m du site principal fait pression sur le site le plus proche et **reste en attente** à son point
+  de regroupement tant que la poussée principale vit. Coût : O(membres) par tick brain + ≤ 14 échantillons nav par équipe au contact.
+- Défense : `squads.retake` (regroupement avant reprise). Banc : `scripts/bots/bench.cjs`.

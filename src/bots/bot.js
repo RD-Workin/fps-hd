@@ -9,7 +9,7 @@ const NORMAL = SKILLS.normal;
 export const DIFFICULTY = {
   reaction: [0.25, 0.55], accuracy: 0.55, trackMin: 0.35, trackTime: 1.4, damage: 25, headDamage: 60, headshotChance: 0.1,
   fov: 110 * Math.PI / 180, view: 70, hearing: 38, stepHearing: 11, burst: [3, 6], shotInterval: 0.1, pause: [0.25, 0.6],
-  mag: 30, reload: 2.4, run: 5.0, walk: 2.6, crouch: 1.7, turnRate: 7.5, falloffStart: 30,
+  mag: 30, reload: 2.4, run: 5.0, walk: 2.6, tac: 3.6, crouch: 1.7, turnRate: 7.5, falloffStart: 30,
   holdCone: 0.55, holdReact: 0.5, holdPreAim: 0.7, // holder's advantage (stationary + already facing): balance bench
 };
 // Sniper bots: single aimed shots, slow bolt, deadly at range, weak up close (hits: 85 body / 150 head)
@@ -253,7 +253,8 @@ export class Bot {
         dest = this.lastKnown; speed = D.walk; look = this.lastKnown; faceMove = false;
         if (this.lastKnown.distanceTo(this.position) < 1.5) { this.target = null; }
       } else if (goal) {
-        if (!(goal.use && this.inUseRange(goal))) { dest = goal; speed = goal.speed === 'walk' ? D.walk : D.run; }
+        if (!(goal.use && this.inUseRange(goal))) { dest = goal; speed = goal.speed === 'walk' ? D.walk : goal.speed === 'tac' ? D.tac : D.run; }
+        if (goal.watch) { look = goal.watch; faceMove = false; } // fire-team sector: weapon up toward it while moving
         const arrived = Math.hypot(goal.x - this.position.x, goal.z - this.position.z) < (goal.tol ?? 1.0) && (goal.y == null || Math.abs(goal.y - this.position.y) < 1.5); // storeys: same xz, other floor
         if (arrived) { dest = null; crouch = !!goal.crouch; if (goal.look) { look = goal.look; faceMove = false; } }
         if (!arrived && goal.look && Math.hypot(goal.x - this.position.x, goal.z - this.position.z) < 6) { look = goal.look; faceMove = false; }
