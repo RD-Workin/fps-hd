@@ -227,6 +227,12 @@ export class Squads {
       if (pace === 'tac') {
         const back = rear && Math.sin(this.brain.ctx.time * 0.9 + t.id) > 0.35;
         watch = back ? { x: x - dx * 12 + dz * side * 6, z: z - dz * 12 - dx * side * 6 } : { x: x + dx * 14 - dz * side * 7, z: z + dz * 14 + dx * side * 7 };
+        // the first support checks the windows / roofs that overlook the site (nearest one ahead, < 35 m)
+        if (j === 0 && !back) {
+          let bw = null, bd = 35;
+          for (const h of this.brain.highSpots(t.site.name)) { const d = hd(h, b.position); if (d < bd && ((h.x - x) * dx + (h.z - z) * dz) > 0) { bd = d; bw = h; } }
+          if (bw) watch = { x: bw.x, y: bw.y + 0.3, z: bw.z };
+        }
       }
       const far = hd(b.position, { x, z });
       if (b === carrier) { b.goal = { x, z, tol: 1.5, speed: far > 4 ? 'run' : pace, noHunt: true, exact: true, watch, formation: true }; return; }
@@ -291,10 +297,11 @@ export class Squads {
       R.spots = this.stageSpots({ stage: R.stage, site: { center: bp } });
     }
     // time needed: the farthest gatherer runs to the bomb, plus the defuse, plus a margin
-    const far = Math.max(...out.map(b => hd(b.position, bp)));
-    const there = out.filter(b => hd(b.position, R.stage) < 10);
+    const far = Math.max(0, ...out.filter(b => hd(b.position, bp) < 80).map(b => hd(b.position, bp)));
+    // only defenders within 80 m count for the go (the far ones, from other sites, join the retake as they arrive)
+    const near = out.filter(b => hd(b.position, bp) < 80), there = out.filter(b => hd(b.position, R.stage) < 10);
     if (there.length && R.t0 == null) R.t0 = now;
-    if (there.length >= Math.ceil(out.length * 0.7) || (R.t0 != null && now - R.t0 > 9) || left < defuseT + far / 4.5 + 5 || now - R.at > 20) {
+    if (there.length >= Math.ceil(Math.max(1, near.length) * 0.7) || (R.t0 != null && now - R.t0 > 9) || left < defuseT + far / 4.5 + 5 || now - R.at > 20) {
       R.go = true; return false;
     }
     out.forEach((b, i) => {

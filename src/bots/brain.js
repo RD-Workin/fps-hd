@@ -392,10 +392,48 @@ export class Brain {
         b.goal = { x: s.x, z: s.z, tol: 0.8, speed: 'run', look: s.look, anchor: s, huntRange: 12, crouch: false };
         return;
       }
-      const spots = this.holdSpots(role); const k = counters[role] = (counters[role] ?? -1) + 1; const s = spots[k % spots.length];
+      const spots = this.holdSpots(role); const k = counters[role] = (counters[role] ?? -1) + 1;
+      // the site's 2nd (and 5th) defender takes an upper-floor window / roof overlooking the site: crossfire from above
+      // (who: the closest non-anchor defender of that site, chosen once per round)
+      const hs = this.highSpots(role); P.high ||= new Map();
+      for (let j = 0; j < Math.min(2, hs.length); j++) {
+        const key = role + j, cur = P.high.get(key);
+        if (cur?.alive && cur.team === 'DEF') continue;
+        const cands = list.filter(o => P.roles.get(o) === role && !P.anchors?.has(o) && ![...P.high.values()].includes(o));
+        if (cands.length) P.high.set(key, cands.sort((a, c) => hd(a.position, hs[j]) - hd(c.position, hs[j]))[0]);
+      }
+      let high = null; for (let j = 0; j < 2; j++) if (P.high.get(role + j) === b && hs[j]) high = hs[j];
+      if (high && role !== P.roles.get(b)) high = null; // rotating to another site: leave the window
+      if (high) {
+        b.goal = { x: high.x, z: high.z, y: high.y, tol: 0.7, speed: 'run', look: high.look, crouch: !high.roof && Math.random() < 0.3, anchor: high, huntRange: 3, noCover: true };
+        return;
+      }
+      const s = spots[k % spots.length];
       if (!P.crouch.has(b)) P.crouch.set(b, Math.random() < 0.7);
       b.goal = { x: s.x, z: s.z, tol: 0.7, speed: hot === role ? 'run' : 'run', look: s.look, crouch: P.crouch.get(b), anchor: s, huntRange: 10 };
     });
+  }
+
+  // upper-floor windows and roof corners (world.nav.holdsHigh) that see the site: scored by sight on the site centre and
+  // on the attackers' entries, best first (cached per site)
+  highSpots(name) {
+    const key = 'high' + name; if (this.spotCache.has(key)) return this.spotCache.get(key);
+    const list = this.ctx.world?.nav?.holdsHigh?.[name] || [], site = this.site(name), phys = this.ctx.physics, V = this.ctx.THREE.Vector3;
+    const res = [];
+    if (list.length && site) {
+      const c = new V(site.center.x, this.fy(site.center.x, site.center.z) + 1, site.center.z), ents = this.entries(site);
+      for (const h of list) {
+        const eye = new V(h.x, h.y + 1.5, h.z);
+        let seeC = 0; // centre + a ring over the site (the plant can be anywhere in it)
+        for (let k = 0; k < 9; k++) { const a = k / 8 * Math.PI * 2, r = k ? site.radius * 0.7 : 0; if (phys.lineOfSight(eye, new V(c.x + Math.cos(a) * r, c.y, c.z + Math.sin(a) * r))) seeC++; }
+        const seeE = ents.filter(e => phys.lineOfSight(eye, new V(e.x, this.fy(e.x, e.z) + 1.2, e.z))).length;
+        if (!seeC && !seeE) continue;
+        res.push({ x: h.x, z: h.z, y: h.y, roof: !!h.roof, look: { x: site.center.x, y: c.y - 1, z: site.center.z }, score: seeC / 3 + seeE - hd(h, site.center) / 40 });
+      }
+      res.sort((a, b) => b.score - a.score);
+      for (let i = res.length - 1; i > 0; i--) if (res.slice(0, i).some(r => hd(r, res[i]) < 3)) res.splice(i, 1);
+    }
+    this.spotCache.set(key, res); return res;
   }
 
   midSpots() {
