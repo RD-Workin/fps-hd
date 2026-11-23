@@ -14,7 +14,7 @@ export function createMinimap(ctx, canvas, zoneEl) {
 
   function signature() {
     const cols = ctx.world?.minimap?.colliders || ctx.physics?.colliders || [];
-    return cols.length + ':' + (ctx.world?.bombSites?.length || 0);
+    return cols.length + ':' + (ctx.world?.bombSites || []).map(s => s.name).join('');
   }
 
   function computeBounds(cols) {

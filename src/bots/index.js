@@ -81,6 +81,7 @@ export function createBots(ctx) {
   ctx.events?.on?.('round:start', () => { ensureNav(); assignWeapons(mgr.list); brain.roundStart(); mgr.intel.ATK.clear(); mgr.intel.DEF.clear(); });
   ctx.events?.on?.('weapon:hit', e => e?.actor?.isBot && e.actor.onHit(ctx.player));
   ctx.events?.on?.('sides:swap', () => { brain.spotCache.clear(); });
+  ctx.events?.on?.('world:objectives', () => { brain.spotCache.clear(); }); // grand map: active sites / spawns changed
 
   const bots = {
     list: mgr.list,

@@ -1,18 +1,20 @@
 // "Citadelle de Port-Cassis" — 10v10 S&D map on 3 ground levels (0 port, +3 ville haute, +6 citadelle).
 // The map is authored as a 2 m cell grid carved out of solid buildings. See docs/decisions/world.md.
-export const CELL = 2, GX0 = -80, GZ0 = -64, GW = 80, GH = 64; // x[-80,80] z[-64,64]
+import { GRAND_CARVES, ROOMS, ROOM_WALLS, GRAND_LABELS, GRAND_CHOKES } from './grand.js';
+export const CELL = 2, GX0 = -176, GZ0 = -64, GW = 176, GH = 64; // x[-176,176] z[-64,64] (grand map, see grand.js)
 // Cell codes: '#' building, '.' floor 0, ';' +1.5, ',' +3, '=' +4.5, ':' +6, covered floors (room / passage under a
 // building mass): 'c' 0, 'e' +1.5, 'C' +3. Stairs '^' 'v' '>' '<' rise toward -z / +z / +x / -x. 'w' sea.
 // A 1.5 m drop between two floors has no railing: players can jump up it (jump apex ~1.2 m + 0.45 step-up), bots can't.
-export const LEVEL = { '.': 0, 'c': 0, ';': 1.5, 'e': 1.5, ',': 3, 'C': 3, '=': 4.5, ':': 6 };
-export const COVERED = { c: 0, e: 1.5, C: 3 };
-export const BOUNDS = { minX: -80, maxX: 80, minZ: -64, maxZ: 56 };
+export const LEVEL = { '.': 0, 'c': 0, 'H': 0, ';': 1.5, 'e': 1.5, ',': 3, 'C': 3, '=': 4.5, ':': 6 };
+export const COVERED = { c: 0, e: 1.5, C: 3, H: 0 }; // 'H' = tall hall (grand.js HALL_CEIL)
+export const BOUNDS = { minX: -176, maxX: 176, minZ: -64, maxZ: 56 };
+export const CORE_BOUNDS = { minX: -80, maxX: 80, minZ: -64, maxZ: 56 }; // the Citadelle (zombie mode stays there)
 
 // v4 "Port-Cassis": open streets around building islands. South = port (ATK), north = citadel (DEF).
 // Left lane -> site A (Place de l'Église, +3). Centre = Place Ronde -> Grand Escalier -> Médina (+3), forks to A and B.
 // Right lane -> site B (Chantier naval, 0), overlooked by the Corniche (+3) and a dock (+1.5).
 const CARVES = [
-  ['w', -80, 80, 56, 64],
+  ['w', -176, 176, 56, 64],
   // PORT (0): quay, two sheds break the long strip
   ['.', -76, 76, 42, 56], ['#', 14, 24, 42, 48], ['c', -46, -34, 46, 54],
   // front row openings: Montée (steps to the Cour), Halle (covered market), Grand-Rue, Hangar (interior), Quai Est
@@ -53,6 +55,8 @@ const CARVES = [
   ['>', -34, -26, -48, -42], ['<', 26, 34, -48, -42],      // Jardins / Bastion -> Citadelle
   ['<', 44, 52, -14, -8],                                  // B -> Corniche
   ['^', 56, 62, -28, -22],                                 // B -> Bastion
+  ...GRAND_CARVES,
+  ...ROOMS.map(r => [r.ch, r.x0, r.x1, r.z0, r.z1]),
 ];
 
 // Thin walls with openings around rooms and galleries (centre line on a cell boundary). ax 'x': wall along x at z = p.
@@ -78,6 +82,7 @@ export const WALLS = [
   { m: 'stone', ax: 'x', p: 28, a: -28, b: -16, y: 0, open: [[-27, -23.8, 'gate'], [-23, -19.8, 'gate'], [-19, -16.4, 'gate']] },
   // Galerie de l'Abbaye (+3): arcade on the cloister garden
   { m: 'stone', ax: 'x', p: -16, a: -42, b: -26, y: 3, open: [[-41, -38, 'gate'], [-37, -34, 'gate'], [-33, -30, 'gate'], [-29, -26.6, 'gate']] },
+  ...ROOM_WALLS,
 ];
 
 export function buildGrid() {
@@ -101,7 +106,7 @@ export const LABELS = [
   ['Place Ronde', 2, 24], ['Rue des Filets', -34, 25], ['Cour', -58, 22], ['Café', -11, 8], ['Tunnel', 26, 17], ['Hangar', 38, 35],
   ['Entrepôt', 42, 16], ['Quai Est', 71, 34], ['Atelier', 61, 11], ['Abbaye', -34, -13], ['Médina', 2, -9], ['Corniche', 32, -10],
   ['Bastion', 50, -38], ['Jardins', -52, -42], ['Passage', -41, 3], ['Escalier', 9, 7],
-].map(([text, x, z]) => ({ text, x, z }));
+].map(([text, x, z]) => ({ text, x, z })).concat(GRAND_LABELS);
 
 // Bot hints (x,z only; floor height via world.nav.floorAt). routes[site]: ATK spawn -> site polylines.
 export const NAV = {
@@ -125,7 +130,7 @@ export const NAV = {
     B: [[70, -17, 52, 6], [66, -19, 70, 8], [50, -4, 52, 8], [74, -4, 71, 10], [58, -16, 48, -11], [62, 2, 52, 8],
       [39, -11, 28, -10], [59, -25, 60, -6], [73.5, 4, 71, 14], [56, -11, 52, 6], [66, -8, 71, 8]],
   },
-  chokes: [[-56, 33], [-62, 11], [-28, 12], [-41, 3], [-34, -13], [0, 34], [9, 7], [-7, 1], [0, -9], [0, -24], [27, 17], [36, 26], [52, 8], [71, 26], [48, -11], [59, -25], [-30, -45], [30, -45], [39, -21]],
+  chokes: [[-56, 33], [-62, 11], [-28, 12], [-41, 3], [-34, -13], [0, 34], [9, 7], [-7, 1], [0, -9], [0, -24], [27, 17], [36, 26], [52, 8], [71, 26], [48, -11], [59, -25], [-30, -45], [30, -45], [39, -21], ...GRAND_CHOKES],
 };
 for (const k of ['A', 'B']) NAV.holds[k] = NAV.holds[k].map(([x, z, tx, tz]) => ({ x, z, yaw: ry(x, z, tx, tz) }));
 

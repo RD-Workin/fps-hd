@@ -205,7 +205,7 @@ export class NavGrid {
   /**
    * A* from (sx,sz) to (gx,gz). Returns array of {x,z} (smoothed, starting AFTER the start point) or null.
    */
-  findPath(sx, sz, gx, gz, maxIter = 40000) {
+  findPath(sx, sz, gx, gz, maxIter = 40000, penalty = null) {
     const s = this.nearestWalkable(this.index(sx, sz), 8);
     const gi0 = this.index(gx, gz);
     const goal = this.nearestWalkable(gi0, 20);
@@ -250,6 +250,7 @@ export class NavGrid {
           }
           const c = clear[j];
           if (c === 1) cost *= 1.9; else if (c === 2) cost *= 1.3; else if (c === 3) cost *= 1.08;
+          if (penalty) cost *= 1 + penalty[j]; // diverse routes (brain.autoRoutes): cells near earlier routes cost more
           const ng = gc + cost;
           if (ST[j] !== gen || ng < G[j]) {
             ST[j] = gen; G[j] = ng; P[j] = cur;

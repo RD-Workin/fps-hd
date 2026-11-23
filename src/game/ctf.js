@@ -89,7 +89,7 @@ export function createCtf(ctx, sd, options = {}) {
     aliveCount(team) { return actors().filter(a => a.team === team && a.alive).length; },
 
     // called when the mode becomes active in the main menu (the S&D object built the roster and placed everyone)
-    enter() { this.phase = 'menu'; placeFlagsAtBase(); visuals?.update(0, this); },
+    enter() { ctx.world?.setObjectives?.('AB'); this.phase = 'menu'; placeFlagsAtBase(); visuals?.update(0, this); },
     leave() { visuals?.hide(); for (const a of actors()) { a.hasFlag = false; a.speedMul = 1; a.ctf = null; } },
     init() { sd.init(); sd.phase = 'menu'; this.enter(); },
 

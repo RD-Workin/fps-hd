@@ -125,6 +125,14 @@ function createSearchDestroy(ctx, options = {}) {
       this.allyCount = a; this.enemyCount = e; this.applyTimings();
       if (!this.started) this.init();
     },
+    // Grande carte: which bomb sites are active each round (world.setObjectives). 'auto' = 2 sites up to 12 per side,
+    // 3 up to 25, 4 above; 'classic' = A/B on the Citadelle only; '2' | '3' | '4' = that many sites, rotating each round.
+    objectiveMode: 'auto',
+    setObjectiveMode(m) { this.objectiveMode = ['classic', '2', '3', '4'].includes(String(m)) ? String(m) : 'auto'; },
+    objectiveCount() {
+      const n = Math.max(this.allyCount + 1, this.enemyCount), m = this.objectiveMode;
+      return m === 'classic' ? 0 : m === 'auto' ? (n <= 12 ? 2 : n <= 25 ? 3 : 4) : +m;
+    },
     preferredSide: 'ATK', // chosen in the menu; the player's squad starts on this side
     setPreferredSide(side) { this.preferredSide = side === 'DEF' || side === 'RND' ? side : 'ATK'; if (!this.started && side !== 'RND') applySide(this.preferredSide); },
     // 'RND' (Aléatoire) is drawn at each match start
@@ -136,6 +144,7 @@ function createSearchDestroy(ctx, options = {}) {
     aliveCount(team) { return actors().filter(a => a.team === team && a.alive).length; },
 
     init() {
+      world().setObjectives?.('AB'); // CTF / Zombies / menu: the Citadelle's classic spawns and sites
       if (this.zmode) {
         stopAllUses(); visuals?.reset(); Object.assign(bomb, { state: 'defused', carrier: null, position: null, site: null, timeLeft: 0 });
         zombie.init(); this.phase = 'menu'; placeMenuCamera(0); return;
@@ -278,18 +287,34 @@ function createSearchDestroy(ctx, options = {}) {
     stopAllUses();
     roundKills = new Map(); roundObjective = new Map();
     visuals?.reset();
+    const obj = pickObjective();
     spawnAll(true);
     try { ctx.weapon?.resetForRound?.(); } catch (e) { console.warn(e); }
     // bomb
     Object.assign(bomb, { state: 'carried', carrier: null, position: null, site: null, timeLeft: 0, planter: null, defuser: null });
     const atk = actors().filter(a => a.team === 'ATK' && a.alive);
     if (atk.length) giveBomb(atk[Math.random() * atk.length | 0], false);
-    game.phase = 'freeze'; game.phaseTimeLeft = R.FREEZE; game.roundTimeLeft = R.ROUND;
+    // far insertions (Vieille-Ville / Gare) need a longer walk: +15 s on the automatic round time
+    const far = obj && !(obj.sites.length === 2 && obj.sites.includes('A') && obj.sites.includes('B'));
+    game.phase = 'freeze'; game.phaseTimeLeft = R.FREEZE; game.roundTimeLeft = R.ROUND + (far && game.roundTimeSetting == null ? 15 : 0);
     for (const a of actors()) a.frozen = true;
     placeCameraOnPlayer();
-    ev('round:start', { round: game.round, playerTeam: ctx.player.team });
+    ev('round:start', { round: game.round, playerTeam: ctx.player.team, objective: obj });
+    const names = (world().bombSites || []).map(s => s.name), list = names.length > 1 ? names.slice(0, -1).join(', ') + ' ou ' + names[names.length - 1] : names[0];
+    if (obj) toast(ctx.player.team === 'ATK' ? `Objectifs : site ${list} — à vous de choisir` : `Renseignement : l'ennemi vise ${list}`);
     if (game.isMatchPoint) toast('Balle de match');
-    if (bomb.carrier?.isPlayer) toast('Vous avez la bombe — allez sur A ou B');
+    if (bomb.carrier?.isPlayer) toast(`Vous avez la bombe — allez sur ${list}`);
+  }
+
+  // Grande carte: activate the round's bomb sites (rotating, never the same set twice in a row when there is a choice)
+  let lastObj = -1;
+  function pickObjective() {
+    const W = world(); if (!W.setObjectives || !W.objectives) return null;
+    const k = game.objectiveCount();
+    if (!k) return W.setObjectives('AB');
+    const sets = W.objectives[k] || W.objectives[2];
+    let i = Math.random() * sets.length | 0; if (sets.length > 1 && i === lastObj) i = (i + 1 + (Math.random() * (sets.length - 1) | 0)) % sets.length;
+    lastObj = i; return W.setObjectives(sets[i]);
   }
 
   function goLive() {
@@ -509,7 +534,7 @@ function createSearchDestroy(ctx, options = {}) {
   }
   function placeMenuCamera(a) {
     const cam = ctx.camera; if (!cam?.lookAt) return;
-    const b = world().bounds || { minX: -50, maxX: 50, minZ: -45, maxZ: 45 };
+    const b = world().coreBounds || world().bounds || { minX: -50, maxX: 50, minZ: -45, maxZ: 45 };
     const cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2;
     const r = Math.max(b.maxX - b.minX, b.maxZ - b.minZ) * 0.42;
     cam.position.set(cx + Math.sin(a) * r, 24, cz + Math.cos(a) * r);

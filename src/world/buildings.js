@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { FACADE, DECAL, rng } from './textures.js';
 import { CELL, GX0, GZ0, LEVEL, COVERED, WALLS } from './layout.js';
+import { HALL_CEIL } from './grand.js';
 import { rects } from './terrain.js';
 const STAIRS = { '^': 1, 'v': 1, '>': 1, '<': 1 };
 import { col } from './build.js';
@@ -65,7 +66,7 @@ export function buildBuildings(G, T, addSolid) {
     addSolid(new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, hTop + 0.6, z1)), style === 'warehouse' ? 'metal' : 'concrete', { navH: y0 > 0 ? 0 : 12 });
   };
   for (const r of rects(T.g, c => c === '#')) one(r, 0, ringMax(r));
-  for (const ch in COVERED) for (const r of rects(T.g, c => c === ch)) one(r, COVERED[ch] + CEIL, COVERED[ch] + CEIL);
+  for (const ch in COVERED) { const ceil = ch === 'H' ? HALL_CEIL : CEIL; for (const r of rects(T.g, c => c === ch)) one(r, COVERED[ch] + ceil, COVERED[ch] + ceil); }
   buildWalls(G, addSolid);
 }
 
@@ -179,7 +180,7 @@ export function buildWalls(G, addSolid) {
   const B3 = (a) => new THREE.Box3(new THREE.Vector3(a[0], a[1], a[2]), new THREE.Vector3(a[3], a[4], a[5]));
   let wi = 0;
   for (const w of WALLS) {
-    const rr = rng(500 + wi++ * 13), Y = w.y, top = Y + CEIL, ware = w.m === 'corr';
+    const rr = rng(500 + wi++ * 13), Y = w.y, top = Y + (w.ceil ?? CEIL), ware = w.m === 'corr';
     const geo = ware ? G.corr : w.m === 'stone' ? G.stone : G.plaster, tint = ware ? col(0x8a9aa0) : w.m === 'stone' ? col(0xe6d6bb) : col([0xf1e4c8, 0xe9d3a8, 0xf3ece0][(rr() * 3) | 0]);
     const wci = (rr() * 3) | 0, wood = col([0x5f8bac, 0x6d9a6a, 0x9a6a4e][wci]), shut = col([0x7fb0d6, 0x8fc088, 0xc48a5e][wci]), stoneC = col(0xdccbb0);
     // box helper in wall space: t along the wall, d across (-TH/2..TH/2 = wall body)
@@ -187,10 +188,10 @@ export function buildWalls(G, addSolid) {
     const sol = (t0, t1, y0, y1, o) => addSolid(B3(w.ax === 'x' ? [t0, y0, w.p - TH / 2, t1, y1, w.p + TH / 2] : [w.p - TH / 2, y0, t0, w.p + TH / 2, y1, t1]), ware ? 'metal' : 'concrete', o);
     const opens = [...(w.open || [])].sort((p, q) => p[0] - q[0]);
     let t = w.a;
-    const span = (t0, t1) => { if (t1 - t0 < 0.02) return; bx(geo, t0, t1, Y, top, -TH / 2, TH / 2, tint, 'ny py'); sol(t0, t1, Y, top, { navH: CEIL }); };
+    const span = (t0, t1) => { if (t1 - t0 < 0.02) return; bx(geo, t0, t1, Y, top, -TH / 2, TH / 2, tint, 'ny py'); sol(t0, t1, Y, top, { navH: top - Y }); };
     for (const [o0, o1, kind] of opens) {
       span(t, o0); t = o1;
-      const head = Y + HEAD[kind];
+      const head = Y + HEAD[kind] * ((w.ceil ?? CEIL) > 5 && kind !== 'door' ? 1.9 : 1); // tall hall: tall windows / gates
       bx(geo, o0, o1, head, top, -TH / 2, TH / 2, tint, 'py'); sol(o0, o1, head, top, { navH: 0 });
       if (kind === 'win') {
         bx(geo, o0, o1, Y, Y + 1.0, -TH / 2, TH / 2, tint, 'ny'); sol(o0, o1, Y, Y + 1.0, { navH: 1.0 });

@@ -77,7 +77,7 @@ function markup() {
       <div class="nv-emblem">${ICONS.emblem}</div>
       <div class="nv-tag">RECHERCHE &amp; DESTRUCTION · 5 CONTRE 5</div>
       <h1 class="nv-title"><span class="a">OPÉRATION</span><span class="b">NOVA</span></h1>
-      <div class="nv-sub"><i></i><span class="sub-t">VIEILLE VILLE</span></div>
+      <div class="nv-sub"><i></i><span class="sub-t">PORT-CASSIS</span></div>
       <p class="nv-desc"></p>
       <div class="nv-result"><div class="r">VICTOIRE</div>
         <div class="fs nv-num"><span class="u">0</span><span class="sep">—</span><span class="t">0</span></div><div class="note"></div></div>
@@ -100,6 +100,7 @@ function markup() {
         <div class="nv-perfwarn" data-sd></div>
         <label>Ambiance</label><div class="nv-seg" data-set="night"><button data-v="day">JOUR</button><button data-v="night">OPS DE NUIT</button></div>
         <label data-sd>Difficulté des ennemis</label><div class="nv-seg" data-sd data-set="skill"><button data-v="easy">RECRUE</button><button data-v="normal">NORMAL</button><button data-v="veteran">VÉTÉRAN</button></div>
+        <label data-only="sd">Objectifs</label><div data-only="sd" class="nv-seg" data-set="obj"><button data-v="auto">AUTO</button><button data-v="classic">A/B CITADELLE</button><button data-v="2">2 SITES</button><button data-v="3">3 SITES</button><button data-v="4">4 SITES</button></div>
         <label data-only="sd">Durée de manche</label><div data-only="sd" class="nv-range"><input type="range" data-set="rtime" min="45" max="300" step="15"><output></output></div>
         <label data-only="sd">Minuterie de la bombe</label><div data-only="sd" class="nv-range"><input type="range" data-set="btime" min="20" max="90" step="5"><output></output></div>
         <label data-only="ctf">Captures pour gagner</label><div data-only="ctf" class="nv-range"><input type="range" data-set="ccaps" min="1" max="7" step="1"><output></output></div>
@@ -142,7 +143,7 @@ export function createHud(ctx) {
     sb: $('.nv-sb'), sbMeta: $('.nv-sb .meta'), sbTb: $('.nv-sb .tb'), menu: $('.nv-menu'), note: $('.nv-note'), pinfo: $('.nv-pinfo'),
     sbEnd: $('.nv-sb-end'), sbEndMeta: $('.nv-sb-end .meta'), sbEndTb: $('.nv-sb-end .tb'), scoresBtn: $('[data-act="scores"]'),
     result: $('.nv-result'), statgrid: $('.nv-statgrid'), playBtn: $('[data-act="play"]'), restartBtn: $('[data-act="restart"]'),
-    mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), side: $('[data-set="side"]'), skill: $('[data-set="skill"]'), night: $('[data-set="night"]'), lamp: $('.nv-lamp'), subT: $('.nv-sub .sub-t'), allies: $('[data-set="allies"]'), enemies: $('[data-set="enemies"]'), perfwarn: $('.nv-perfwarn'), rtime: $('[data-set="rtime"]'), btime: $('[data-set="btime"]'),
+    mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), side: $('[data-set="side"]'), skill: $('[data-set="skill"]'), night: $('[data-set="night"]'), lamp: $('.nv-lamp'), subT: $('.nv-sub .sub-t'), allies: $('[data-set="allies"]'), enemies: $('[data-set="enemies"]'), perfwarn: $('.nv-perfwarn'), rtime: $('[data-set="rtime"]'), obj: $('[data-set="obj"]'), btime: $('[data-set="btime"]'),
     mode: $('[data-set="mode"]'), zprog: $('[data-set="zprog"]'), ccaps: $('[data-set="ccaps"]'), cmin: $('[data-set="cmin"]'), cstep: $('[data-set="cstep"]'), clives: $('[data-set="clives"]'),
     flags: $('.nv-flags'), flagUs: $('.nv-flags .us'), flagThem: $('.nv-flags .them'), deathK: $('.nv-death .k'), deathR: $('.nv-death .r'),
     bombLb: $('.nv-bombpill .lb'), tagLine: $('.nv-tag'), desc: $('.nv-desc'), legObj: $('.nv-sb-leg .obj'),
@@ -160,7 +161,7 @@ export function createHud(ctx) {
   const op = (el, v) => { v = Math.round(v * 100) / 100; if (memo(el, 'op', v)) el.style.opacity = v; };
 
   // ---------------------------------------------------------------- state
-  const settings = { night: 'day', skill: 'normal', mode: 'sd', zallies: 3, zprog: 'both', ccaps: 3, cmin: 10, cstep: 0, clives: 0, rtime: 0, btime: 0, allies: 9, enemies: 10, side: 'ATK', quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
+  const settings = { obj: 'auto', night: 'day', skill: 'normal', mode: 'sd', zallies: 3, zprog: 'both', ccaps: 3, cmin: 10, cstep: 0, clives: 0, rtime: 0, btime: 0, allies: 9, enemies: 10, side: 'ATK', quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
   let lastSpec = '';
   const tally = new Map(); // actor -> {kills, deaths}  (fallback when actor.stats missing)
   const me = { shots: 0, hits: 0, hs: 0, kills: 0, deaths: 0, roundKills: 0 };
@@ -195,13 +196,15 @@ export function createHud(ctx) {
       E.perfwarn.textContent = n > 32 ? `${t} — très lourd : réservé aux PC puissants (qualité BASSE conseillée)` : n > 24 ? `${t} — peut ramer sur un PC modeste` : t;
       E.perfwarn.classList.toggle('warn', n > 24); }
     try { ctx.game?.setTimings?.(settings.rtime || null, settings.btime || null); } catch (e) { console.warn('[hud] timings', e); }
+    try { ctx.game?.setObjectiveMode?.(settings.obj); } catch (e) { console.warn('[hud] objectives', e); }
+    for (const b of E.obj.children) b.classList.toggle('on', b.dataset.v === settings.obj);
     { const auto = ctx.game?.autoTimings?.() || { round: 105, bomb: 40 }, mmss = v => `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
       for (const [el, v, mn, mx, a, f] of [[E.rtime, settings.rtime, 45, 300, auto.round, mmss], [E.btime, settings.btime, 20, 90, auto.bomb, v => v + ' s']]) {
         el.value = v || mn; el.nextElementSibling.value = v ? f(v) : `AUTO ${f(a)}`; el.style.setProperty('--p', (((v || mn) - mn) / (mx - mn) * 100) + '%');
       } }
     try { if (!!ctx.world?.night !== (settings.night === 'night')) ctx.world?.setNight?.(settings.night === 'night'); } catch (e) { console.warn('[hud] night', e); }
     for (const b of E.night.children) b.classList.toggle('on', b.dataset.v === settings.night);
-    if (E.subT) E.subT.textContent = settings.night === 'night' ? 'VIEILLE VILLE · OPS DE NUIT' : 'VIEILLE VILLE';
+    if (E.subT) E.subT.textContent = settings.night === 'night' ? 'PORT-CASSIS · OPS DE NUIT' : 'PORT-CASSIS';
     try { settings.skill = ctx.bots?.setSkill?.(settings.skill) ?? settings.skill; } catch (e) { console.warn('[hud] skill', e); }
     for (const b of E.skill.children) b.classList.toggle('on', b.dataset.v === settings.skill);
     try { ctx.game?.setPreferredSide?.(settings.side); } catch (e) { console.warn('[hud] side', e); }
@@ -223,7 +226,7 @@ export function createHud(ctx) {
     E.tagLine.textContent = ctf ? `CAPTURE DU DRAPEAU · ${settings.allies + 1} CONTRE ${settings.enemies} · BO3` : `RECHERCHE & DESTRUCTION · ${settings.allies + 1} CONTRE ${settings.enemies}`;
     E.desc.textContent = ctf
       ? `Un drapeau côté port, un côté citadelle. Ramenez le drapeau adverse à votre base pour marquer, le vôtre doit y être. ${settings.ccaps} captures ou le meilleur score après ${settings.cmin} min gagnent la manche, en deux manches gagnantes. Chaque mort allonge la réapparition et coûte une vie : sans vie, on est éliminé jusqu'à la fin de la manche.`
-      : 'Les attaquants doivent poser la charge sur le site A ou B et la protéger jusqu\'à l\'explosion. Les défenseurs doivent éliminer l\'escouade adverse ou désamorcer la charge. Pas de réapparition : chaque balle compte. Première équipe à 4 manches.';
+      : 'Votre escouade débarque sur la côte de Port-Cassis : vieille ville, citadelle, port et gare. À chaque manche, le renseignement désigne les sites visés : les attaquants posent la charge sur l\'un d\'eux, les défenseurs, prévenus, s\'organisent pour les tenir ou désamorcer. Pas de réapparition : chaque balle compte. Première équipe à 4 manches.';
     E.legObj.textContent = ctf ? 'OBJ captures + drapeaux rendus' : 'OBJ poses + désamorçages';
     // CTF sliders (0 = automatic from the team size)
     const g = ctx.game, auto = { step: Math.round(2 * n / 5 * 10) / 10, lives: Math.max(3, Math.round(9.5 - 0.27 * n)) };
@@ -250,6 +253,7 @@ export function createHud(ctx) {
   E.side.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.side = v; save(settings); applySettings(); if (ctx.game?.started) toast('Camp appliqué à la prochaine partie'); } });
   E.skill.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { settings.skill = b.dataset.v; save(settings); applySettings(); if (ctx.game?.started) toast(`Difficulté des ennemis : ${b.textContent}`); } });
   E.night.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v && v !== settings.night) { settings.night = v; save(settings); applySettings(); if (ctx.game?.started) toast(v === 'night' ? 'Ops de nuit : lampe torche sur F' : 'Retour au jour'); } });
+  E.obj.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.obj = v; save(settings); applySettings(); if (ctx.game?.started) toast('Objectifs appliqués à la prochaine manche'); } });
   E.zprog.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.zprog = v; save(settings); applySettings(); if (ctx.game?.started && zmode()) toast('Appliqué à partir de la prochaine vague'); } });
   E.sens.addEventListener('input', () => { settings.sens = +E.sens.value; save(settings); applySettings(); });
   for (const k of ['allies', 'enemies']) E[k].addEventListener('change', () => { settings[k === 'allies' && settings.mode === 'zombie' ? 'zallies' : k] = +E[k].value; save(settings); applySettings(); if (ctx.game?.started) toast('Effectifs appliqués à la prochaine partie (Recommencer)'); });
