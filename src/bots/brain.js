@@ -1,6 +1,7 @@
 // Team brain: turns the game state (ctx.game: Search & Destroy or Capture du drapeau) into one goal per bot every 0.4 s.
 // Goal = {x, z, tol, speed:'run'|'walk', look?:{x,z}, crouch?, use?, kind?:'plant'|'defuse', anchor?, huntRange?, noHunt?}
 import { Squads } from './squads.js';
+import { SH } from '../world/storeys.js';
 const rand = (a, b) => a + Math.random() * (b - a);
 const hd = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
@@ -480,6 +481,9 @@ export class Brain {
       let high = null; for (let j = 0; j < 2; j++) if (P.high.get(role + j) === b && hs[j]) high = hs[j];
       if (high && role !== P.roles.get(b)) high = null; // rotating to another site: leave the window
       if (high) {
+        // attackers in the house below: leave the window, ambush the stair top from the far corner of the floor
+        const amb = this.stairAmbush(high, now);
+        if (amb) { b.goal = { x: amb.x, z: amb.z, y: amb.y, tol: 0.7, speed: 'tac', look: amb.look, watch: amb.look, crouch: true, anchor: amb, huntRange: 2, noCover: true, exact: true }; return; }
         b.goal = { x: high.x, z: high.z, y: high.y, tol: 0.7, speed: 'run', look: high.look, crouch: !high.roof && Math.random() < 0.3, anchor: high, huntRange: 3, noCover: true };
         return;
       }
@@ -487,6 +491,25 @@ export class Brain {
       if (!P.crouch.has(b)) P.crouch.set(b, Math.random() < 0.7);
       b.goal = { x: s.x, z: s.z, tol: 0.7, speed: hot === role ? 'run' : 'run', look: s.look, crouch: P.crouch.get(b), anchor: s, huntRange: 10 };
     });
+  }
+
+  // high spot inside a house whose lower floors hold attackers (seen < 4 s): the corner of the spot's floor farthest
+  // from the stair top, looking at it (cached per spot; null when the house is clear or the spot is on the roof)
+  stairAmbush(high, now) {
+    if (high.roof) return null;
+    const HC = this.squads.houses, H = HC.houses().find(q => HC.inside(q, high, 0)); if (!H) return null;
+    const k = Math.round((high.y - H.F(0)) / SH); if (k < 1) return null;
+    let seen = false;
+    for (const [e, i] of this.mgr.intel.DEF) if (e.alive && now - i.t < 4 && HC.inside(H, i.pos) && (i.pos.y ?? 0) < high.y - 1) { seen = true; break; }
+    if (!seen) return null;
+    const ck = 'amb' + H.id + ':' + k; if (this.spotCache.has(ck)) return this.spotCache.get(ck);
+    const pt = H.portals.find(p => p.k === k - 1); let res = null;
+    if (pt) {
+      const yt = H.F(k), cs = [[H.box.x0 + 1, H.box.z0 + 1], [H.box.x1 - 1, H.box.z0 + 1], [H.box.x0 + 1, H.box.z1 - 1], [H.box.x1 - 1, H.box.z1 - 1]]
+        .map(([x, z]) => ({ x, z })).sort((p, q) => hd(q, pt.top) - hd(p, pt.top));
+      res = { x: cs[0].x, z: cs[0].z, y: yt, look: { x: pt.top.x, y: yt + 0.8, z: pt.top.z } };
+    }
+    this.spotCache.set(ck, res); return res;
   }
 
   // upper-floor windows and roof corners (world.nav.holdsHigh) that see the site: scored by sight on the site centre and
