@@ -144,7 +144,7 @@ export function buildTerrain(T, G, addSolid) {
     }
   }
   // quay edge + invisible sea wall
-  G.stone.box(-82, -2.5, 56, 82, 0.18, 57.4, col(0xcbbb9c), '', 2);
+  G.stone.box(-178, -2.5, 56, 178, 0.18, 57.4, col(0xcbbb9c), '', 2);
   // (gap x[-7.4,7.4] = landing-ship ramp, see props.js)
-  for (const [x0, x1] of [[-82, -7.4], [7.4, 82]]) addSolid(new THREE.Box3(new THREE.Vector3(x0, 0, 56.2), new THREE.Vector3(x1, 8, 58)), 'concrete', { invisible: true, navH: 8 });
+  for (const [x0, x1] of [[-178, -7.4], [7.4, 178]]) addSolid(new THREE.Box3(new THREE.Vector3(x0, 0, 56.2), new THREE.Vector3(x1, 8, 58)), 'concrete', { invisible: true, navH: 8 });
 }

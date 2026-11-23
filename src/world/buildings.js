@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { FACADE, DECAL, rng } from './textures.js';
 import { CELL, GX0, GZ0, LEVEL, COVERED, WALLS } from './layout.js';
+import { HALL_CEIL } from './grand.js';
 import { rects } from './terrain.js';
 const STAIRS = { '^': 1, 'v': 1, '>': 1, '<': 1 };
 import { col } from './build.js';
@@ -45,9 +46,9 @@ function faceSlope(geo, f, t0, t1, y0, y1, dep, uv, c) {
 export function buildBuildings(G, T, addSolid) {
   const shopSigns = [DECAL.S_MARCHE, DECAL.S_CAFE, DECAL.S_PHARMA, DECAL.S_HOTEL, DECAL.S_BOULANG];
   const white = [1, 1, 1];
-  const outF = (x, z) => T.levelCell(x, z);
+  const outF = (x, z) => { const [i, j] = T.cellOf(x, z), c = T.at(i, j); return c === 'h' || c === 'i' || c === 'I' ? null : T.levelCell(x, z); }; // no facade dressing inside a house
   const ringMax = (r) => { let m = 0; for (let j = r.j0 - 1; j <= r.j1; j++) for (let i = r.i0 - 1; i <= r.i1; i++) { const c = T.at(i, j); if (c in LEVEL) m = Math.max(m, LEVEL[c]); else if (c in STAIRS) m = Math.max(m, 3); } return m; };
-  const styleAt = (x, z) => (x > 28 && z > -24 ? 'warehouse' : (z < -28 && Math.abs(x) < 34) || (x < -60 && z < -12 && z > -30) || (x > 60 && z < -40) ? 'stone' : Math.abs(x) < 27 && z < 5 && z > -28 ? 'white' : 'plaster');
+  const styleAt = (x, z) => x > 80 ? (z < -26 && z > -60 ? 'stone' : 'warehouse') : x < -80 ? (z < -4 ? ((Math.floor(x / 22) + Math.floor(z / 18)) % 3 === 0 ? 'stone' : 'white') : 'plaster') : (x > 28 && z > -24 ? 'warehouse' : (z < -28 && Math.abs(x) < 34) || (x < -60 && z < -12 && z > -30) || (x > 60 && z < -40) ? 'stone' : Math.abs(x) < 27 && z < 5 && z > -28 ? 'white' : 'plaster');
   let bi = 0;
   const one = (r, y0, base) => {
     const [x0, x1, z0, z1] = [GX0 + r.i0 * CELL, GX0 + r.i1 * CELL, GZ0 + r.j0 * CELL, GZ0 + r.j1 * CELL];
@@ -65,7 +66,7 @@ export function buildBuildings(G, T, addSolid) {
     addSolid(new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, hTop + 0.6, z1)), style === 'warehouse' ? 'metal' : 'concrete', { navH: y0 > 0 ? 0 : 12 });
   };
   for (const r of rects(T.g, c => c === '#')) one(r, 0, ringMax(r));
-  for (const ch in COVERED) for (const r of rects(T.g, c => c === ch)) one(r, COVERED[ch] + CEIL, COVERED[ch] + CEIL);
+  for (const ch in COVERED) { const ceil = ch === 'H' ? HALL_CEIL : CEIL; for (const r of rects(T.g, c => c === ch)) one(r, COVERED[ch] + ceil, COVERED[ch] + ceil); }
   buildWalls(G, addSolid);
 }
 
@@ -179,18 +180,18 @@ export function buildWalls(G, addSolid) {
   const B3 = (a) => new THREE.Box3(new THREE.Vector3(a[0], a[1], a[2]), new THREE.Vector3(a[3], a[4], a[5]));
   let wi = 0;
   for (const w of WALLS) {
-    const rr = rng(500 + wi++ * 13), Y = w.y, top = Y + CEIL, ware = w.m === 'corr';
+    const rr = rng(500 + wi++ * 13), Y = w.y, top = Y + (w.ceil ?? CEIL), ware = w.m === 'corr';
     const geo = ware ? G.corr : w.m === 'stone' ? G.stone : G.plaster, tint = ware ? col(0x8a9aa0) : w.m === 'stone' ? col(0xe6d6bb) : col([0xf1e4c8, 0xe9d3a8, 0xf3ece0][(rr() * 3) | 0]);
     const wci = (rr() * 3) | 0, wood = col([0x5f8bac, 0x6d9a6a, 0x9a6a4e][wci]), shut = col([0x7fb0d6, 0x8fc088, 0xc48a5e][wci]), stoneC = col(0xdccbb0);
     // box helper in wall space: t along the wall, d across (-TH/2..TH/2 = wall body)
     const bx = (g, t0, t1, y0, y1, d0, d1, c, skip = '') => (w.ax === 'x' ? g.box(t0, y0, w.p + d0, t1, y1, w.p + d1, c, skip) : g.box(w.p + d0, y0, t0, w.p + d1, y1, t1, c, skip));
-    const sol = (t0, t1, y0, y1, o) => addSolid(B3(w.ax === 'x' ? [t0, y0, w.p - TH / 2, t1, y1, w.p + TH / 2] : [w.p - TH / 2, y0, t0, w.p + TH / 2, y1, t1]), ware ? 'metal' : 'concrete', o);
+    const sol = (t0, t1, y0, y1, o) => addSolid(B3(w.ax === 'x' ? [t0, y0, w.p - TH / 2, t1, y1, w.p + TH / 2] : [w.p - TH / 2, y0, t0, w.p + TH / 2, y1, t1]), ware ? 'metal' : 'concrete', w.noNav ? { ...o, noNav: true } : o);
     const opens = [...(w.open || [])].sort((p, q) => p[0] - q[0]);
     let t = w.a;
-    const span = (t0, t1) => { if (t1 - t0 < 0.02) return; bx(geo, t0, t1, Y, top, -TH / 2, TH / 2, tint, 'ny py'); sol(t0, t1, Y, top, { navH: CEIL }); };
+    const span = (t0, t1) => { if (t1 - t0 < 0.02) return; bx(geo, t0, t1, Y, top, -TH / 2, TH / 2, tint, 'ny py'); sol(t0, t1, Y, top, { navH: top - Y }); };
     for (const [o0, o1, kind] of opens) {
       span(t, o0); t = o1;
-      const head = Y + HEAD[kind];
+      const head = Y + HEAD[kind] * ((w.ceil ?? CEIL) > 5 && kind !== 'door' ? 1.9 : 1); // tall hall: tall windows / gates
       bx(geo, o0, o1, head, top, -TH / 2, TH / 2, tint, 'py'); sol(o0, o1, head, top, { navH: 0 });
       if (kind === 'win') {
         bx(geo, o0, o1, Y, Y + 1.0, -TH / 2, TH / 2, tint, 'ny'); sol(o0, o1, Y, Y + 1.0, { navH: 1.0 });
@@ -198,7 +199,7 @@ export function buildWalls(G, addSolid) {
         for (const tt of [o0, o1 - 0.07]) bx(G.wood, tt, tt + 0.07, Y + 1.06, head, -0.06, 0.06, wood, 'ny py');          // jambs
         bx(G.wood, o0, o1, head - 0.07, head, -0.06, 0.06, wood); bx(G.wood, (o0 + o1) / 2 - 0.03, (o0 + o1) / 2 + 0.03, Y + 1.06, head - 0.07, -0.04, 0.04, wood, 'ny py');
         const sw = (o1 - o0) / 2;                                                                                           // shutters folded open on both faces
-        for (const d of [-1, 1]) for (const [a, b] of [[o0 - sw, o0 - 0.02], [o1 + 0.02, o1 + sw]]) { if (a < w.a || b > w.b) continue; bx(G.paint, a, b, Y + 1.06, head, d * (TH / 2 + 0.05) - 0.025, d * (TH / 2 + 0.05) + 0.025, shut); }
+        for (const d of w.out ? [w.out] : [-1, 1]) for (const [a, b] of [[o0 - sw, o0 - 0.02], [o1 + 0.02, o1 + sw]]) { if (a < w.a || b > w.b) continue; bx(G.paint, a, b, Y + 1.06, head, d * (TH / 2 + 0.05) - 0.025, d * (TH / 2 + 0.05) + 0.025, shut); }
       } else {
         // the frame overlaps the opening by 3 cm on each side and under the lintel: a frame face flush with the wall's cut face flickers (z-fighting)
         for (const tt of [o0 - 0.1, o1 - 0.03]) bx(kind === 'gate' && !ware ? G.stone : G.wood, tt, tt + 0.13, Y, head, -TH / 2 - 0.04, TH / 2 + 0.04, kind === 'gate' && !ware ? stoneC : wood, 'ny py');

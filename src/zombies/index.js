@@ -194,7 +194,7 @@ export function createHorde(ctx) {
   // quay edge where zombies climb out of the sea (south, z ≈ 54.6), walkable on the port floor
   let shore = null;
   function shorePoints(nav) {
-    const fa = ctx.world?.nav?.floorAt, b = ctx.world?.bounds || { minX: -80, maxX: 80, maxZ: 56 };
+    const fa = ctx.world?.nav?.floorAt, b = ctx.world?.coreBounds || ctx.world?.bounds || { minX: -80, maxX: 80, maxZ: 56 };
     const z = b.maxZ - 1.4, out = [];
     for (let x = b.minX + 3; x <= b.maxX - 3; x += 0.5) {
       if (!nav.isWalkable(x, z) || !nav.isWalkable(x, z - 1.5) || nav.clearance(x, z) < 2) continue;
@@ -248,7 +248,7 @@ export function createHorde(ctx) {
   // ------------------------------------------------------------------ spatial hash (separation), 1.2 m cells
   const HC = 1.2; let hw = 0, hh = 0, hx0 = 0, hz0 = 0, head = null; const nextIdx = new Int32Array(ZCFG.MAX);
   function hashBuild() {
-    const b = ctx.world?.bounds || { minX: -80, maxX: 80, minZ: -64, maxZ: 56 };
+    const b = ctx.world?.coreBounds || ctx.world?.bounds || { minX: -80, maxX: 80, minZ: -64, maxZ: 56 };
     if (!head) { hx0 = b.minX; hz0 = b.minZ; hw = Math.ceil((b.maxX - b.minX) / HC) + 1; hh = Math.ceil((b.maxZ - b.minZ) / HC) + 1; head = new Int32Array(hw * hh); }
     head.fill(-1);
     for (const z of pool) {

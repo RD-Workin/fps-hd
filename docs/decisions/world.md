@@ -70,3 +70,20 @@
 - Coût : le nombre de lumières change seulement au basculement (menu) et au changement de qualité → recompilation des
   shaders, préchauffée par main.js sur `'world:night'`. En jeu : +8 lumières ponctuelles (HAUTE) + 1 spot joueur + 3 spots
   des lampes de bots, +3 draw calls (dôme, flaques, faisceaux + reflets des bots = 2).
+
+## Grande carte « Port-Cassis » (v5, chantier Immersion R&D — voir aussi docs/DECISIONS.md)
+- Grille étendue à x[-176,176] (GX0 -176, GW 176) ; la Citadelle v4 est inchangée au centre. `grand.js` = données de
+  l'extension (carves, ROOMS → murs générés, sites, insertions, postes, objectifs, régions), `grandZones.js` = décor.
+- Vieille-Ville (ouest) : 3 terrasses (+3 Haute-Ville, +1,5 Marché, 0 port de pêche), ruelles de 1 à 2 cellules, voûtes
+  ('C'), Placette du Puits, Maison du Notable (+3), Café du Marché et Atelier (+1,5), Remise et Saurisserie (0).
+  Site D = Place du Marché (-136, 10), fontaine au centre, kiosque, étals. Liaisons : Rue Haute → Jardins, Rue de
+  l'Église → site A, Rue du Marché → Cour des Pêcheurs, quai.
+- Gare (est) : quai et cour de fret, entrepôts (pièces 'c'), faisceau de 5 voies, 3 quais +1,5 coupés par le passage à
+  niveau (Avenue de la Gare), trains de fret de 13 m (conteneurs, trémies, citernes, plats ; châssis solide, on passe
+  entre les wagons), auvents sur poteaux, Hall de la Gare = cellule 'H' (plafond 7 m, `HALL_CEIL`, fenêtres et portails
+  ×1,9 en hauteur). Site C = quai central (140, 0). Liaisons : Bastion (escalier), chantier naval, Quai Est, quai.
+- ROOMS : `{ch, x0,x1,z0,z1, y, m?, sides:{N|S|E|W: [[centre, 'door'|'win'|'gate']]}}` → carve couvert + un mur mince par
+  côté listé (WALLS acceptent `ceil`). Ne lister que les côtés qui donnent sur une rue (sinon la masse voisine ferme).
+- Objectifs : `world.setObjectives(set)` change `bombSites`, `spawns` et cale la carte d'ombre sur `REGION` des sites actifs
+  (densité de texels ≈ Citadelle seule pour 2 sites). Décalcomanies C/D ajoutées à l'atlas (A-D en 256 px).
+- Coût mesuré : voir PR (draw calls inchangés : géométrie fusionnée par matériau).

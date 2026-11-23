@@ -1,16 +1,19 @@
 // World module — "Citadelle de Port-Cassis": 10v10 terraced harbour town on 3 levels. Contract: ARCHITECTURE.md + world.md.
 import * as THREE from 'three';
 import { buildTextures } from './textures.js';
-import { Geo, grime, sway, groundMaterial } from './build.js';
-import { BOUNDS, SPAWNS, SITES, LABELS, NAV, CTF, GX0, GZ0, GW, GH, CELL } from './layout.js';
+import { Geo, grime, sway, groundMaterial, col } from './build.js';
+import { BOUNDS, CORE_BOUNDS, SPAWNS, LABELS, NAV, CTF, GX0, GZ0, GW, GH, CELL } from './layout.js';
+import { ALL_SITES, INSERTIONS, POSTS, OBJECTIVES, REGION } from './grand.js';
 import { createTerrain, buildTerrain } from './terrain.js';
 import { buildBuildings } from './buildings.js';
 import { createKit } from './props.js';
 import { buildShip } from './ship.js';
 import { dressZones } from './zones.js';
+import { dressGrand } from './grandZones.js';
 import { extendKit } from './kit2.js';
 import { buildAtmosphere, buildDistant, buildDust, buildComposer } from './env.js';
 import { createShadowCache } from './shadowCache.js';
+import { buildStoreys, storeyFloorAt, HOUSE_HOLDS } from './storeys.js';
 import { createNight } from './night.js';
 
 export function createWorld(ctx) {
@@ -50,7 +53,7 @@ export function createWorld(ctx) {
   const navColliders = [];
   function addSolid(box, material, o = {}) {
     if (!o.navOnly) physics.add(box, material, null);
-    if (o.floor) return;
+    if (o.floor || o.noNav) return;
     const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
     const f = T.floorAt(cx, cz);
     let h = o.navH ?? (f == null ? 12 : box.max.y - f);
@@ -61,12 +64,16 @@ export function createWorld(ctx) {
   // ---------- content ----------
   buildTerrain(T, G, addSolid);
   buildBuildings(G, T, addSolid);
+  const B3 = a => new THREE.Box3(new THREE.Vector3(a[0], a[1], a[2]), new THREE.Vector3(a[3], a[4], a[5]));
+  const storeyNav = buildStoreys(G, addSolid, B3, col);
+  // floor under (x, z): with a height y, the storey of a multi-storey house the actor stands on (else the terrain)
+  const floorAt = (x, z, y) => storeyFloorAt(x, z, y) ?? T.floorAt(x, z);
   const K = extendKit(createKit(G, Tx, T, physics, addSolid, scene));
-  buildShip(K); dressZones(K);
+  buildShip(K); dressZones(K); dressGrand(K);
   const { waterMat } = K.finish();
   buildDistant(G, scene);
   const noAO = [];
-  const GB = { minX: -82, maxX: 82, minZ: -66, maxZ: 66 };
+  const GB = { minX: -178, maxX: 178, minZ: -66, maxZ: 66 };
   const groundMat = groundMaterial(Tx, groundMask(T, navColliders, GB), GB);
   for (const k in G) {
     if (!G[k].p.length) continue;
@@ -75,7 +82,7 @@ export function createWorld(ctx) {
     if (k === 'decal') { m.renderOrder = 1; noAO.push(m); }
   }
   // ground plane (level 0) + sea
-  const gGeo = new Geo(2.4); const E = 160;
+  const gGeo = new Geo(2.4); const E = 300;
   gGeo.quad([-E, 0, 56], [E, 0, 56], [E, 0, -E], [-E, 0, -E], [0, 1, 0], [-E / 2.4, -56 / 2.4, E / 2.4, E / 2.4], [1, 1, 1]);
   const ground = gGeo.mesh(groundMat, { cast: false }); ground.name = 'world_ground'; ground.userData.static = true; scene.add(ground);
   const seaMat = new THREE.MeshStandardMaterial({ color: 0x2f6474, roughness: 0.1, metalness: 0.15, normalMap: Tx.sand.normalMap, normalScale: new THREE.Vector2(0.35, 0.35) });
@@ -140,13 +147,40 @@ export function createWorld(ctx) {
   };
 
   const V3 = (x, z) => new THREE.Vector3(x, T.floorAt(x, z) ?? 0, z);
+  const toSpawn = s => ({ pos: V3(s.x, s.z), yaw: s.yaw });
+  const allSites = ALL_SITES.map(s => ({ name: s.name, center: V3(s.x, s.z), radius: s.radius, zone: s.zone }));
+  // ---------- objectives (Recherche & Destruction on the grand map) ----------
+  // Each round activates 2 to 4 of the sites D A B C (adjacent ones); world.bombSites / world.spawns follow, so the game,
+  // the bots and the HUD only ever see the active sites. ATK land on the coast in front of them, DEF start on their posts.
+  function interleave(lists) { const out = [], n = Math.max(...lists.map(l => l.length)); for (let i = 0; i < n; i++) for (const l of lists) if (l[i]) out.push(l[i]); return out; }
+  let objective = null;
+  function setObjectives(o) {
+    const set = typeof o === 'string' ? OBJECTIVES[2].find(x => x.sites.join('') === o) : o;
+    objective = set || OBJECTIVES[2][0];
+    world.bombSites = objective.sites.map(n => allSites.find(s => s.name === n));
+    const atk = interleave(objective.insertion.map(k => INSERTIONS[k] || SPAWNS.ATK));
+    const classic = objective.sites.length === 2 && objective.sites.includes('A') && objective.sites.includes('B');
+    const def = classic ? SPAWNS.DEF : interleave(objective.sites.map(n => POSTS[n] || SPAWNS.DEF.filter(p => (n === 'A' ? p.x < -8 : p.x > -8))));
+    world.spawns = { ATK: atk.map(toSpawn), DEF: def.map(toSpawn) };
+    const xs = objective.sites.flatMap(n => REGION[n]);
+    atm.fitShadow(Math.min(...xs) - 3, Math.max(...xs) + 3, -67, 59); shadowDirty = true;
+    world.objective = { sites: [...objective.sites], insertion: [...objective.insertion] };
+    ctx.events?.emit?.('world:objectives', world.objective);
+    return world.objective;
+  }
   const world = {
     bounds: { ...BOUNDS },
-    spawns: { ATK: SPAWNS.ATK.map(s => ({ pos: V3(s.x, s.z), yaw: s.yaw })), DEF: SPAWNS.DEF.map(s => ({ pos: V3(s.x, s.z), yaw: s.yaw })) },
-    bombSites: SITES.map(s => ({ name: s.name, center: V3(s.x, s.z), radius: s.radius })),
+    coreBounds: { ...CORE_BOUNDS },
+    spawns: { ATK: SPAWNS.ATK.map(toSpawn), DEF: SPAWNS.DEF.map(toSpawn) },
+    bombSites: allSites.filter(s => s.name === 'A' || s.name === 'B'),
+    allSites, objectives: OBJECTIVES, objective: { sites: ['A', 'B'], insertion: ['port'] },
+    setObjectives,
     ctf: { bases: { ATK: V3(...CTF.bases.ATK), DEF: V3(...CTF.bases.DEF) }, lanes: CTF.lanes }, // Capture du drapeau
-    minimap: { labels: LABELS, colliders: navColliders, floorAt: T.floorAt },
-    nav: { ...NAV, colliders: navColliders, floorAt: T.floorAt, grid: { x0: GX0, z0: GZ0, w: GW, h: GH, cell: CELL, rows: T.g.map(r => r.join('')) } },
+    minimap: { labels: LABELS, colliders: navColliders, floorAt },
+    // storeys: per house {house, layers:[{k, y, rect, blocks}], portals:[{k, bottom, top}]} (bots/nav.js setLayers)
+    // highHolds: window / roof positions {x, z, y, yaw, high, roof?, house} ; holdsHigh[site] = those within 50 m of a site
+    nav: { ...NAV, colliders: navColliders, floorAt, storeys: storeyNav, highHolds: HOUSE_HOLDS,
+      holdsHigh: Object.fromEntries(ALL_SITES.map(s => [s.name, HOUSE_HOLDS.filter(h => Math.hypot(h.x - s.x, h.z - s.z) < 50)])), grid: { x0: GX0, z0: GZ0, w: GW, h: GH, cell: CELL, rows: T.g.map(r => r.join('')) } },
     sun: atm.sun, quality, post, shadows: SH, // post / shadows: debug & perf bench access
     setQuality,
     // Ops de nuit: night lighting variant (see night.js). Changing it changes the light count -> shaders recompile:
