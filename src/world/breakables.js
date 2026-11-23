@@ -14,7 +14,7 @@ export const BREAKABLES = [
   { kind: 'planks', ax: 'x', p: 39, a: -122, b: -120 },    // Halle aux poissons, small south door
   { kind: 'fence', ax: 'z', p: -162, a: 30, b: 34 },       // west passage <-> Cour des Pêcheurs
   { kind: 'door', ax: 'z', p: -101, a: 6, b: 8 },          // Café du Marché, back door (east street)
-  { kind: 'fence', ax: 'x', p: -19, a: -100, b: -94 },     // east lane (Notable -> Rue de l'Église)
+  { kind: 'fence', ax: 'x', p: -19, a: -100, b: -84 },     // site hoarding across the east lane + Cour de l'Église (Notable -> Rue de l'Église)
   { kind: 'fence', ax: 'z', p: -153, a: -22, b: -14 },     // Jardins du Cloître <-> Parvis
 ];
 const SPEC = {

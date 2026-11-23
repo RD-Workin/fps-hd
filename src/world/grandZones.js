@@ -54,8 +54,8 @@ export function dressGrand(K) {
   Stack(-139, 15.6, 2, 1.0); Crate(-133, 4.6); Crate(-133, 5.8, 1.0); Cart(-138.8, 4.4, R); Sandbags(-134.6, 15.8, -131.6, 15.8, 1.05);
   GDecal(DECAL.D, -136, 13.6, 3.2, 3.2, 0); GDecal(DECAL.HAZARD, -136, 6.4, 4.4, 1.1, 0);
   // around the hall: west stalls, kiosk, cars along the south edge, trees and planters to break the long lines
-  Stall(-151.6, 7, 1, 1); Stall(-151.6, 11, 1, 2); Tent(-148, 17.5, true); Kiosk(-150, 1.6, 0x2f5f4a);
-  Car(-140.5, 19.6, true, 0xa2412f); Car(-120, 9.5, false, 0xd8d4cc); Car(-153, -1.6, true, 0x3d7a4a);
+  Stall(-151.6, 7, 1, 1); Stall(-151.6, 11, 1, 2); Tent(-148, 17.5, true); Kiosk(-146, 3.6, 0x2f5f4a);
+  Car(-140.5, 19.6, true, 0xa2412f); Car(-120, 9.5, false, 0xd8d4cc); Car(-140.4, -2.4, true, 0x3d7a4a);
   Tree(-122, 18.2, 6, 2.6); Tree(-147, -1.4, 6, 2.4); Tree(-117.2, 5.8, 5.5, 2.2);
   Planter(-142.5, -2.6, -140.6, -0.6); Planter(-131.4, -2.6, -129.5, -0.6);               // either side of the monumental stairs
   LowWall(-125, 12.4, -122, 13, 1.1); LowWall(-147.6, 4, -145, 4.6, 1.1); Jersey(-131, 20.4, true, 3);
@@ -67,13 +67,17 @@ export function dressGrand(K) {
   Floor(-174, -160, 4, 22, 'stone', 0xd2c4aa);
   Tent(-169.5, 8.4, false); Tent(-165, 18.4, true); Car(-171.4, 16.8, false, 0xe8e2d2); Stack(-163.2, 13.4, 2, 1.0); Crate(-162, 14.4, 0.9);
   Cart(-166.6, 4.6, 0); Barrel(-173, 21, OCHRE); Pot(-160.6, 21.2, 1.2); Pot(-173.2, 4.8);
-  Dumpster(-170.6, -4.6, true); Crate(-163, -5, 1.0); Barrel(-163.4, 1.8, BLUE);           // west stairs landing
+  Dumpster(-170.6, -4.6, true); Crate(-163, -5, 1.0); Barrel(-170.6, 2.6, BLUE);           // west stairs landing
   // Café du Marché ('e', +1.5): tables, counter, shelves
   Floor(-110, -102, 2, 14, 'wood', 0xa8855e); Counter(-103.6, 3, -102.6, 9, 1.05); CafeTable(-108, 4.6); CafeTable(-107.6, 9.6); CafeTable(-105, 12.4);
   Shelf('z', -1, -102, 10, 13.6, 2.2);
   // east street + Placette du Four (+1.5): café terrace, tree, carts
   Dumpster(-95.6, -2.6, false); Crate(-98.6, 2.6); Crate(-98.6, 3.8, 1.0); Barrel(-95.4, 7.2, RUST);
   CafeTable(-110, 16.4, 0); CafeTable(-106.4, 17.8, 2); Tree(-101, 19.4, 5.5, 2.4); Planter(-97.6, 15.4, -95.4, 17.6); Cart(-112, 20.6, R);
+  // Cour du Pressoir (+1.5): the east street widens into a working yard (well, van, wine press shed, low walls, crates)
+  Floor(-94, -84, -2, 18, 'stone', 0xcfc0a4); Well(-89.4, 5.6); Car(-86.4, -0.2, false, 0x5c6f7a); Stack(-92.6, -0.6, 2, 1.1); Barrel(-93, 1.4, RUST);
+  LowWall(-92.4, 10, -88.4, 10.6, 1.1); Sandbags(-86.6, 6.4, -85, 9.4, 1.0); Tent(-90.4, 14.6, true); Crate(-85.4, 13.4, 1.0); Stack(-85.6, 15.4, 1, 1.0);
+  Pergola(-99.6, 8.6, -95.6, 12.6); CafeTable(-97.6, 10.6, 1); Lamp(-84.6, 3.6, 0); Pot(-93.4, 17.2, 1.1);
   Cart(-86, 19.4, 0); Barrel(-82.8, 22.6, BLUE); Car(-91.5, 22.4, true, 0xc9852f);           // Rue du Marché
   laundry(V(-112, 6.6, 16), V(-94, 6.8, 17)); laundry(V(-174, 6.2, 12), V(-160, 6.4, 12.8));
 
@@ -95,7 +99,7 @@ export function dressGrand(K) {
   Truck(-152.5, -50.2); Stack(-166.6, -50.6, 2, 1.1); Crate(-160, -50.8, 1.0); Barrel(-143.4, -50.4, BLUE); Barrel(-142.7, -51, RUST);
   Car(-160.5, -40.6, true, 0xa2412f); Crate(-145.6, -40.4, 1.0); Lamp(-170, -46, 0);
   // Rue Haute (jogs): parked cars, carts, a builders' skip
-  Car(-127.5, -49.2, true, 0xe8e2d2); Cart(-118.8, -39.4, 0); Dumpster(-110, -45.2, true); Car(-97, -35.2, true, 0x3d7a4a); Barrel(-88.6, -45.2, OCHRE);
+  Car(-124, -46.6, true, 0xe8e2d2); Cart(-118.8, -39.4, 0); Dumpster(-110, -45.2, true); Car(-97, -35.2, true, 0x3d7a4a); Barrel(-88.6, -45.2, OCHRE);
   for (const x of [-138, -112, -94]) Lamp(x, x < -120 ? -44.6 : -38.6, 0);
   // Maison du Notable ('C', +3)
   Floor(-116, -104, -34, -22, 'wood', 0x9c7b56); Rug(-113, -107, -31, -25, 1);
@@ -103,9 +107,13 @@ export function dressGrand(K) {
   // east lane + Rue de l'Église
   Crate(-96, -19.6); Crate(-96, -18.4, 1.0); Barrel(-99.2, -15.2, BLUE); Cart(-92, -11.2, 0); Pot(-102.4, -13); Barrel(-84.6, -9.4, BLUE);
   for (const x of [-100, -86]) Lamp(x, -13.6, 0);
+  // Cour de l'Église (+3): old churchyard behind the hoarding (tombs, cypresses, an ossuary shed, builders' stacks)
+  Floor(-94, -84, -24, -14, 'concrete', 0x8e9a68);
+  for (const [x, z] of [[-92.4, -22.6], [-90, -22.6], [-87.6, -22.6], [-91.2, -16.2], [-88.4, -16.2]]) LowWall(x - 0.5, z - 0.18, x + 0.5, z + 0.18, 0.95);
+  Cypress(-85.4, -23, 6.5); Cypress(-93.2, -14.8, 6); Counter(-86.4, -17.6, -84.6, -15.2, 1.2, 0x8b8578); Stack(-96.4, -22.6, 2, 1.1); Sandbags(-99.6, -16.6, -97.6, -15.6, 1.0);
   for (const z of [-50, -38, -16]) laundry(V(-170, 7.4, z), V(-150, 7.6, z + 0.6));
   vine('z', 1, -150, -26, -20, 3.2, 7.6); vine('x', -1, -34, -116, -110, 3.3, 7.4, 0xe07a2a); vine('z', -1, -112, 4, 10, 1.6, 5.8);
-  for (const [x, z] of [[-168.6, -52], [-118.6, -33.4], [-150, 21.2], [-112.6, -0.6]]) Pot(x, z);
+  for (const [x, z] of [[-168.6, -52], [-118.6, -33.4], [-150, 21.2], [-127, -0.8]]) Pot(x, z);
 
   function marketHall(x0, x1, z0, z1) { // open market hall: stone pillars every ~4 m, timber roof out of reach (5.3 m)
     const Y = F((x0 + x1) / 2, (z0 + z1) / 2), H = 5.3;
@@ -124,7 +132,7 @@ export function dressGrand(K) {
   Container(84, 45.5, true, RED); Container(84, 45.5, true, BLUE, 2.6); Container(92, 49.6, true, GREEN);
   Container(104, 38.6, false, OCHRE); Container(107, 38.6, false, GREY); Container(107, 38.6, false, RED, 2.6);
   Container(122, 46, true, BLUE); Container(160, 45.5, true, GREEN); Container(160, 48.3, true, OCHRE); Container(166.6, 38, false, RED);
-  Truck(126, 38.6, 0x5d6b4a); Truck(142, 39, 0x6a5a3a); Pallets(150, 40.6, 3); Stack(97, 42.4, 2); Crate(98.2, 42.4); Barrel(118.6, 42.8, RUST); Tyres(171, 42, 3);
+  Truck(136.4, 39.4, 0x5d6b4a); Truck(142, 39, 0x6a5a3a); Pallets(150, 40.6, 3); Stack(97, 42.4, 2); Crate(98.2, 42.4); Barrel(118.6, 42.8, RUST); Tyres(171, 42, 3);
   for (const x of [88, 118, 148, 170]) Lamp(x, 43.6, 0);
   for (const [x, c, ry] of [[96, 0x6d6f70, 0.1], [126, 0x2f6f9a, -0.1], [166, 0xb04a3a, 0.15]]) Boat(x, 60.5, ry, c, -0.75, false);
   // Entrepôts (rooms 0): shelving racks = tall cover, a forklift-sized crate stack

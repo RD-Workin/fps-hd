@@ -43,6 +43,7 @@ export const GRAND_CARVES = [
   ['e', -110, -102, 2, 14], // Café du Marché (interior)
   ['#', -112, -110, 2, 14], [';', -112, -110, 4, 6], [';', -112, -110, 10, 12], // café west wall + 2 doors
   [';', -100, -94, -4, 14], // east street (short)
+  [';', -94, -84, -2, 18], // Cour du Pressoir: the east street opens into a square (café east side -> Rue du Marché)
   [';', -102, -100, 6, 8], // café east door
   [';', -112, -94, 14, 22], // Placette du Four
   [';', -96, -80, 18, 24], // Rue du Marché -> Citadelle
@@ -65,6 +66,7 @@ export const GRAND_CARVES = [
   [',', -104, -100, -26, -24], // notable east door
   [',', -104, -80, -14, -8], [',', -90, -80, -10, -6], // Rue de l'Église -> site A
   [',', -100, -94, -24, -14], // east lane parvis/notable -> rue de l'Église
+  [',', -94, -84, -24, -14], // Cour de l'Église (old churchyard): the lane and the Rue de l'Église open into a yard
 
   // ======================= GARE DE TRIAGE (east) =======================
   ['.', 80, 174, 44, 56],                     // quai de fret
@@ -150,7 +152,7 @@ export const REGION = { D: [-176, -40], A: [-90, 10], B: [10, 90], C: [40, 176] 
 
 export const GRAND_LABELS = [
   ['Place Haute', -155, -47], ['Rue Haute', -112, -42], ['Jardins du Cloître', -165, -28], ['Parvis Saint-Roch', -134, -24], ['Notable', -110, -28],
-  ["Rue de l'Église", -92, -11], ['Grande Place', -136, 0], ['Café', -106, 8], ['Tisserand', -167, 12], ['Placette du Four', -103, 18], ['Rue du Marché', -88, 21],
+  ["Rue de l'Église", -92, -11], ['Grande Place', -136, 0], ['Café', -106, 8], ['Tisserand', -167, 12], ['Placette du Four', -103, 18], ['Cour du Pressoir', -89, 6], ['Cour de l\'Église', -89, -20], ['Rue du Marché', -88, 21],
   ['Cour des Pêcheurs', -149, 32], ['Halle aux poissons', -126, 34], ['Cour du Four', -106, 32], ['Port de pêche', -140, 50], ['Escalier du Port', -89, 32],
   ['Gare', 143, -34], ['Place de la Gare', 140, -48], ['Quais', 140, 6], ['Voies', 100, 4], ['Passage à niveau', 116, 4],
   ['Rue du Triage', 150, 22], ['Entrepôt 1', 95, 30], ['Entrepôt 2', 156, 30], ['Quai de fret', 140, 48], ['Dépôt', 133, 30],
