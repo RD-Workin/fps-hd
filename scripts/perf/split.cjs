@@ -3,6 +3,8 @@ const { chromium } = require('playwright');
   const [al='39', en='40', secs='20'] = process.argv.slice(2);
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const p = await b.newPage({ viewport: { width: 640, height: 360 } });
+  // SEED=n: deterministic Math.random (same objectives, spawns, bot choices) to compare two builds frame for frame
+  if (process.env.SEED) await p.addInitScript(s => { let a = s >>> 0; Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }, +process.env.SEED);
   p.on('pageerror', e => console.log('ERR', e.message));
   await p.goto('http://localhost:4173/', { waitUntil: 'commit', timeout: 120000 });
   await p.waitForFunction(() => window.__ctx && window.__ctx.bots, null, { timeout: 120000 });

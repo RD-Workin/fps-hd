@@ -1,20 +1,23 @@
 // Perf bench (dev only, needs Playwright + Chromium): per-pass draw calls / triangles of the composer + shadow refresh.
 // npx vite build && npx vite preview --port 4173 ; node scripts/perf/passes.cjs http://localhost:4173/ <allies> <enemies> <high|low> <frames>
 // POS='[x,y,z,yaw]' moves the player first. ms are SwiftShader timings in a headless container: compare counts, not ms.
+// NOSOLD=1 hides every bot soldier (world-only counts).
 // per-pass breakdown: calls / tris / synced ms (swiftshader) for N frames
 const { chromium } = require('playwright');
 (async () => {
   const [url, al = '9', en = '10', q = 'high', frames = '6'] = process.argv.slice(2);
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const p = await b.newPage({ viewport: { width: +(process.env.W || 640), height: +(process.env.H || 360) } });
+  // SEED=n: deterministic Math.random (same objectives, spawns, bot choices) to compare two builds frame for frame
+  if (process.env.SEED) await p.addInitScript(s => { let a = s >>> 0; Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }, +process.env.SEED);
   p.on('pageerror', e => console.log('ERR', e.message));
   await p.goto(url, { waitUntil: 'commit', timeout: 120000 });
   await p.waitForFunction(() => window.__ctx && window.__ctx.bots, null, { timeout: 120000 });
   await p.waitForTimeout(8000);
-  const r = await p.evaluate(async ([al, en, q, frames, POS]) => {
+  const r = await p.evaluate(async ([al, en, q, frames, POS, NOSOLD]) => {
     const ctx = window.__ctx, R = ctx.renderer, gl = R.getContext(), px = new Uint8Array(4);
     const sync = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    ctx.world.setQuality(q); ctx.game.setTeamSizes(+al, +en); ctx.game.start(); ctx.paused = false;
+    ctx.world.setQuality(q); ctx.game.setTeamSizes(+al, +en); ctx.game.start(); ctx.paused = false; if (NOSOLD) for (const b of ctx.bots.list) b.model.root.visible = false;
     await new Promise(r => setTimeout(r, 500));
     if (POS) { ctx.player.position.set(POS[0], POS[1], POS[2]); ctx.player.yaw = POS[3]; }
     // warm: a few frames so the bake / first dynamic refresh happen before measuring
@@ -31,7 +34,7 @@ const { chromium } = require('playwright');
     for (let i = 0; i < frames; i++) { await new Promise(r => requestAnimationFrame(r)); }
     for (const k in acc) { const a = acc[k]; acc[k] = { ms: +(a.ms / a.n).toFixed(1), calls: Math.round(a.calls / a.n), ktris: Math.round(a.tris / a.n / 1000), n: a.n }; }
     return acc;
-  }, [al, en, q, frames, process.env.POS ? JSON.parse(process.env.POS) : null]);
+  }, [al, en, q, frames, process.env.POS ? JSON.parse(process.env.POS) : null, !!process.env.NOSOLD]);
   console.log(JSON.stringify(r, null, 0));
   await b.close();
 })();

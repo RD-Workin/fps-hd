@@ -32,6 +32,7 @@ export const POSE_RATE = {
   crowd: { onscreen: [[LOD_DIST[0], 1], [45, 2], [90, 3], [Infinity, 4]], offscreen: [[12, 2], [40, 4], [Infinity, 6]] },
 };
 export const CROWD = 40;
+const SHADOW_FAR = 60; // m (camera distance, crowd only): beyond, no dynamic shadow
 const STALE_DIST = 40; // m: beyond, an off-screen soldier's skeleton is not carried between poses (its shadow is far away)
 let SLOT = 0;
 const _D = new THREE.Matrix4(), _inv = new THREE.Matrix4();
@@ -54,6 +55,46 @@ const LOCO = { walk: { dist: 2.0, speed: 1.5 }, jog: { dist: 3.2, speed: 3.6 }, 
 const LOOPS = ['idle', 'walk', 'jog', 'sprint', 'cidle', 'cwalk'];
 const FINGERS = ['f_index', 'f_middle', 'f_ring', 'f_pinky', 'thumb'];
 
+// band flag in the body shader: albedo tinted with the team colour where aBand = 1 (armband vertices)
+function patchBand(sh) {
+  sh.vertexShader = 'attribute float aBand;\nvarying float vBand;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vBand = aBand;');
+  sh.fragmentShader = 'uniform vec3 uBand;\nvarying float vBand;\n' + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n diffuseColor.rgb *= mix(vec3(1.0), uBand, vBand);');
+}
+// merge each LOD's armband SkinnedMesh into its body SkinnedMesh (float attributes + aBand). Returns false (nothing
+// changed) if the asset does not match the expected layout.
+function mergeArmbands(scene) {
+  const pairs = [];
+  scene.traverse(o => {
+    if (!o.isSkinnedMesh || o.material?.name !== 'Armband') return;
+    const body = o.parent?.children.find(c => c.isSkinnedMesh && c.material?.name === 'Soldier');
+    if (!body) return;
+    const sb = body.skeleton, sa = o.skeleton;
+    const same = sb.bones.length === sa.bones.length && sb.bones.every((b, i) => b === sa.bones[i]) && body.bindMatrix.equals(o.bindMatrix)
+      && sb.boneInverses.every((m, i) => m.equals(sa.boneInverses[i]) || m.elements.every((v, k) => Math.abs(v - sa.boneInverses[i].elements[k]) < 1e-6))
+      && body.material.map === o.material.map;
+    if (same) pairs.push([body, o]);
+  });
+  if (!pairs.length) return false;
+  for (const [body, band] of pairs) {
+    const ga = body.geometry, gb = band.geometry, na = ga.attributes.position.count, nb = gb.attributes.position.count;
+    const g = new THREE.BufferGeometry();
+    for (const name of ['position', 'normal', 'uv', 'tangent', 'skinIndex', 'skinWeight']) {
+      const A = ga.attributes[name], B = gb.attributes[name]; if (!A || !B) continue;
+      const k = A.itemSize, out = name === 'skinIndex' ? new Uint16Array((na + nb) * k) : new Float32Array((na + nb) * k);
+      const get = ['getX', 'getY', 'getZ', 'getW'];
+      for (let i = 0; i < na; i++) for (let c = 0; c < k; c++) out[i * k + c] = A[get[c]](i);
+      for (let i = 0; i < nb; i++) for (let c = 0; c < k; c++) out[(na + i) * k + c] = B[get[c]](i);
+      g.setAttribute(name, new THREE.BufferAttribute(out, k));
+    }
+    const flag = new Float32Array(na + nb); flag.fill(1, na); g.setAttribute('aBand', new THREE.BufferAttribute(flag, 1));
+    const ia = ga.index.array, ib = gb.index.array, idx = new Uint32Array(ia.length + ib.length);
+    idx.set(ia); for (let i = 0; i < ib.length; i++) idx[ia.length + i] = ib[i] + na;
+    g.setIndex(new THREE.BufferAttribute(na + nb < 65536 ? Uint16Array.from(idx) : idx, 1));
+    body.geometry = g; band.removeFromParent();
+  }
+  return true;
+}
+
 function prepare(gltf) {
   const scene = gltf.scene, clips = {};
   for (const [k, n] of Object.entries(CLIPS)) clips[k] = gltf.animations.find(a => a.name === n);
@@ -66,17 +107,22 @@ function prepare(gltf) {
       m.envMapIntensity = 0.8;
     }
   });
+  // Perf (40c40): the armband is merged into the body mesh of each LOD (same skeleton, same texture, identity bind
+  // offset — checked at load) and tinted in the body shader through a per-vertex flag: one draw call and one skeleton
+  // update less per soldier and per pass.
+  const merged = mergeArmbands(scene);
   const teamMats = {}, bodyMats = {};
   for (const t of ['ATK', 'DEF']) {
     if (mats.Armband) { const m = mats.Armband.clone(); m.color.setHex(TEAM_COLORS[t]); teamMats[t] = m; }
-    if (mats.Soldier && RIM_STRENGTH > 0) {
-      const m = mats.Soldier.clone(), rim = new THREE.Color(...RIM[t]);
+    if (mats.Soldier) {
+      const m = mats.Soldier.clone(), rim = new THREE.Color(...RIM[t]), band = new THREE.Color(TEAM_COLORS[t]);
       m.onBeforeCompile = sh => {
-        sh.uniforms.uRim = { value: rim }; sh.uniforms.uRimK = RIM_K;
-        sh.fragmentShader = 'uniform vec3 uRim; uniform float uRimK;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
-          `#include <emissivemap_fragment>\n float rimF = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2);\n totalEmissiveRadiance += uRim * rimF * ${RIM_STRENGTH.toFixed(2)} * uRimK;`);
+        sh.uniforms.uRim = { value: rim }; sh.uniforms.uRimK = RIM_K; sh.uniforms.uBand = { value: band };
+        patchBand(sh);
+        if (RIM_STRENGTH > 0) sh.fragmentShader = 'uniform vec3 uRim; uniform float uRimK;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>',
+          `#include <emissivemap_fragment>\n float rimF = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 2.2);\n totalEmissiveRadiance += uRim * rimF * ${RIM_STRENGTH.toFixed(2)} * uRimK * (1.0 - vBand);`);
       };
-      m.customProgramCacheKey = () => 'soldierRim' + t;
+      m.customProgramCacheKey = () => 'soldierBody' + t + (merged ? 'B' : '');
       bodyMats[t] = m;
     }
   }
@@ -119,7 +165,8 @@ const live = new Set();
 function passLod(mode) {
   for (const s of live) {
     if (!s.root.parent?.parent) { live.delete(s); continue; } // disposed bot
-    s.showLod(mode === 'shadow' ? 2 : mode === 'ao' ? Math.max(1, s.lod) : s.lod);
+    // shadow / AO passes also drop the armband and magazine meshes (2 of the 4 draw calls of a soldier, no visible effect)
+    s.showLod(mode === 'shadow' ? 2 : mode === 'ao' ? Math.max(1, s.lod) : s.lod, !!mode);
   }
 }
 // rotate a bone by a world-space rotation q
@@ -198,7 +245,7 @@ class HDSoldier {
     this.holder = new THREE.Group(); this.root.add(this.holder);
     if (rifle) {
       rifle.removeFromParent(); rifle.position.set(0, 0, 0); rifle.rotation.set(0, Math.PI, 0); this.holder.add(rifle);
-      this.mag = rifle.getObjectByName('Mag'); this.magRest = this.mag?.position.clone();
+      this.mag = rifle.getObjectByName('Mag'); this.magRest = this.mag?.position.clone(); this.magWant = true;
       this.rifleLods = [[], []];
       rifle.traverse(o => { if (o.isMesh && o !== this.mag) this.rifleLods[/LOD1/.test(o.name) ? 1 : 0].push(o); });
     }
@@ -235,7 +282,7 @@ class HDSoldier {
     }
     this.cullSphere = new THREE.Sphere(new THREE.Vector3(), CULL_R); // same as the meshes' culling spheres this.offscreen = false;
     this.deadPos = new THREE.Vector3(); this.settled = false; this.shown = -1;
-    this.slot = SLOT++; this.tick = 0; this.dist = 0; this.skipDt = 0;
+    this.slot = SLOT++; this.tick = 0; this.dist = 0; this.rawDist = 0; this.skipDt = 0; this.cast = true;
     this.posedRoot = new THREE.Matrix4(); // root matrixWorld at the last full pose / carry (skeleton)
     this.proxyRoot = new THREE.Matrix4(); // same for the hitbox proxies (always carried)
     this.stale = false; // off-screen far soldier: skeleton left where it was, re-posed as soon as it comes into view
@@ -256,7 +303,7 @@ class HDSoldier {
     for (const k of LOOPS) this.act[k].reset().play();
     if (this.holder.parent !== this.root) this.root.add(this.holder);
     this.holder.visible = true;
-    if (this.mag) { this.mag.position.copy(this.magRest); this.mag.visible = true; }
+    if (this.mag) { this.mag.position.copy(this.magRest); this.magWant = true; this.mag.visible = this.lod < 2; }
   }
   kill(fallYawLocal) {
     this.dead = true; this.settled = false;
@@ -270,18 +317,26 @@ class HDSoldier {
   updateLod() {
     const cam = this.ctx?.camera; let l = 0;
     if (cam) {
-      cam.getWorldPosition(_v1); const d = _v1.distanceTo(this.root.position) * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) / TAN_HIP;
-      l = d < LOD_DIST[0] ? 0 : d < LOD_DIST[1] ? 1 : 2; this.dist = d;
+      cam.getWorldPosition(_v1); const raw = _v1.distanceTo(this.root.position), d = raw * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) / TAN_HIP;
+      l = d < LOD_DIST[0] ? 0 : d < LOD_DIST[1] ? 1 : 2; this.dist = d; this.rawDist = raw;
       // off-screen soldiers are posed at half rate like far ones (camera matrices of the last render: generous sphere)
       _pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _frustum.setFromProjectionMatrix(_pm);
       this.cullSphere.center.copy(this.root.position).y += CULL_Y;
       this.offscreen = !_frustum.intersectsSphere(this.cullSphere);
     }
     this.lod = l; if (l !== this.shown) this.showLod(l);
+    // big battles: soldiers far from the camera stop casting into the dynamic shadow refresh (fewer rects to repair, fewer
+    // shadow draw calls; a 2 m figure's shadow at 60+ m is a few pixels)
+    const cast = !(live.size > CROWD && this.rawDist > SHADOW_FAR);
+    if (cast !== this.cast) { this.cast = cast; this.root.traverse(o => { if (o.isMesh) o.castShadow = cast; }); }
   }
-  showLod(l) {
-    if (l === this.shown || l < 0) return; this.shown = l;
-    this.lods.forEach((arr, i) => arr.forEach(o => (o.visible = i === l)));
+  showLod(l, lite = false) {
+    if (l < 0 || (l === this.shown && lite === this.lite)) return;
+    const changed = l !== this.shown; this.shown = l; this.lite = lite;
+    const band = this.armbandSet ||= new Set(this.armbands);
+    this.lods.forEach((arr, i) => arr.forEach(o => (o.visible = i === l && !(lite && band.has(o)))));
+    if (this.mag) this.mag.visible = this.magWant && !lite && l < 2; // magazine: not drawn beyond 30 m
+    if (!changed) return;
     for (const o of this.lods[l]) if (o.bindMode === 'attached') o.bindMatrixInverse.copy(o.matrixWorld).invert();
     if (this.rifleLods) this.rifleLods.forEach((arr, i) => arr.forEach(o => (o.visible = (l > 0 ? 1 : 0) === i)));
   }
@@ -378,8 +433,9 @@ class HDSoldier {
     if (magOut > 0) {
       const magWell = H(-0.02, -0.12, -0.06), pouch = r.localToWorld(new THREE.Vector3(-0.06, chest.y - 0.28, -0.22));
       wristL = magWell.lerp(pouch, magOut);
-      if (this.mag) { this.mag.position.copy(this.magRest); this.mag.position.y -= 0.16 * magOut; this.mag.visible = magOut < 0.9; }
-    } else if (this.mag) { this.mag.position.copy(this.magRest); this.mag.visible = true; }
+      if (this.mag) { this.mag.position.copy(this.magRest); this.mag.position.y -= 0.16 * magOut; this.magWant = magOut < 0.9; }
+    } else if (this.mag) { this.mag.position.copy(this.magRest); this.magWant = true; }
+    if (this.mag) this.mag.visible = this.magWant && this.lod < 2;
     solveIK(B['upper_arm.L'], B['forearm.L'], B['hand.L'], wristL, right.clone().multiplyScalar(-0.4).add(rootDown), ...this.armLen.L);
     const RH = this.A.restHand, q = new THREE.Quaternion();
     const left = hr.clone().negate(), down = hup.clone().negate();

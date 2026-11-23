@@ -6,6 +6,8 @@ const { chromium } = require('playwright');
   const [url, al = '9', en = '10', q = 'high', secs = '20'] = process.argv.slice(2);
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-vsync', '--disable-frame-rate-limit'] });
   const p = await b.newPage({ viewport: { width: +(process.env.W||640), height: +(process.env.H||360) } });
+  // SEED=n: deterministic Math.random (same objectives, spawns, bot choices) to compare two builds frame for frame
+  if (process.env.SEED) await p.addInitScript(s => { let a = s >>> 0; Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }, +process.env.SEED);
   p.on('pageerror', e => console.log('ERR', e.message));
   await p.addInitScript(() => { try { localStorage.clear(); } catch {} });
   await p.goto(url, { waitUntil: 'commit', timeout: 120000 });
