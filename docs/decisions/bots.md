@@ -97,3 +97,33 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
 - Rendu : faisceau = cône additif coupé au premier mur (raycast) + reflet de lentille fort quand la lampe vise la
   caméra, 2 draw calls instanciés pour tous les bots. Les 3 lampes les plus proches de la caméra (BASSE : 1) ont un vrai
   SpotLight (nombre fixe la nuit). `actor._lit` (0..1, éclairage des lampadaires) recalculé à 10 Hz.
+
+## Escouades tactiques (squads.js, itération 5, grande carte)
+- **Équipes** de 2-4 bots formées par point d'insertion (grappes < 30 m, coupées en ~3,5). Le porteur marche au milieu de la
+  première équipe (pointe devant, arrière derrière). Une route par équipe ; les équipes d'un même site prennent des rues
+  différentes (`autoRoutes` ou routes faites main).
+- **Formation** : la pointe suit la route ; les autres suivent le fil d'Ariane de la pointe (points tous les 1,5 m), 4,5 m
+  d'écart, décalés de 1,7 m à gauche/droite si la rue le permet (colonne décalée, pas de file indienne). La pointe ralentit
+  (allure `tac`) quand la colonne s'étire et tient l'angle si elle est trop loin devant. À < 30 m du site ou après un
+  contact : allure tactique 3,6 m/s, arme vers un secteur (`goal.watch`) : appuis en avant-oblique de leur côté, l'arrière
+  regarde derrière une partie du temps.
+- **Tenaille** : chaque équipe se regroupe à son point d'attente (dernier point de route à > 18 m du site), accroupie, sur des
+  points espacés de 2,6 m et cachés du site si possible. Toutes les équipes du site partent **ensemble** : quand toutes sont
+  en place (70 %), ou 6 s après la première si les retardataires sont à < 2 s, ou 14 s max, ou contact (si au moins la moitié
+  est en place), ou < 45 s de manche. Fumigène + flash par équipe au départ (`pushUtility(team)`). Le porteur entre 1,2 s après.
+- **Contact** (info d'équipe < 1,5 s à < 40 m) : exercice de 5 s max puis la colonne repart au moins 4 s (pas de gel en duel
+  longue distance). Pendant l'exercice : un flanqueur (le dernier libre) contourne à 8-15 m sous 50-90° ; l'arrière tient, accroupi,
+  pré-visé ; les autres referment sur le contact à allure tactique, pré-visés (échange de tirs). Sans progrès 14 s : nouvelle
+  route depuis la position actuelle, en s'éloignant du dernier contact.
+- **Après la pose** : moitié des gardes regardent vers l'extérieur (accès de reprise), moitié la bombe.
+- **Reprise (DEF)** : les défenseurs hors du site se regroupent à ~18 m de la bombe sur le chemin de leur centre, cachés,
+  puis entrent ensemble (70 % présents, 9 s après le premier, ou quand l'horloge l'impose : distance/4,5 + désamorçage + 5 s).
+  Ceux qui étaient sur le site tiennent leur position, accroupis, pré-visés sur la bombe.
+- **Mesures** (`scripts/bots/bench.cjs`, bots seuls, carte v5 « auto ») — « collés » = bots ATK en mouvement avec un
+  coéquipier à < 2,5 m, avant le premier contact :
+  | | avant | après |
+  |---|---|---|
+  | 5c5 classique (24 manches) | collés 43 %, distance moy. 4,2 m, 83 % ATK (6 manches) | collés 10 %, 5,6 m, 63 % ATK, 22 poses / 24 |
+  | 10c10 auto (30 manches) | collés 59 %, 3,0 m, 75 % ATK (8 manches) | collés 27 %, 4,8 m, **50 % ATK**, tués 211 / 212 |
+  | 20c20 auto (12 manches) | collés 52 %, 3,9 m, 67 % ATK (6 manches) | collés 32 %, 4,2 m, 33 % ATK (10 poses, 6 désamorcées) |
+  Bots CPU : 0,83 ms (10c10), 1,5 ms (20c20, contre 1,34 avant). À suivre : 20c20 penche DEF (reprises groupées fortes).
