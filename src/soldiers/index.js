@@ -10,6 +10,7 @@ import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { SoldierModel as ProceduralSoldier, DIM, RIM_K } from '../bots/model.js';
+import { createCrowd } from './crowd.js';
 
 export { DIM };
 export const TEAM_COLORS = { ATK: 0xc8372d, DEF: 0x2f7fe0 };
@@ -32,6 +33,7 @@ export const POSE_RATE = {
   crowd: { onscreen: [[LOD_DIST[0], 1], [45, 2], [90, 3], [Infinity, 4]], offscreen: [[12, 2], [40, 4], [Infinity, 6]] },
 };
 export const CROWD = 40;
+export const CROWD_INSTANCING = true; // crowd.js: LOD2 soldiers drawn instanced in big battles
 const SHADOW_FAR = 60; // m (camera distance, crowd only): beyond, no dynamic shadow
 const STALE_DIST = 40; // m: beyond, an off-screen soldier's skeleton is not carried between poses (its shadow is far away)
 let SLOT = 0;
@@ -150,7 +152,11 @@ function prepare(gltf) {
   const h1 = bone('DEF-head').getWorldPosition(new THREE.Vector3());
   const d = h1.sub(h0); // model frame (faces +Z) -> body frame (faces -Z): rotate PI around Y
   const deathAngle = Math.atan2(-d.x, -d.z);
-  return { scene, clips, teamMats, bodyMats, restHand, fingerPose, deathAngle };
+  // instanced far crowd (crowd.js): LOD2 body + rifle of the source model, base material and team colours
+  let lod2Body = null, lod2Rifle = null;
+  scene.traverse(o => { if (o.isSkinnedMesh && o.material?.name === 'Soldier' && /LOD2/.test(o.parent?.name || '')) lod2Body = o; if (o.isMesh && o.name === 'Rifle_LOD1') lod2Rifle = o; });
+  return { scene, clips, teamMats, bodyMats, restHand, fingerPose, deathAngle, merged, baseMat: mats.Soldier, lod2Body, lod2Rifle,
+    teamColors: TEAM_COLORS, rimColors: RIM, rimK: RIM_K, rimStrength: RIM_STRENGTH, crowds: new Map() };
 }
 
 // ---------------------------------------------------------------- small math helpers
@@ -167,6 +173,7 @@ function passLod(mode) {
     if (!s.root.parent?.parent) { live.delete(s); continue; } // disposed bot
     // shadow / AO passes also drop the armband and magazine meshes (2 of the 4 draw calls of a soldier, no visible effect)
     s.showLod(mode === 'shadow' ? 2 : mode === 'ao' ? Math.max(1, s.lod) : s.lod, !!mode);
+    s.crowd?.pass(mode);
   }
 }
 // rotate a bone by a world-space rotation q
@@ -291,6 +298,14 @@ class HDSoldier {
     live.add(this);
     const hooks = ctx?.scene && (ctx.scene.userData.passHooks ||= []);
     if (hooks && !hooks.includes(passLod)) hooks.push(passLod);
+    // instanced far crowd (one per scene)
+    if (ctx?.scene && CROWD_INSTANCING) {
+      if (!A.crowds.has(ctx.scene)) A.crowds.set(ctx.scene, createCrowd(A, ctx.scene));
+      this.crowd = A.crowds.get(ctx.scene);
+      this.crowdBones = this.lods[2].find(o => o.isSkinnedMesh)?.skeleton.bones; this.crowdRifle = this.rifleLods?.[1][0];
+      if (this.crowd && this.crowdBones && this.crowdRifle) this.crowd.add(this); else this.crowd = null;
+    }
+    this.inCrowd = false;
   }
 
   setTeam(team) {
@@ -324,21 +339,24 @@ class HDSoldier {
       this.cullSphere.center.copy(this.root.position).y += CULL_Y;
       this.offscreen = !_frustum.intersectsSphere(this.cullSphere);
     }
-    this.lod = l; if (l !== this.shown) this.showLod(l);
+    // big battle: a visible LOD2 soldier beyond SHADOW_FAR (no dynamic shadow there anyway) is drawn by the instanced
+    // crowd (crowd.js) instead of its own meshes; nearer ones keep their own meshes and shadow
+    const inCrowd = !!this.crowd && this.ctx.scene.userData.crowdOff !== true && live.size > CROWD && l === 2 && this.rawDist > SHADOW_FAR && !this.offscreen;
+    this.lod = l; if (l !== this.shown || inCrowd !== this.inCrowd) { this.inCrowd = inCrowd; this.showLod(l, false, true); }
+    this.crowd?.touch();
     // big battles: soldiers far from the camera stop casting into the dynamic shadow refresh (fewer rects to repair, fewer
     // shadow draw calls; a 2 m figure's shadow at 60+ m is a few pixels)
     const cast = !(live.size > CROWD && this.rawDist > SHADOW_FAR);
     if (cast !== this.cast) { this.cast = cast; this.root.traverse(o => { if (o.isMesh) o.castShadow = cast; }); }
   }
-  showLod(l, lite = false) {
-    if (l < 0 || (l === this.shown && lite === this.lite)) return;
+  showLod(l, lite = false, force = false) {
+    if (l < 0 || (l === this.shown && lite === this.lite && !force)) return;
     const changed = l !== this.shown; this.shown = l; this.lite = lite;
-    const band = this.armbandSet ||= new Set(this.armbands);
-    this.lods.forEach((arr, i) => arr.forEach(o => (o.visible = i === l && !(lite && band.has(o)))));
+    const band = this.armbandSet ||= new Set(this.armbands), crowd = this.inCrowd && l === 2; // crowd: drawn instanced
+    this.lods.forEach((arr, i) => arr.forEach(o => (o.visible = i === l && !crowd && !(lite && band.has(o)))));
     if (this.mag) this.mag.visible = this.magWant && !lite && l < 2; // magazine: not drawn beyond 30 m
-    if (!changed) return;
-    for (const o of this.lods[l]) if (o.bindMode === 'attached') o.bindMatrixInverse.copy(o.matrixWorld).invert();
-    if (this.rifleLods) this.rifleLods.forEach((arr, i) => arr.forEach(o => (o.visible = (l > 0 ? 1 : 0) === i)));
+    if (this.rifleLods) this.rifleLods.forEach((arr, i) => arr.forEach(o => (o.visible = (l > 0 ? 1 : 0) === i && !crowd)));
+    if (changed) for (const o of this.lods[l]) if (o.bindMode === 'attached') o.bindMatrixInverse.copy(o.matrixWorld).invert();
   }
 
   /** s: {pos, yaw, pitch, speed, moveX, moveZ, crouch, ready, reload(-1|0..1), headYaw, fired, dt} */
