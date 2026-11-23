@@ -1,16 +1,17 @@
 // Rotating minimap. Static layer (walls/props/sites) is pre-rendered once into an offscreen canvas
 // and rebuilt only if the collider set changes. Dynamic layer redrawn at ~30 Hz.
 const SIZE = 220;           // CSS px
-const PPM = 3.3;            // display pixels per meter (view radius ≈ 33 m)
+const PPM0 = 3.3;           // display pixels per meter at zoom 1 (view radius ≈ 33 m)
 
 export function createMinimap(ctx, canvas, zoneEl) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = canvas.height = Math.round(SIZE * dpr);
   const g = canvas.getContext('2d');
-  const S = PPM * dpr;      // offscreen pixels per meter
+  const S = PPM0 * dpr;     // offscreen pixels per meter
   let off = null, offOrigin = { x: 0, z: 0 }, offW = 0, offH = 0, sig = '';
   let acc = 1, sigTimer = 0, zoneTimer = 0, lastZone = null;
   const C = SIZE / 2, R = SIZE / 2;
+  let zoom = 1; // N: 1 = close (≈ 33 m), 0.36 = wide (≈ 90 m); the whole map is the tactical panel (bigmap.js)
 
   function signature() {
     const cols = ctx.world?.minimap?.colliders || ctx.physics?.colliders || [];
@@ -84,6 +85,7 @@ export function createMinimap(ctx, canvas, zoneEl) {
 
   function draw() {
     const p = ctx.player; if (!p) return;
+    const PPM = PPM0 * zoom;
     const yaw = p.yaw || 0, px = p.position.x, pz = p.position.z;
     const cs = Math.cos(yaw), sn = Math.sin(yaw);
     const toMini = (x, z, out) => { const dx = x - px, dz = z - pz; out.x = C + (dx * cs - dz * sn) * PPM; out.y = C + (dx * sn + dz * cs) * PPM; return out; };
@@ -121,7 +123,7 @@ export function createMinimap(ctx, canvas, zoneEl) {
     }
     // labels
     const labels = ctx.world?.minimap?.labels;
-    if (labels?.length) {
+    if (labels?.length && zoom === 1) { // wide zoom: street names would overlap
       g.font = '600 9px "Barlow Condensed", Rajdhani, sans-serif'; g.fillStyle = 'rgba(220, 235, 245, .55)';
       for (const l of labels) { toMini(l.x, l.z, pt); if (Math.hypot(pt.x - C, pt.y - C) < R - 14) g.fillText(String(l.text).toUpperCase(), pt.x, pt.y); }
     }
@@ -256,6 +258,7 @@ export function createMinimap(ctx, canvas, zoneEl) {
       }
     },
     rebuild() { sig = ''; sigTimer = 0; },
+    setZoom(z) { zoom = z; acc = 1; },
     get yaw() { return ctx.player?.yaw || 0; },
   };
 }

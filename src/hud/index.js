@@ -4,6 +4,7 @@
 import './hud.css';
 import { ICONS } from './icons.js';
 import { createMinimap } from './minimap.js';
+import { createBigMap } from './bigmap.js';
 import { createKillcam } from './killcam.js';
 import { createSpecView } from './specview.js';
 
@@ -29,7 +30,7 @@ function markup() {
     ['Z Q S D', 'Se déplacer', 'wide'], ['Souris', 'Regarder', 'wide'], ['Clic G', 'Tirer', 'wide'], ['Clic D', 'Viser (ADS)', 'wide'], ['R', 'Recharger'], ['1 / 2', 'Arme (préparation)'],
     ['G', 'Fumigène (maintenir)'], ['T', 'Flash (maintenir)'], ['Clic D', 'Lancer court', 'wide'],
     ['E', 'Poser / désamorcer'], ['F', 'Lampe (nuit)'], ['Cadavre', 'Munitions', 'wide'], ['Espace', 'Sauter', 'wide'], ['C', 'S\'accroupir'], ['Maj', 'Marcher'],
-    ['Tab', 'Scores'], ['M', 'Couper le son'], ['Échap', 'Pause'],
+    ['Tab', 'Scores'], ['N', 'Dézoomer la carte'], ['M', 'Couper le son'], ['Échap', 'Pause'],
   ].map(([k, l, w]) => `<div class="nv-key"><kbd class="${w || ''}">${k}</kbd>${l}</div>`).join('');
   const arcs = Array.from({ length: ARC_N }, () =>
     `<svg class="nv-arc" viewBox="0 0 340 340"><defs><radialGradient id="nvdg" cx="170" cy="170" r="${ARC_R}" gradientUnits="userSpaceOnUse">` +
@@ -172,6 +173,13 @@ export function createHud(ctx) {
   const killcam = (() => { try { return createKillcam(ctx, root, { esc, ICONS }); } catch (e) { console.warn('[hud] killcam', e); return null; } })();
   const specView = (() => { try { return createSpecView(ctx, root, { esc, ICONS }); } catch (e) { console.warn('[hud] specview', e); return null; } })();
   const minimap = (() => { try { return createMinimap(ctx, $('.nv-mm canvas'), $('.nv-mm-zone')); } catch (e) { console.warn('[hud] minimap', e); return null; } })();
+  const bigmap = (() => { try { return createBigMap(ctx, $('.nv-game') || root); } catch (e) { console.warn('[hud] bigmap', e); return null; } })();
+  // N: minimap zoom cycle — close → wide → whole map (bigmap panel) → close
+  let mapZoom = 0;
+  addEventListener('keydown', e => {
+    if (e.code !== 'KeyN' || e.repeat) return; const tg = e.target; if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA')) return;
+    mapZoom = (mapZoom + 1) % 3; minimap?.setZoom?.(mapZoom === 1 ? 0.36 : 1); bigmap?.show?.(mapZoom === 2);
+  });
   const isAlly = a => a && ctx.player && (ctx.game?.isAlly ? ctx.game.isAlly(a) : a.team === ctx.player.team);
   const stat = a => a.stats || tally.get(a) || { kills: 0, deaths: 0 };
   // HUD-side extra stats (game.stats has no assists / headshots): actor -> {assists, hs}; victim -> Set(attackers)
@@ -463,7 +471,8 @@ export function createHud(ctx) {
       return;
     }
     banner(atk ? 'atk' : 'def', `MANCHE ${round ?? g?.round ?? ''}`, atk ? 'ATTAQUE' : 'DÉFENSE',
-      (atk ? 'Posez la charge sur le site <b>A</b> ou <b>B</b>' : 'Protégez les sites <b>A</b> et <b>B</b>') + mp, 2.8);
+      (() => { const n = (ctx.world?.bombSites || []).map(s => `<b>${s.name}</b>`), last = n.pop() || '<b>A</b>', l = n.length ? n.join(', ') : '';
+        return atk ? `Posez la charge sur le site ${l ? l + ' ou ' : ''}${last}` : `Protégez ${l ? 'les sites ' + l + ' et ' : 'le site '}${last}`; })() + mp, 2.8);
   });
   ev.on('round:end', ({ weWon, reason, mvp, matchOver, caps } = {}) => {
     if (matchOver) return; // match:end shows its own banner
@@ -746,6 +755,8 @@ export function createHud(ctx) {
     updateTags(dt);
     killcam?.update(dt);
     if (!ctx.paused || menuMode !== 'main') minimap?.update?.(dt);
+    bigmap?.update?.(dt);
+    if (memo(root, 'bigmap', !!bigmap?.open)) root.classList.toggle('is-bigmap', !!bigmap?.open);
   }
   let matchExitScheduled = false;
 
