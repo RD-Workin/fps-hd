@@ -11,7 +11,8 @@ Mesure : touche **F3** en jeu (ou `?fps` dans l'URL) → i/s, ms/image, draw cal
 Enveloppes par image (HAUTE, 1080p) :
 - Draw calls ≤ **400** (BASSE ≤ 250) · triangles ≤ **1,5 M** (BASSE ≤ 700 k)
 - Bots ≤ **2 ms** CPU — mesuré 0,56 ms en 10c10 et 1,17 ms en 20c20 (39 bots, IA + animation, Chromium headless, Citadelle)
-- Effectifs réglables dans le menu (0–19 alliés, 1–20 adversaires) ; avertissement au-delà de 25 acteurs, « très lourd » au-delà de 33
+- Bots en 40c40 (79 bots, grande carte) ≤ **3 ms** CPU en moyenne, p95 ≤ 5 ms
+- Effectifs réglables dans le menu (0–39 alliés, 1–40 adversaires, boutons 5c5 / 10c10 / 20c20 / 40c40) ; avertissement au-delà de 25 acteurs, « lourd » au-delà de 33, « grande bataille » au-delà de 60
 - Post-traitement ≤ 4 ms GPU en HAUTE (AO + bloom + AA), BASSE : AA seul
 - Ombres : carte statique mise en cache (pas de re-rendu par image) ; en HAUTE, rafraîchissement partiel des seules zones touchées par les ombres mobiles (voir plus bas)
 - Pixel ratio : BASSE ≤ 1,0 · HAUTE ≤ 1,5 (jamais `devicePixelRatio` brut sur écran Retina/4K)
@@ -49,3 +50,28 @@ Ce qui a changé (aucun réglage visuel touché ; captures avant/après identiqu
 - **Préchauffage des shaders** au menu (`renderer.compileAsync`) : plus de gel au premier tir / impact / explosion.
 - **Résolution dynamique** (HAUTE, écrans HiDPI seulement) : si l'image dépasse ~20 ms pendant 2 s, le sur-échantillonnage
   baisse par pas de 0,25 (jamais sous 1,0 = résolution native) et remonte après 10 s calmes. Visible dans F3 (`px`).
+
+## Passe 40c40 (nov. 2026) — grande bataille sur la grande carte
+
+Bancs : `scripts/perf/cpu.cjs` (CPU par module, rendu coupé), `scripts/perf/split.cjs` (bots : animation / A* / perception
+par image + pires images), `scripts/perf/profile.cjs` (profil CPU, fonctions les plus chères), `scripts/perf/passes.cjs`
+(draw calls / triangles par passe). Tous : `npx vite build && npx vite preview --port 4173` puis `node scripts/perf/<x>.cjs
+http://localhost:4173/ 39 40 …` (`split.cjs 39 40 20` sans URL). Grande carte (branche h6ui6r), objectifs tirés au hasard.
+
+| 40c40, CPU des bots par image | avant | après |
+|---|---|---|
+| moyenne (cpu.cjs) | 5,07 ms | 2,33 ms (−54 %) |
+| p95 | 14,5 ms | 4,0 ms (−72 %) |
+| A* : pics sur une image | 14–17 ms | ≤ 6 ms |
+
+Le profil montrait l'animation des soldats à ~4× le coût de l'IA (mixer + IK + ~130 matrices par soldat et par image), et
+des A* traversant la carte (12 ms chacun) relancés à chaque image quand ils échouaient.
+- **LOD d'animation** (`soldiers/index.js`, `POSE_RATE`) : pose complète toutes les 1 à 6 images selon la distance
+  (corrigée du FOV) et la visibilité. Au-delà de 40 soldats (`CROWD`), la table « crowd » anime aussi 10–30 m à 30 Hz.
+  Les soldats sont échelonnés (une pose par image et par créneau, plus de pics une image sur deux). Entre deux poses, le
+  squelette suit la racine par une matrice par nœud (`carry`, vérifié identique à 1e-14 près à un recalcul complet) :
+  le déplacement reste fluide à 60 i/s, seuls les membres sont animés moins souvent.
+- **Squelettes gelés hors champ** : hors champ et à plus de 40 m, seules les hitbox suivent ; le soldat est masqué et
+  reposé dès qu'il revient dans le champ (sphère de test = sphère de culling des maillages, 2,3 m).
+- **Chemins** (`bots/pathcache.js`) : cache par cellule d'arrivée de 4 m (réutilisé si le bot voit l'un des 4 premiers
+  points en ligne droite, départ à moins de 6 m), cache des échecs 2 s, budget par image en ms (1,5 ms, 8 recherches max).

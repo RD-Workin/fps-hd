@@ -95,8 +95,9 @@ function markup() {
       <div class="nv-card"><h3>RÉGLAGES</h3><div class="nv-set">
         <label>Mode de jeu</label><div class="nv-seg nv-seg-mode" data-set="mode"><button data-v="sd">RECHERCHE &amp; DESTRUCTION</button><button data-v="ctf">CAPTURE DU DRAPEAU</button><button data-v="zombie">ZOMBIES</button></div>
         <label data-zm>Difficulté qui monte par</label><div class="nv-seg" data-zm data-set="zprog"><button data-v="count">NOMBRE</button><button data-v="speed">VITESSE</button><button data-v="both">LES DEUX</button></div>
-        <label>Bots alliés</label><div class="nv-range"><input type="range" data-set="allies" min="0" max="19" step="1"><output></output></div>
-        <label data-sd>Bots adverses</label><div class="nv-range" data-sd><input type="range" data-set="enemies" min="1" max="20" step="1"><output></output></div>
+        <label>Bots alliés</label><div class="nv-range"><input type="range" data-set="allies" min="0" max="39" step="1"><output></output></div>
+        <label data-sd>Bots adverses</label><div class="nv-range" data-sd><input type="range" data-set="enemies" min="1" max="40" step="1"><output></output></div>
+        <label data-sd>Effectifs rapides</label><div class="nv-seg" data-sd data-set="preset"><button data-v="5">5c5</button><button data-v="10">10c10</button><button data-v="20">20c20</button><button data-v="40">40c40</button></div>
         <div class="nv-perfwarn" data-sd></div>
         <label>Ambiance</label><div class="nv-seg" data-set="night"><button data-v="day">JOUR</button><button data-v="night">OPS DE NUIT</button></div>
         <label data-sd>Difficulté des ennemis</label><div class="nv-seg" data-sd data-set="skill"><button data-v="easy">RECRUE</button><button data-v="normal">NORMAL</button><button data-v="veteran">VÉTÉRAN</button></div>
@@ -143,7 +144,7 @@ export function createHud(ctx) {
     sb: $('.nv-sb'), sbMeta: $('.nv-sb .meta'), sbTb: $('.nv-sb .tb'), menu: $('.nv-menu'), note: $('.nv-note'), pinfo: $('.nv-pinfo'),
     sbEnd: $('.nv-sb-end'), sbEndMeta: $('.nv-sb-end .meta'), sbEndTb: $('.nv-sb-end .tb'), scoresBtn: $('[data-act="scores"]'),
     result: $('.nv-result'), statgrid: $('.nv-statgrid'), playBtn: $('[data-act="play"]'), restartBtn: $('[data-act="restart"]'),
-    mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), side: $('[data-set="side"]'), skill: $('[data-set="skill"]'), night: $('[data-set="night"]'), lamp: $('.nv-lamp'), subT: $('.nv-sub .sub-t'), allies: $('[data-set="allies"]'), enemies: $('[data-set="enemies"]'), perfwarn: $('.nv-perfwarn'), rtime: $('[data-set="rtime"]'), obj: $('[data-set="obj"]'), btime: $('[data-set="btime"]'),
+    mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), side: $('[data-set="side"]'), skill: $('[data-set="skill"]'), night: $('[data-set="night"]'), lamp: $('.nv-lamp'), subT: $('.nv-sub .sub-t'), allies: $('[data-set="allies"]'), enemies: $('[data-set="enemies"]'), perfwarn: $('.nv-perfwarn'), preset: $('[data-set="preset"]'), rtime: $('[data-set="rtime"]'), obj: $('[data-set="obj"]'), btime: $('[data-set="btime"]'),
     mode: $('[data-set="mode"]'), zprog: $('[data-set="zprog"]'), ccaps: $('[data-set="ccaps"]'), cmin: $('[data-set="cmin"]'), cstep: $('[data-set="cstep"]'), clives: $('[data-set="clives"]'),
     flags: $('.nv-flags'), flagUs: $('.nv-flags .us'), flagThem: $('.nv-flags .them'), deathK: $('.nv-death .k'), deathR: $('.nv-death .r'),
     bombLb: $('.nv-bombpill .lb'), tagLine: $('.nv-tag'), desc: $('.nv-desc'), legObj: $('.nv-sb-leg .obj'),
@@ -189,12 +190,14 @@ export function createHud(ctx) {
     try { ctx.world?.setQuality?.(settings.quality); } catch (e) { console.warn('[hud] setQuality', e); }
     for (const b of E.quality.children) b.classList.toggle('on', b.dataset.v === settings.quality);
     try { ctx.game?.setTeamSizes?.(settings.allies, settings.enemies); } catch (e) { console.warn('[hud] team sizes', e); }
-    for (const [el, v, mn, mx] of [[E.allies, settings.mode === 'zombie' ? settings.zallies : settings.allies, 0, 19], [E.enemies, settings.enemies, 1, 20]]) {
-      el.value = v; el.nextElementSibling.value = v; el.style.setProperty('--p', ((v - mn) / (mx - mn) * 100) + '%');
+    for (const [el, v, mn, mx] of [[E.allies, settings.mode === 'zombie' ? settings.zallies : settings.allies, 0, settings.mode === 'zombie' ? 19 : 39], [E.enemies, settings.enemies, 1, 40]]) {
+      el.max = mx; el.value = v; el.nextElementSibling.value = v; el.style.setProperty('--p', ((v - mn) / (mx - mn) * 100) + '%');
     }
     { const n = settings.allies + settings.enemies + 1; const t = `${settings.allies + 1} contre ${settings.enemies}`;
-      E.perfwarn.textContent = n > 32 ? `${t} — très lourd : réservé aux PC puissants (qualité BASSE conseillée)` : n > 24 ? `${t} — peut ramer sur un PC modeste` : t;
-      E.perfwarn.classList.toggle('warn', n > 24); }
+      // 40c40: bots far from the player think less often and are drawn simplified (docs/decisions/scale.md)
+      E.perfwarn.textContent = n > 60 ? `${t} — grande bataille : IA et soldats lointains simplifiés, qualité BASSE conseillée sur PC portable` : n > 32 ? `${t} — lourd : réservé aux PC puissants (qualité BASSE conseillée)` : n > 24 ? `${t} — peut ramer sur un PC modeste` : t;
+      E.perfwarn.classList.toggle('warn', n > 24);
+      for (const b of E.preset.children) b.classList.toggle('on', +b.dataset.v === settings.allies + 1 && +b.dataset.v === settings.enemies); }
     try { ctx.game?.setTimings?.(settings.rtime || null, settings.btime || null); } catch (e) { console.warn('[hud] timings', e); }
     try { ctx.game?.setObjectiveMode?.(settings.obj); } catch (e) { console.warn('[hud] objectives', e); }
     for (const b of E.obj.children) b.classList.toggle('on', b.dataset.v === settings.obj);
@@ -257,6 +260,7 @@ export function createHud(ctx) {
   E.zprog.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.zprog = v; save(settings); applySettings(); if (ctx.game?.started && zmode()) toast('Appliqué à partir de la prochaine vague'); } });
   E.sens.addEventListener('input', () => { settings.sens = +E.sens.value; save(settings); applySettings(); });
   for (const k of ['allies', 'enemies']) E[k].addEventListener('change', () => { settings[k === 'allies' && settings.mode === 'zombie' ? 'zallies' : k] = +E[k].value; save(settings); applySettings(); if (ctx.game?.started) toast('Effectifs appliqués à la prochaine partie (Recommencer)'); });
+  E.preset.addEventListener('click', e => { const n = +e.target.closest('button')?.dataset.v; if (!n) return; settings.allies = n - 1; settings.enemies = n; save(settings); applySettings(); if (ctx.game?.started) toast('Effectifs appliqués à la prochaine partie (Recommencer)'); });
   for (const k of ['allies', 'enemies']) E[k].addEventListener('input', () => { E[k].nextElementSibling.value = E[k].value; });
   for (const [k, auto] of [['rtime', 45], ['btime', 20]]) E[k].addEventListener('input', () => { const v = +E[k].value; settings[k] = v <= auto ? 0 : v; save(settings); applySettings(); });
   for (const k of ['rtime', 'btime']) E[k].addEventListener('change', () => { if (ctx.game?.started) toast('Durées appliquées à la prochaine manche'); });
