@@ -141,3 +141,8 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
 - Perf : `autoRoutes` en cache pour toute la partie (par grille de nav, départ arrondi à 20 m) et précalculées pendant le gel
   (`squads.warmRoutes`, un jeu par tick) : plus de pic d'A* au go en 40c40.
 - Banc : 10c10 auto 50 % ATK (24 manches, tués 183/172), 20c20 auto 42 % (12 manches, avant 25 %).
+- Itération 7 : défenseur seul sur un site débordé (≥ 3 attaquants vus, ≤ 1 défenseur) → repli à ~24 m vers ses postes,
+  caché (`fallbackSpot`), en attendant la reprise. Après la pose, postes ATK `guardAround(.., 'post')` : 7-18 m, à couvert,
+  de préférence de l'autre côté de la bombe par rapport à la reprise ; défusage entendu → les 3 attaquants les plus
+  proches (< 40 m) foncent sur la bombe. **Variance du banc** : en 20c20, 16 manches donnent ±20 points d'une série à
+  l'autre ; décider sur ≥ 32 manches. 20c20 auto, 32 manches : 22 % → 31 % ATK avec la ruée au défusage.
