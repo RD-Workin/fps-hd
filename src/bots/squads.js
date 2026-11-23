@@ -44,17 +44,18 @@ export class Squads {
     groups.sort((a, b) => (b.includes(carrier) ? 1 : 0) - (a.includes(carrier) ? 1 : 0));
     const teams = [], laneUse = {};
     P.laneShift ??= Math.floor(Math.random() * 4);
-    const nT = groups.length;
+    const nT = groups.length, cen = g => ({ x: g.reduce((a, b) => a + b.position.x, 0) / g.length, z: g.reduce((a, b) => a + b.position.z, 0) / g.length });
+    let farK = -1, farD = 110; // a team that landed > 110 m from the main site is the natural pressure team
+    groups.forEach((g, k) => { if (g.length && !g.includes(carrier)) { const d = hd(cen(g), site.center); if (d > farD) { farD = d; farK = k; } } });
     groups.forEach((g, k) => {
       if (!g.length) return;
       const from = { x: g.reduce((a, b) => a + b.position.x, 0) / g.length, z: g.reduce((a, b) => a + b.position.z, 0) / g.length };
       let tgt = site;
-      // balance: with 3+ teams, the last one (not the carrier's) pressures another site; 5+ teams: a second one too
       const hasCarrier = carrier && g.includes(carrier);
       const near = [...B.sites()].sort((a, b) => hd(from, a.center) - hd(from, b.center))[0];
-      if (!hasCarrier && near && near !== site && hd(from, site.center) > 110 && hd(from, site.center) > hd(from, near.center) * 1.8) tgt = near; // too far: pressure the nearest site
-      else if (!hasCarrier && others.length && nT >= 3 && k === nT - 1) tgt = [...others].sort((a, b) => hd(from, a.center) - hd(from, b.center))[0];
-      else if (!hasCarrier && others.length > 1 && nT >= 5 && k === nT - 2) tgt = [...others].sort((a, b) => hd(from, a.center) - hd(from, b.center))[1];
+      // concentration of force: only ONE team (the farthest from the main site, 3+ teams) pressures another site
+      if (!hasCarrier && nT >= 3 && k === farK && near && near !== site) tgt = near;
+      else if (farK < 0 && !hasCarrier && others.length && nT >= 3 && k === nT - 1) tgt = [...others].sort((a, b) => hd(from, a.center) - hd(from, b.center))[0];
       const hand = (routes[tgt.name] || []).filter(l => hd({ x: l[0][0], z: l[0][1] }, from) < 30);
       const lanes = hand.length ? hand : B.autoRoutes(from, tgt);
       const u = laneUse[tgt.name] = (laneUse[tgt.name] ?? -1) + 1; // teams on the same site take different streets

@@ -11,7 +11,7 @@ export class Brain {
     const sites = this.sites();
     this.plan = { liveAt: null, squads: null, member: new Map(), site: sites.length ? sites[Math.random() * sites.length | 0].name : null, via: new Map(), viaDone: new Set(), plantPt: null, roles: null, crouch: new Map() };
     this.threat = {}; for (const s of sites) this.threat[s.name] = -100; this.guardCache = new Map();
-    for (const b of this.mgr?.list || []) b.squad = undefined;
+    for (const b of this.mgr?.list || []) { b.squad = undefined; b._lurk = null; }
   }
   sites() { return this.ctx.world?.bombSites || []; }
   fy(x, z) { return this.ctx.world?.nav?.floorAt?.(x, z) ?? 0; }
@@ -83,6 +83,12 @@ export class Brain {
       const spots = this.guardAround(bomb.position, 'atk');
       // half watch the retake lanes (outward, where the defenders come from), half deny the defuse (look at the bomb)
       list.forEach((b, i) => {
+        // far away (pressure teams on the big map): don't cross the map one by one; hold and cut the rotations there
+        if (bomb.state === 'planted' && hd(b.position, bomb.position) > 60) {
+          b._lurk ||= { x: b.position.x, z: b.position.z };
+          b.goal = { x: b._lurk.x, z: b._lurk.z, tol: 2, speed: 'tac', look: bomb.position, crouch: true, anchor: b._lurk, huntRange: 14 };
+          return;
+        }
         const s = spots[i % spots.length], dx = s.x - bomb.position.x, dz = s.z - bomb.position.z, L = Math.hypot(dx, dz) || 1;
         const look = i % 2 === 0 ? { x: s.x + dx / L * 12, z: s.z + dz / L * 12 } : bomb.position;
         b.goal = { ...s, tol: 0.8, speed: 'run', look, crouch: i % 2 === 0, anchor: s, huntRange: 10 };
