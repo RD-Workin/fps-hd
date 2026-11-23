@@ -5,6 +5,7 @@ import { Bot, DIFFICULTY } from './bot.js';
 import { SKILLS, SKILL_IDS } from './skill.js';
 import { Brain } from './brain.js';
 import { createBotLamps } from './lamps.js';
+import { wrapPathCache, takePathBudget, PATH_BUDGET } from './pathcache.js';
 export { DIFFICULTY, SKILLS, SKILL_IDS };
 
 const _oc = new THREE.Vector3();
@@ -41,7 +42,7 @@ export function createBots(ctx) {
     // up to 3 A* per frame, but stop once ~2 ms went into path-finding this frame (long cross-map paths at round start
     // used to stack 3 x 6 ms in one frame = visible hitch); a bot that waits a frame keeps following its previous path
     pathSpent: 0,
-    takePathBudget() { if (this.budget <= 0 || this.pathSpent > 2) return false; this.budget--; return true; },
+    takePathBudget() { return takePathBudget(this); }, // pathcache.js (perf / 40c40)
     // difficulty: the team facing the player plays `level`, the player's own team always 'normal'
     level: 'normal',
     skillForTeam(team) { const pt = ctx.player?.team; return pt && team !== pt ? SKILLS[this.level] : SKILLS.normal; },
@@ -73,7 +74,7 @@ export function createBots(ctx) {
     if (mgr.nav && cols.length === mgr.navCount) return;
     let b = ctx.world?.bounds;
     if (!b) { b = { minX: -60, maxX: 60, minZ: -50, maxZ: 50 }; }
-    mgr.nav = new NavGrid(cols, b, { cell: 0.5, radius: 0.4 }); mgr.navCount = cols.length;
+    mgr.nav = wrapPathCache(new NavGrid(cols, b, { cell: 0.5, radius: 0.4 })); mgr.navCount = cols.length;
     mgr.nav.setLinks(findLinks(ctx, mgr.nav));
     mgr.nav.setLayers?.(storeyLayers(ctx.world?.nav?.storeys));
     brain.spotCache.clear();
@@ -104,7 +105,7 @@ export function createBots(ctx) {
     },
     update(dt) {
       ensureNav();
-      mgr.budget = 3; mgr.pathSpent = 0;
+      mgr.budget = PATH_BUDGET.count; mgr.pathSpent = 0;
       brain.update(dt);
       for (const b of mgr.list) b.update(dt);
       mgr.lamps.update(dt);
