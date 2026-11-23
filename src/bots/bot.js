@@ -214,7 +214,7 @@ export class Bot {
       if (lk) {
         const dx = this.position.x - lk.x, dz = this.position.z - lk.z, n = Math.hypot(dx, dz) || 1, nav = this.mgr.nav;
         let sx = dx / n + (this.blindJitter || 0) * 0.6, sz = dz / n;
-        if (nav && !nav.isWalkable(this.position.x + sx, this.position.z + sz)) { const tx = sx; sx = -sz; sz = tx; }
+        if (nav && !nav.isWalkable(this.position.x + sx, this.position.z + sz, this.position.y)) { const tx = sx; sx = -sz; sz = tx; }
         dest = { x: this.position.x + sx * 2, z: this.position.z + sz * 2, direct: true }; speed = D.crouch; faceMove = false;
       }
       crouch = this.blindAmt > 0.5;
@@ -240,7 +240,7 @@ export class Bot {
             let sx = -dz / n * this.strafeDir, sz = dx / n * this.strafeDir;
             if (dist > 28) { sx += dx / n * 0.6; sz += dz / n * 0.6; } // close distance a bit
             const nav = this.mgr.nav;
-            if (nav && !nav.isWalkable(this.position.x + sx * 0.9, this.position.z + sz * 0.9)) { this.strafeDir *= -1; sx = -sx; sz = -sz; }
+            if (nav && !nav.isWalkable(this.position.x + sx * 0.9, this.position.z + sz * 0.9, this.position.y)) { this.strafeDir *= -1; sx = -sx; sz = -sz; }
             dest = { x: this.position.x + sx * 2, z: this.position.z + sz * 2, direct: true }; speed = D.walk; faceMove = false;
           }
         }
@@ -255,7 +255,7 @@ export class Bot {
       } else if (goal) {
         if (!(goal.use && this.inUseRange(goal))) { dest = goal; speed = goal.speed === 'walk' ? D.walk : goal.speed === 'tac' ? D.tac : D.run; }
         if (goal.watch) { look = goal.watch; faceMove = false; } // fire-team sector: weapon up toward it while moving
-        const arrived = Math.hypot(goal.x - this.position.x, goal.z - this.position.z) < (goal.tol ?? 1.0);
+        const arrived = Math.hypot(goal.x - this.position.x, goal.z - this.position.z) < (goal.tol ?? 1.0) && (goal.y == null || Math.abs(goal.y - this.position.y) < 1.5); // storeys: same xz, other floor
         if (arrived) { dest = null; crouch = !!goal.crouch; if (goal.look) { look = goal.look; faceMove = false; } }
         if (!arrived && goal.look && Math.hypot(goal.x - this.position.x, goal.z - this.position.z) < 6) { look = goal.look; faceMove = false; }
         if (t - this.alertT < 3 && this.lastKnown) { look = this.lastKnown; faceMove = false; }
@@ -425,10 +425,10 @@ export class Bot {
   followPath(dest) {
     const nav = this.mgr.nav; if (!nav) return dest;
     const t = this.ctx.time;
-    const changed = !this.pathGoal || Math.hypot(this.pathGoal.x - dest.x, this.pathGoal.z - dest.z) > 1.2;
+    const changed = !this.pathGoal || Math.hypot(this.pathGoal.x - dest.x, this.pathGoal.z - dest.z) > 1.2 || Math.abs((this.pathGoal.y ?? 0) - (dest.y ?? 0)) > 1.5;
     if ((changed || !this.path || t > this.repathT) && this.mgr.takePathBudget()) {
-      const tp = performance.now(); this.path = nav.findPath(this.position.x, this.position.z, dest.x, dest.z); this.pathI = 0; this.mgr.pathSpent += performance.now() - tp;
-      this.pathGoal = { x: dest.x, z: dest.z }; this.repathT = t + rand(2.5, 4);
+      const tp = performance.now(); this.path = nav.findPath(this.position.x, this.position.z, dest.x, dest.z, undefined, undefined, this.position.y, dest.y); this.pathI = 0; this.mgr.pathSpent += performance.now() - tp;
+      this.pathGoal = { x: dest.x, z: dest.z, y: dest.y }; this.repathT = t + rand(2.5, 4);
     }
     if (!this.path || !this.path.length) return changed ? null : dest;
     while (this.pathI < this.path.length - 1 && Math.hypot(this.path[this.pathI].x - this.position.x, this.path[this.pathI].z - this.position.z) < 0.45) this.pathI++;

@@ -28,8 +28,17 @@ régulièrement (`git fetch origin claude/project-thread-h6ui6r && git merge FET
     Sites C/D : pas de holds faits main → `brain.holdSpots` les calcule.
 - Spawns : ATK = insertions côtières (`ouest` port de pêche, `port` Citadelle, `est` quai de fret), DEF = postes par site
   (D Rue Haute, C Place de la Gare, A/B cour de la citadelle). Ombres ajustées à la région des sites actifs.
-- Étages superposés (à venir, étape 2) : l'API `floorAt(x, z)` deviendra `floorAt(x, z, y?)` (y = hauteur courante pour
-  choisir l'étage) ; le `NavGrid` gagnera des couches. Je préviendrai ici avant de changer une signature.
+- Étages superposés (fait, `src/world/storeys.js`) : 6 maisons (`marche` site D, `pecheurs`, `remparts`, `aiguillage`,
+  `depot`, `capitainerie`), 2-3 étages + toit-terrasse, escaliers en lacets, fenêtres à chaque étage.
+  - `world.nav.floorAt(x, z, y?)` : avec `y`, renvoie le plancher de l'étage où l'on est (sinon comme avant).
+  - `world.nav.highHolds` : `{x, z, y, yaw, high: true, roof?, house}` (fenêtres d'étage + coins de toit) ;
+    `world.nav.holdsHigh[site]` = ceux à < 50 m du site.
+  - Nav bots : `nav.findPath(sx, sz, gx, gz, maxIter?, penalty?, sy?, gy?)` enchaîne les grilles d'étage par les escaliers
+    (points `hard: true`). `isWalkable/clearance/snap/los/randomPointNear` prennent un `y` optionnel en dernier argument.
+    **Un but d'étage doit porter `y`** (`goal = {x, z, y, ...}`) : bot.js passe `this.position.y` / `dest.y` et l'arrivée
+    exige |Δy| < 1,5 m quand `goal.y` est défini.
+  - Trajets > 60 m : A* pondéré (×1,6) et budget 150 000 itérations (traversée complète ≈ 8-17 ms, une fois, puis cache).
+  - Tests : `scripts/perf/climbtest.cjs` (6 bots montent sur les 6 toits puis redescendent), `scripts/perf/pathtest.cjs`.
 
 ## Jeu (R&D)
 - `game.objectiveMode` 'auto' | 'classic' | '2' | '3' | '4' (`setObjectiveMode`) ; auto : 2 sites ≤ 12 par camp, 3 ≤ 25, 4 au-delà.

@@ -1,7 +1,7 @@
 // World module — "Citadelle de Port-Cassis": 10v10 terraced harbour town on 3 levels. Contract: ARCHITECTURE.md + world.md.
 import * as THREE from 'three';
 import { buildTextures } from './textures.js';
-import { Geo, grime, sway, groundMaterial } from './build.js';
+import { Geo, grime, sway, groundMaterial, col } from './build.js';
 import { BOUNDS, CORE_BOUNDS, SPAWNS, LABELS, NAV, CTF, GX0, GZ0, GW, GH, CELL } from './layout.js';
 import { ALL_SITES, INSERTIONS, POSTS, OBJECTIVES, REGION } from './grand.js';
 import { createTerrain, buildTerrain } from './terrain.js';
@@ -13,6 +13,7 @@ import { dressGrand } from './grandZones.js';
 import { extendKit } from './kit2.js';
 import { buildAtmosphere, buildDistant, buildDust, buildComposer } from './env.js';
 import { createShadowCache } from './shadowCache.js';
+import { buildStoreys, storeyFloorAt, HOUSE_HOLDS } from './storeys.js';
 import { createNight } from './night.js';
 
 export function createWorld(ctx) {
@@ -52,7 +53,7 @@ export function createWorld(ctx) {
   const navColliders = [];
   function addSolid(box, material, o = {}) {
     if (!o.navOnly) physics.add(box, material, null);
-    if (o.floor) return;
+    if (o.floor || o.noNav) return;
     const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
     const f = T.floorAt(cx, cz);
     let h = o.navH ?? (f == null ? 12 : box.max.y - f);
@@ -63,6 +64,10 @@ export function createWorld(ctx) {
   // ---------- content ----------
   buildTerrain(T, G, addSolid);
   buildBuildings(G, T, addSolid);
+  const B3 = a => new THREE.Box3(new THREE.Vector3(a[0], a[1], a[2]), new THREE.Vector3(a[3], a[4], a[5]));
+  const storeyNav = buildStoreys(G, addSolid, B3, col);
+  // floor under (x, z): with a height y, the storey of a multi-storey house the actor stands on (else the terrain)
+  const floorAt = (x, z, y) => storeyFloorAt(x, z, y) ?? T.floorAt(x, z);
   const K = extendKit(createKit(G, Tx, T, physics, addSolid, scene));
   buildShip(K); dressZones(K); dressGrand(K);
   const { waterMat } = K.finish();
@@ -171,8 +176,11 @@ export function createWorld(ctx) {
     allSites, objectives: OBJECTIVES, objective: { sites: ['A', 'B'], insertion: ['port'] },
     setObjectives,
     ctf: { bases: { ATK: V3(...CTF.bases.ATK), DEF: V3(...CTF.bases.DEF) }, lanes: CTF.lanes }, // Capture du drapeau
-    minimap: { labels: LABELS, colliders: navColliders, floorAt: T.floorAt },
-    nav: { ...NAV, colliders: navColliders, floorAt: T.floorAt, grid: { x0: GX0, z0: GZ0, w: GW, h: GH, cell: CELL, rows: T.g.map(r => r.join('')) } },
+    minimap: { labels: LABELS, colliders: navColliders, floorAt },
+    // storeys: per house {house, layers:[{k, y, rect, blocks}], portals:[{k, bottom, top}]} (bots/nav.js setLayers)
+    // highHolds: window / roof positions {x, z, y, yaw, high, roof?, house} ; holdsHigh[site] = those within 50 m of a site
+    nav: { ...NAV, colliders: navColliders, floorAt, storeys: storeyNav, highHolds: HOUSE_HOLDS,
+      holdsHigh: Object.fromEntries(ALL_SITES.map(s => [s.name, HOUSE_HOLDS.filter(h => Math.hypot(h.x - s.x, h.z - s.z) < 50)])), grid: { x0: GX0, z0: GZ0, w: GW, h: GH, cell: CELL, rows: T.g.map(r => r.join('')) } },
     sun: atm.sun, quality, post, shadows: SH, // post / shadows: debug & perf bench access
     setQuality,
     // Ops de nuit: night lighting variant (see night.js). Changing it changes the light count -> shaders recompile:

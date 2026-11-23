@@ -1,11 +1,12 @@
 // "Citadelle de Port-Cassis" — 10v10 S&D map on 3 ground levels (0 port, +3 ville haute, +6 citadelle).
 // The map is authored as a 2 m cell grid carved out of solid buildings. See docs/decisions/world.md.
 import { GRAND_CARVES, ROOMS, ROOM_WALLS, GRAND_LABELS, GRAND_CHOKES } from './grand.js';
+import { HOUSES, HCHAR, HOUSE_WALLS } from './storeys.js';
 export const CELL = 2, GX0 = -176, GZ0 = -64, GW = 176, GH = 64; // x[-176,176] z[-64,64] (grand map, see grand.js)
 // Cell codes: '#' building, '.' floor 0, ';' +1.5, ',' +3, '=' +4.5, ':' +6, covered floors (room / passage under a
 // building mass): 'c' 0, 'e' +1.5, 'C' +3. Stairs '^' 'v' '>' '<' rise toward -z / +z / +x / -x. 'w' sea.
 // A 1.5 m drop between two floors has no railing: players can jump up it (jump apex ~1.2 m + 0.45 step-up), bots can't.
-export const LEVEL = { '.': 0, 'c': 0, 'H': 0, ';': 1.5, 'e': 1.5, ',': 3, 'C': 3, '=': 4.5, ':': 6 };
+export const LEVEL = { '.': 0, 'c': 0, 'H': 0, 'h': 0, 'i': 1.5, 'I': 3, ';': 1.5, 'e': 1.5, ',': 3, 'C': 3, '=': 4.5, ':': 6 };
 export const COVERED = { c: 0, e: 1.5, C: 3, H: 0 }; // 'H' = tall hall (grand.js HALL_CEIL)
 export const BOUNDS = { minX: -176, maxX: 176, minZ: -64, maxZ: 56 };
 export const CORE_BOUNDS = { minX: -80, maxX: 80, minZ: -64, maxZ: 56 }; // the Citadelle (zombie mode stays there)
@@ -57,6 +58,7 @@ const CARVES = [
   ['^', 56, 62, -28, -22],                                 // B -> Bastion
   ...GRAND_CARVES,
   ...ROOMS.map(r => [r.ch, r.x0, r.x1, r.z0, r.z1]),
+  ...HOUSES.map(h => [HCHAR[h.base], h.x0, h.x1, h.z0, h.z1]), // multi-storey houses (storeys.js): ground floor, no mass above
 ];
 
 // Thin walls with openings around rooms and galleries (centre line on a cell boundary). ax 'x': wall along x at z = p.
@@ -83,6 +85,7 @@ export const WALLS = [
   // Galerie de l'Abbaye (+3): arcade on the cloister garden
   { m: 'stone', ax: 'x', p: -16, a: -42, b: -26, y: 3, open: [[-41, -38, 'gate'], [-37, -34, 'gate'], [-33, -30, 'gate'], [-29, -26.6, 'gate']] },
   ...ROOM_WALLS,
+  ...HOUSE_WALLS,
 ];
 
 export function buildGrid() {
