@@ -91,14 +91,14 @@ export function dressGrand(K) {
 
   // --- faisceau de voies (0) with platforms (+1.5): tracks along x, parked freight trains (gaps = crossings)
   const TRACKS = [17, 6, -6, -17, -22.5];
-  for (const zc of TRACKS) track(82, 174, zc);
+  for (const zc of TRACKS) track(zc < -20 ? 92 : 82, 174, zc); // -22.5 starts after the Poste d'aiguillage
   // wagons: [x0, track z, kind]. Gaps between wagons (>= 2 m) are the ways across.
   const W = [
     [84, 17, 'cont'], [99, 17, 'hopper'], [123, 17, 'cont'], [139, 17, 'tank'], [155, 17, 'cont'],
     [86, 6, 'flat'], [125, 6, 'cont'], [148, 6, 'hopper'], [163, 6, 'flat'],
     [84, -6, 'hopper'], [97, -6, 'cont'], [127, -6, 'tank'], [152, -6, 'cont'],
     [90, -17, 'cont'], [105, -17, 'cont'], [124, -17, 'hopper'], [138, -17, 'cont'], [158, -17, 'tank'],
-    [86, -22.5, 'tank'], [132, -22.5, 'cont'], [150, -22.5, 'flat'],
+    [94, -22.5, 'tank'], [132, -22.5, 'cont'], [150, -22.5, 'flat'],
   ];
   for (const [x0, zc, kind] of W) wagon(x0, zc, kind);
   // platform furniture: canopies over the platforms, benches, lamps, luggage carts; SITE C (140, 0) on the central platform
@@ -117,8 +117,8 @@ export function dressGrand(K) {
   // signal gantries over the yard (decor, out of reach)
   for (const x of [114, 172]) { G.metal.box(x - 0.2, 0, -25.4, x + 0.2, 7.4, -25, col(0x5a5e60)); G.metal.box(x - 0.2, 0, 21, x + 0.2, 7.4, 21.4, col(0x5a5e60));
     G.metal.box(x - 0.25, 7, -25.4, x + 0.25, 7.5, 21.4, col(0x5a5e60)); solid(x - 0.2, 0, -25.4, x + 0.2, 7.4, -25, 'metal'); solid(x - 0.2, 0, 21, x + 0.2, 7.4, 21.4, 'metal'); }
-  for (let x = 90; x <= 170; x += 20) { G.metal.box(x - 0.08, 0, -26.6, x + 0.08, 6.8, -26.4, col(0x4b4f52)); } // catenary poles
-  wire(V(82, 6.6, -26.5), V(174, 6.6, -26.5), 0.4);
+  for (let x = 100; x <= 170; x += 20) { G.metal.box(x - 0.08, 0, -26.6, x + 0.08, 6.8, -26.4, col(0x4b4f52)); } // catenary poles
+  wire(V(92, 6.6, -26.5), V(174, 6.6, -26.5), 0.4);
 
   // --- Hall de la Gare (H, 7 m): pillars, benches, ticket counter, newsstand, departures board
   Floor(120, 166, -40, -28, 'tile', 0xd8d2c4);

@@ -75,6 +75,7 @@ export function createBots(ctx) {
     if (!b) { b = { minX: -60, maxX: 60, minZ: -50, maxZ: 50 }; }
     mgr.nav = new NavGrid(cols, b, { cell: 0.5, radius: 0.4 }); mgr.navCount = cols.length;
     mgr.nav.setLinks(findLinks(ctx, mgr.nav));
+    mgr.nav.setLayers?.(storeyLayers(ctx.world?.nav?.storeys));
     brain.spotCache.clear();
   }
 
@@ -128,6 +129,24 @@ export function createBots(ctx) {
   };
   if (typeof window !== 'undefined' && /[?&]bottest/.test(location.search)) import('./selftest.js').then(m => m.install(ctx));
   return bots;
+}
+
+// Multi-storey houses (world storeys.js): one small NavGrid per upper floor, walls along the inner rect, the stair hole and
+// the stair going up blocked (bots take stairs only through the portals). Portal k joins floor k (bottom) and k+1 (top).
+function storeyLayers(storeys) {
+  if (!storeys?.length) return null;
+  const box = (x0, z0, x1, z1, h = 1.6) => ({ box: { min: { x: x0, y: 0, z: z0 }, max: { x: x1, y: h, z: z1 } } });
+  return storeys.map(({ house: h, layers, portals }) => {
+    const rect = { x0: h.x0, x1: h.x1, z0: h.z0, z1: h.z1 }, floors = new Map(), H = { id: h.id, rect, floors, portals, base: h.base };
+    for (const L of layers) {
+      const r = L.rect, e = 0.05;
+      const cols = [box(r.x0 - 0.3, r.z0 - 0.3, r.x1 + 0.3, r.z0 + e), box(r.x0 - 0.3, r.z1 - e, r.x1 + 0.3, r.z1 + 0.3),
+        box(r.x0 - 0.3, r.z0, r.x0 + e, r.z1), box(r.x1 - e, r.z0, r.x1 + 0.3, r.z1), ...L.blocks.map(b => box(b.x0, b.z0, b.x1, b.z1))];
+      const grid = new NavGrid(cols, { minX: r.x0 - 0.5, maxX: r.x1 + 0.5, minZ: r.z0 - 0.5, maxZ: r.z1 + 0.5 }, { cell: 0.5, radius: 0.35 });
+      floors.set(L.k, { k: L.k, y: L.y, grid, rect: r, house: H });
+    }
+    return H;
+  });
 }
 
 // Jump / drop links between two floor levels (multi-level maps only): scan the grid for two walkable cells separated by a

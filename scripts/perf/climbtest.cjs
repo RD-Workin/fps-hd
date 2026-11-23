@@ -1,0 +1,22 @@
+// node scripts/perf/climbtest.cjs : each bot walks from the street to an upper-floor / roof hold of a house (storey nav check)
+const { chromium } = require('playwright');
+(async () => { const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-proxy-server'] });
+  const p = await b.newPage(); p.on('pageerror', e => console.log('ERR', e.message));
+  await p.route(u => !u.href.startsWith('http://localhost'), r => r.abort()); await p.goto('http://localhost:4173/', { waitUntil: 'commit' });
+  await p.waitForFunction(() => window.__ctx && window.__ctx.bots, null, { timeout: 120000 });
+  await p.evaluate(() => { const c = window.__ctx; c.world.render = () => {}; c.game.setTeamSizes(6, 1); c.game.start(); c.paused = false; c.player.frozen = true; c.player.position.set(0, -50, 200); });
+  await p.waitForFunction(() => window.__ctx.game.phase === 'live', null, { timeout: 60000 });
+  await p.evaluate(() => { const c = window.__ctx, H = c.world.nav.highHolds, houses = [...new Set(H.map(h => h.house))];
+    const bots = c.bots.list.filter(b => b.alive && b.team === c.player.team); c.bots.list.filter(b => b.team !== c.player.team).forEach(e => { e.frozen = true; e.position.set(0, 0, -20); }); window.__T = [];
+    bots.forEach((bot, i) => { const hs = H.filter(h => h.house === houses[i % houses.length]); const g = hs.find(h => h.roof) || hs[hs.length - 1];
+      const sx = g.x + (g.x > 0 ? -14 : 14), sz = g.z + 10, s = c.bots.nav.snap ? c.bots.nav.snap(sx, sz) : { x: sx, z: sz };
+      bot.position.set(s.x, c.world.nav.floorAt(s.x, s.z) ?? 0, s.z); bot.velocity?.set(0, 0, 0);
+      const goal = { x: g.x, z: g.z, y: g.y, tol: 0.8, speed: 'run' }; window.__T.push({ bot, goal, house: g.house, max: 0, start: { x: s.x, z: s.z, y: bot.position.y } });
+      Object.defineProperty(bot, 'goal', { get: () => goal, set: () => {}, configurable: true }); });
+    setInterval(() => { c.game.roundTimeLeft = 999; }, 50); setInterval(() => window.__T.forEach(t => { t.bot.frozen = false; t.max = Math.max(t.max, t.bot.position.y); t.target = t.bot.target = null; }), 100); });
+  await p.waitForTimeout(40000);
+  console.log(await p.evaluate(() => window.__T.map(t => `${t.house}: goal y${t.goal.y.toFixed(1)} at (${t.goal.x.toFixed(1)},${t.goal.z.toFixed(1)}) -> bot (${t.bot.position.x.toFixed(1)},${t.bot.position.y.toFixed(1)},${t.bot.position.z.toFixed(1)}) maxY ${t.max.toFixed(1)} ${Math.hypot(t.goal.x - t.bot.position.x, t.goal.z - t.bot.position.z) < 1.2 && Math.abs(t.goal.y - t.bot.position.y) < 1 ? 'OK' : 'FAIL'}`).join('\n')));
+  await p.evaluate(() => window.__T.forEach(t => { t.up = Math.hypot(t.goal.x - t.bot.position.x, t.goal.z - t.bot.position.z) < 1.2 && Math.abs(t.goal.y - t.bot.position.y) < 1; Object.assign(t.goal, t.start); }));
+  await p.waitForTimeout(40000);
+  console.log('down:'); console.log(await p.evaluate(() => window.__T.map(t => `${t.house}: back to street ${Math.hypot(t.goal.x - t.bot.position.x, t.goal.z - t.bot.position.z) < 1.2 && Math.abs(t.goal.y - t.bot.position.y) < 1 ? 'OK' : 'FAIL at ' + [t.bot.position.x, t.bot.position.y, t.bot.position.z].map(v => v.toFixed(1))}`).join('\n')));
+  await b.close(); })();
