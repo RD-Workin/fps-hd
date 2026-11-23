@@ -89,8 +89,10 @@ export class Brain {
           b.goal = { x: b._lurk.x, z: b._lurk.z, tol: 2, speed: 'tac', look: bomb.position, crouch: true, anchor: b._lurk, huntRange: 14 };
           return;
         }
-        const s = spots[i % spots.length], dx = s.x - bomb.position.x, dz = s.z - bomb.position.z, L = Math.hypot(dx, dz) || 1;
-        const look = i % 2 === 0 ? { x: s.x + dx / L * 12, z: s.z + dz / L * 12 } : bomb.position;
+        // one guard denies the defuse (eyes on the bomb), the others face where the retake will come from: the freshest
+        // defenders seen within 80 m, else the defenders' posts
+        const s = spots[i % spots.length], th = this.retakeDir(bomb.position), dx = th.x - s.x, dz = th.z - s.z, L = Math.hypot(dx, dz) || 1;
+        const look = i === 1 ? bomb.position : { x: s.x + dx / L * 12, z: s.z + dz / L * 12 };
         b.goal = { ...s, tol: 0.8, speed: 'run', look, crouch: i % 2 === 0, anchor: s, huntRange: 10 };
       });
       return;
@@ -115,8 +117,19 @@ export class Brain {
     const botCarrier = carrier && !carrier.isPlayer && rest.has(carrier) ? carrier : null;
     if (botCarrier) rest.delete(botCarrier);
     if (bomb.state === 'dropped' && bomb.position) {
-      const near = [...rest].sort((a, b) => hd(a.position, bomb.position) - hd(b.position, bomb.position)).slice(0, 2);
-      for (const b of near) { b.goal = { x: bomb.position.x, z: bomb.position.z, tol: 0.2, speed: 'run', noHunt: true }; rest.delete(b); }
+      // the closest one recovers it, a second one only if the first is far; bots within 30 m cover the pickup
+      const near = [...rest].sort((a, b) => hd(a.position, bomb.position) - hd(b.position, bomb.position));
+      const fetch = near.slice(0, near[0] && hd(near[0].position, bomb.position) > 25 ? 2 : 1);
+      for (const b of fetch) { b.goal = { x: bomb.position.x, z: bomb.position.z, tol: 0.2, speed: 'run', noHunt: true }; rest.delete(b); }
+      const cover = near.slice(fetch.length).filter(b => hd(b.position, bomb.position) < 30);
+      if (cover.length) {
+        const spots = this.guardAround(bomb.position, 'atk');
+        cover.forEach((b, i) => {
+          const s = spots[i % spots.length], dx = s.x - bomb.position.x, dz = s.z - bomb.position.z, L = Math.hypot(dx, dz) || 1;
+          b.goal = { x: s.x, z: s.z, tol: 1, speed: 'run', look: { x: s.x + dx / L * 12, z: s.z + dz / L * 12 }, crouch: true, anchor: s, huntRange: 10 };
+          rest.delete(b);
+        });
+      }
     }
     // player carrier: the 2 closest bots escort him (bot carriers walk inside their fire-team instead)
     if (carrier?.isPlayer) {
@@ -135,12 +148,23 @@ export class Brain {
       const t = P.member.get(botCarrier), mates = t ? t.members.filter(b => b !== botCarrier && b.alive && rest.has(b)) : [];
       const plant = { x: P.plantPt.x, z: P.plantPt.z, tol: 0.5, speed: 'run', kind: 'plant', use: true, noCover: hd(botCarrier.position, site.center) < site.radius + 3, noHunt: true };
       const inSite = hd(botCarrier.position, site.center) < site.radius + 6, late = (game.roundTimeLeft ?? 99) < 40;
-      if (!t || t.site !== site || !mates.length || inSite || late || (t.state === 'go' && now > t.goAt + 1.2)) botCarrier.goal = plant;
+      // the bomb goes in once the first wave holds the site (a mate inside and no fresh contact), or 8 s after the go
+      const cleared = t && mates.some(b => hd(b.position, site.center) < site.radius + 4) && !(t.contact && now - t.contact.t < 2);
+      if (!t || t.site !== site || !mates.length || inSite || late || (t.state === 'go' && now > t.goAt + 1.2 && (cleared || now > t.goAt + 8))) botCarrier.goal = plant;
       else if (t.state === 'stage' || t.state === 'go') { // the bomb comes in behind the first wave
         const s = t.stage || site.center;
         botCarrier.goal = { x: s.x, z: s.z, tol: 2.5, speed: 'run', noHunt: true, crouch: true, look: site.center, exact: true };
       } else if (!botCarrier.goal?.formation) botCarrier.goal = plant; // (moving: squads.follow placed it in the column)
     }
+  }
+
+  retakeDir(bp) {
+    const P = this.plan, now = this.ctx.time;
+    if (P.rdir && now - P.rdir.t < 1.5) return P.rdir;
+    let x = 0, z = 0, n = 0;
+    for (const [e, i] of this.mgr.intel.ATK) if (e.alive && now - i.t < 10 && hd(i.pos, bp) < 80 && hd(i.pos, bp) > 6) { x += i.pos.x; z += i.pos.z; n++; }
+    const c = n ? { x: x / n, z: z / n } : this.spawnCenter('DEF');
+    return (P.rdir = { x: c.x, z: c.z, t: now });
   }
 
   // ------------------------------------------------------------ grenades (src/grenades)
@@ -224,8 +248,11 @@ export class Brain {
   // k diverse routes from `from` to a site: A* again and again, each time making the cells near the previous routes
   // dearer, so the squads of a big map spread over different streets. Waypoints every ~14 m. Cached per start/site.
   autoRoutes(from, site, k = 3) {
-    const nav = this.mgr.nav, key = 'routes' + Math.round(from.x / 8) + ',' + Math.round(from.z / 8) + site.name;
-    if (this.spotCache.has(key)) return this.spotCache.get(key);
+    // cached for the whole game per nav grid (the map is static): only the first round from a given insertion pays the
+    // A* (≈ 3 × 8-17 ms on the big map); start points are bucketed by 20 m
+    const nav = this.mgr.nav, key = Math.round(from.x / 20) + ',' + Math.round(from.z / 20) + site.name + k;
+    if (this._routeNav !== nav) { this._routeNav = nav; this.routeCache = new Map(); }
+    if (this.routeCache.has(key)) return this.routeCache.get(key);
     const pen = new Float32Array(nav.w * nav.h), out = [], R = Math.round(7 / nav.cell);
     for (let r = 0; r < k; r++) {
       const path = nav.findPath(from.x, from.z, site.center.x, site.center.z, 250000, pen); if (!path) break;
@@ -247,7 +274,7 @@ export class Brain {
       if (out.some(o => o.length && route.every(p => o.some(q => hd({ x: p[0], z: p[1] }, { x: q[0], z: q[1] }) < 8)))) continue;
       out.push(route);
     }
-    this.spotCache.set(key, out); return out;
+    this.routeCache.set(key, out); return out;
   }
 
   viaPoint(from, to) {

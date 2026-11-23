@@ -76,7 +76,7 @@ export class Squads {
   // ------------------------------------------------------------------ per tick
   update(list, site, game, carrier) {
     const B = this.brain, P = B.plan, now = B.ctx.time;
-    if (P.liveAt == null) { for (const b of list) b.goal = null; return; } // teams form at the go (bomb handed out, site chosen)
+    if (P.liveAt == null) { for (const b of list) b.goal = null; this.warmRoutes(list); return; } // teams form at the go
     if (!P.teams || P.teamSite !== site.name || (carrier && !P.member.has(carrier))) this.build(list, site, carrier);
     const alive = new Set(list); if (carrier) alive.add(carrier);
     // late joiners (picked up the bomb, etc.): put them in the closest team
@@ -97,17 +97,32 @@ export class Squads {
       const ready = pending.filter(t => t.state === 'stage' && this.staged(t, alive) >= 0.7 || !t.stage);
       const first = Math.min(...pending.map(t => t.t0 ?? Infinity));
       // a staged team spotted launches the execute only if most of the pincer is in place (else it holds and fights)
-      const contact = pending.some(t => t.state === 'stage' && t.contact && now - t.contact.t < 1.5) && ready.length * 2 >= pending.length;
+      // (all or nothing: when the execute starts, every team of the site goes; never a lone team into a held site)
+      const men = ts => ts.reduce((a, t) => a + this.alive(t, alive).length, 0);
+      const contact = pending.some(t => t.state === 'stage' && t.contact && now - t.contact.t < 1.5) && men(ready) >= men(pending) * 0.66;
       const regroup = B.mgr.skillForTeam?.('ATK')?.regroup ?? true;
       // wait for the slowest team still on its way (≈ 4 m/s), 6 s minimum after the first is in place, 14 s max
       let eta = 0;
       for (const t of pending) if (t.state === 'move' && t.stage) { const h = this.head(t); if (h) eta = Math.max(eta, hd(h.position, t.stage) / 4); }
       const waited = now - first, waitOver = waited > 14 || (waited > 6 && eta < 2);
       if (!regroup || ready.length === pending.length || waitOver || contact || timeLeft < 45) {
-        for (const t of pending) if (t.state === 'stage' || !regroup || timeLeft < 45 || !t.stage) { t.state = 'go'; t.goAt = now; if (!contact) B.pushUtility?.(t); }
+        for (const t of pending) { t.state = 'go'; t.goAt = now; if (!contact) B.pushUtility?.(t); }
       }
     }
     for (const t of P.teams) this.teamGoals(t, alive, game, carrier, now);
+  }
+
+  // freeze time: compute the A* routes of each insertion cluster to each active site, ONE set per brain tick, so the
+  // go doesn't pay them all in one frame (40c40 spike). autoRoutes caches them for the whole game.
+  warmRoutes(list) {
+    const B = this.brain, todo = this._warm ||= { done: new Set() };
+    const cl = [];
+    for (const b of list) { const c = cl.find(c => hd(c, b.position) < 30); if (!c) cl.push({ x: b.position.x, z: b.position.z }); }
+    for (const c of cl) for (const s of B.sites()) {
+      const key = Math.round(c.x / 20) + ',' + Math.round(c.z / 20) + s.name;
+      if (todo.done.has(key)) continue;
+      todo.done.add(key); B.autoRoutes(c, s); return;
+    }
   }
 
   alive(t, set) { return t.members.filter(b => b.alive && set.has(b)); }
