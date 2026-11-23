@@ -22,6 +22,19 @@ export const LOD_DIST = [10, 30]; // m: LOD0 < 10 < LOD1 < 30 < LOD2
 const TAN_HIP = Math.tan(THREE.MathUtils.degToRad(75) / 2);
 // conservative culling sphere around a soldier (m): covers every clip incl. the death fall (body lying ~1.9 m long)
 const CULL_R = 2.3, CULL_Y = 0.9;
+// Animation LOD (40c40 pass, docs/PERF.md): a full pose (mixer + IK + ~130 matrices) only every `rate` frames, chosen from
+// the FOV-corrected distance and visibility; soldiers are staggered (slot) so the work spreads evenly over the frames.
+// In between, the posed skeleton is carried along with the root by one matrix per node (rigid move, no re-pose).
+// [max distance m, frames] on screen; off-screen soldiers only show through their shadow.
+// Big battles (more than CROWD soldiers in the match, e.g. 40c40) use the `crowd` table: LOD1 (10-30 m) is animated at 30 Hz too.
+export const POSE_RATE = {
+  normal: { onscreen: [[LOD_DIST[1], 1], [60, 2], [110, 3], [Infinity, 4]], offscreen: [[12, 2], [Infinity, 4]] },
+  crowd: { onscreen: [[LOD_DIST[0], 1], [45, 2], [90, 3], [Infinity, 4]], offscreen: [[12, 2], [40, 4], [Infinity, 6]] },
+};
+export const CROWD = 40;
+const STALE_DIST = 40; // m: beyond, an off-screen soldier's skeleton is not carried between poses (its shadow is far away)
+let SLOT = 0;
+const _D = new THREE.Matrix4(), _inv = new THREE.Matrix4();
 
 // ---------------------------------------------------------------- asset loading (once)
 let assetPromise = null, asset = null;
@@ -220,8 +233,14 @@ class HDSoldier {
       o.boundingSphere = new THREE.Sphere(c.clone().applyMatrix4(inv), CULL_R / o.matrixWorld.getMaxScaleOnAxis());
       o.frustumCulled = true;
     }
-    this.cullSphere = new THREE.Sphere(new THREE.Vector3(), 1.4); this.offscreen = false;
+    this.cullSphere = new THREE.Sphere(new THREE.Vector3(), CULL_R); // same as the meshes' culling spheres this.offscreen = false;
     this.deadPos = new THREE.Vector3(); this.settled = false; this.shown = -1;
+    this.slot = SLOT++; this.tick = 0; this.dist = 0; this.skipDt = 0;
+    this.posedRoot = new THREE.Matrix4(); // root matrixWorld at the last full pose / carry (skeleton)
+    this.proxyRoot = new THREE.Matrix4(); // same for the hitbox proxies (always carried)
+    this.stale = false; // off-screen far soldier: skeleton left where it was, re-posed as soon as it comes into view
+    this.nodes = []; this.root.traverse(o => o !== this.root && this.nodes.push(o));
+    this.proxies = [this.hips, this.spine, this.neck, ...this.arms.flatMap(a => [a.sh, a.el]), ...this.legs.flatMap(l => [l.th, l.kn])];
     live.add(this);
     const hooks = ctx?.scene && (ctx.scene.userData.passHooks ||= []);
     if (hooks && !hooks.includes(passLod)) hooks.push(passLod);
@@ -252,7 +271,7 @@ class HDSoldier {
     const cam = this.ctx?.camera; let l = 0;
     if (cam) {
       cam.getWorldPosition(_v1); const d = _v1.distanceTo(this.root.position) * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) / TAN_HIP;
-      l = d < LOD_DIST[0] ? 0 : d < LOD_DIST[1] ? 1 : 2;
+      l = d < LOD_DIST[0] ? 0 : d < LOD_DIST[1] ? 1 : 2; this.dist = d;
       // off-screen soldiers are posed at half rate like far ones (camera matrices of the last render: generous sphere)
       _pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); _frustum.setFromProjectionMatrix(_pm);
       this.cullSphere.center.copy(this.root.position).y += CULL_Y;
@@ -263,6 +282,7 @@ class HDSoldier {
   showLod(l) {
     if (l === this.shown || l < 0) return; this.shown = l;
     this.lods.forEach((arr, i) => arr.forEach(o => (o.visible = i === l)));
+    for (const o of this.lods[l]) if (o.bindMode === 'attached') o.bindMatrixInverse.copy(o.matrixWorld).invert();
     if (this.rifleLods) this.rifleLods.forEach((arr, i) => arr.forEach(o => (o.visible = (l > 0 ? 1 : 0) === i)));
   }
 
@@ -272,16 +292,21 @@ class HDSoldier {
     r.position.copy(s.pos); r.rotation.y = s.yaw;
     this.updateLod();
     this.posed = true;
-    // far soldiers (LOD2): full pose every other frame, the skipped frame only moves the root
-    // off-screen ones too (their shadow animates at 30 Hz, invisible in practice; hitboxes still follow the root every frame)
-    if ((this.lod === 2 || this.offscreen) && !this.dead && (this.skip = !this.skip)) { this.skipDt = dt; r.updateMatrixWorld(true); this.updateProxies(); return; }
+    // animation LOD: far / off-screen soldiers get a full pose every `rate` frames (staggered by slot); the skipped frames
+    // carry the last pose along with the root (hitboxes follow too, so shots still land on the visible body)
+    if (!this.dead) {
+      const T = live.size > CROWD ? POSE_RATE.crowd : POSE_RATE.normal, tiers = this.offscreen ? T.offscreen : T.onscreen;
+      let rate = 1; for (const [dm, n] of tiers) if (this.dist < dm) { rate = n; break; }
+      const away = this.offscreen && this.dist > STALE_DIST;
+      if (rate > 1 && (++this.tick + this.slot) % rate && !(this.stale && !away)) { this.skipDt += dt; this.carry(away); return; }
+    }
     if (this.skipDt) { dt += this.skipDt; this.skipDt = 0; }
     if (this.dead) {
       // a corpse whose death clip has finished and that no longer moves keeps its matrices and hitboxes
       const still = this.act.death.paused && r.position.equals(this.deadPos) && r.rotation.y === this.deadYaw;
       if (still && this.settled) return;
       this.settled = still; this.deadPos.copy(r.position); this.deadYaw = r.rotation.y;
-      this.mixer.update(dt); r.updateMatrixWorld(true); this.updateProxies(); return;
+      this.mixer.update(dt); r.updateMatrixWorld(true); this.posedDone(); return;
     }
     const ek = k => 1 - Math.exp(-dt * k);
     this.crouch += ((s.crouch || 0) - this.crouch) * ek(10);
@@ -365,8 +390,27 @@ class HDSoldier {
       hup.clone().multiplyScalar(0.7).addScaledVector(hr, 0.6).normalize(), q));
     if (this.lod === 0) for (const [b, fq] of this.fingers) b.quaternion.copy(fq);
     _top = null;
-    r.updateMatrixWorld(true);
-    this.updateProxies();
+    r.updateMatrixWorld(true); this.posedDone();
+  }
+  posedDone() { this.posedRoot.copy(this.root.matrixWorld); this.proxyRoot.copy(this.root.matrixWorld); this.stale = false; this.root.visible = true; this.updateProxies(); }
+
+  // rigid move of the posed skeleton with the root: D = newRoot * oldRoot^-1 applied to every world matrix (no re-pose).
+  // skeleton=false (off-screen and far): only the hitboxes move; the skeleton is re-posed when the soldier comes into view.
+  carry(away) {
+    const r = this.root; r.updateMatrix();
+    if (!r.matrix.equals(this.proxyRoot)) {
+      _D.multiplyMatrices(r.matrix, _inv.copy(this.proxyRoot).invert()); this.proxyRoot.copy(r.matrix);
+      for (const o of this.proxies) { o.matrixWorld.premultiply(_D); o.matrix.copy(o.matrixWorld); }
+    }
+    // a stale skeleton is hidden (it would stay frozen where it left the view); only its far shadow disappears meanwhile
+    if (away) { if (!this.stale && !r.matrix.equals(this.posedRoot)) { this.stale = true; r.visible = false; } return; }
+    if (r.matrix.equals(this.posedRoot)) return;
+    _D.multiplyMatrices(r.matrix, _inv.copy(this.posedRoot).invert());
+    r.matrixWorld.copy(r.matrix); this.posedRoot.copy(r.matrix);
+    for (const o of this.nodes) o.matrixWorld.premultiply(_D);
+    // attached skinned meshes cancel their own transform (bindMatrixInverse = matrixWorld^-1): keep the visible LOD in step
+    // (showLod refreshes the others when they get shown)
+    for (const o of this.lods[this.shown] || this.meshes) if (o.bindMode === 'attached') o.bindMatrixInverse.copy(o.matrixWorld).invert();
   }
 
   // proxies for bot hitboxes: position at the joint, -Y along the limb (+Y for torso/neck)

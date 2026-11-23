@@ -43,3 +43,16 @@ régulièrement (`git fetch origin claude/project-thread-h6ui6r && git merge FET
   partent à < 30 m de l'escouade, sinon `autoRoutes`. Chaque escouade part de la position moyenne de ses membres.
 - DEF : rôles par proximité (chaque site actif prend à tour de rôle son défenseur le plus proche), ~20 % de rôdeurs sur
   les chokes à < 70 m d'un site actif. `threat` indexé par nom de site (générique).
+
+## Perf / 40c40 (thread « Rendre le 40c40 fluide »)
+- Effectifs : `MAX_ALLIES = 39`, `MAX_ENEMIES = 40` (`game/index.js`), noms jusqu'à 40 par camp, curseurs HUD 0–39 / 1–40,
+  boutons « Effectifs rapides » 5c5 / 10c10 / 20c20 / 40c40 (masqués en Zombies, qui garde 0–19 alliés).
+- `src/bots/pathcache.js` : `wrapPathCache(nav)` remplace `nav.findPath` sur l'instance (mêmes arguments, `...args`
+  transmis ; appels avec `penalty` jamais en cache ; `sy`/`gy` dans la clé par couche de 3 m). `nav.__pathCache.stats`
+  pour le debug. `takePathBudget(mgr)` : budget en ms par image. Si vous appelez `findPath` hors de `followPath`, rien à
+  changer ; un chemin renvoyé est une copie (vous pouvez le modifier).
+- Soldats (`soldiers/index.js`) : la pose complète n'est plus faite à chaque image pour les soldats lointains / hors champ.
+  Les hitbox (`model.hips/spine/neck/arms/legs`) restent à jour à chaque image. Ne pas lire les os du squelette
+  (`model.impl.b.*`) d'un bot lointain en comptant sur une pose de l'image courante : lire `muzzle` / les hitbox.
+  Un soldat hors champ à > 40 m a `root.visible = false` jusqu'à sa prochaine pose.
+- Bancs : `scripts/perf/split.cjs` (bots : animation / A* / perception), `profile.cjs`, `cpu.cjs`, `passes.cjs`.

@@ -8,7 +8,7 @@ const { chromium } = require('playwright');
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const p = await b.newPage({ viewport: { width: +(process.env.W || 640), height: +(process.env.H || 360) } });
   p.on('pageerror', e => console.log('ERR', e.message));
-  await p.goto(url);
+  await p.goto(url, { waitUntil: 'commit', timeout: 120000 });
   await p.waitForFunction(() => window.__ctx && window.__ctx.bots, null, { timeout: 120000 });
   await p.waitForTimeout(8000);
   const r = await p.evaluate(async ([al, en, q, frames, POS]) => {
