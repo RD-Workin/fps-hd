@@ -12,6 +12,7 @@ import { createHud } from './hud/index.js';
 import { createAudio } from './audio/index.js';
 import { createGrenades } from './grenades/index.js';
 import { preloadSoldiers } from './soldiers/index.js';
+import { chunkStatics } from './core/chunks.js';
 
 // ---- renderer / scene / camera (shared) ----
 const app = document.getElementById('app');
@@ -45,6 +46,7 @@ ctx.player = new Player(ctx);
 
 preloadSoldiers(renderer);        // start fetching the HD soldier glb right away
 ctx.world = createWorld(ctx);     // map, lights, sky, post-processing, colliders, spawns, sites
+ctx.worldChunks = chunkStatics(scene); // perf: map-wide static meshes split into 96 m tiles so frustum culling works (core/chunks.js)
 ctx.weapon = createWeapon(ctx);   // viewmodel, shooting, recoil, reload, effects
 ctx.bots = createBots(ctx);       // AI actors
 ctx.game = createGame(ctx);       // Search & Destroy rules
