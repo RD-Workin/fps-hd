@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
   const p = await b.newPage(); p.on('pageerror', e => console.log('ERR', e.message));
   await p.route(u => !u.href.startsWith('http://localhost'), r => r.abort()); await p.goto('http://localhost:4173/', { waitUntil: 'commit' });
   await p.waitForFunction(() => window.__ctx && window.__ctx.bots, null, { timeout: 120000 });
-  await p.evaluate(() => { const c = window.__ctx; c.world.render = () => {}; c.game.setTeamSizes(6, 1); c.game.start(); c.paused = false; c.player.frozen = true; c.player.position.set(0, -50, 200); });
+  await p.evaluate((N) => { const c = window.__ctx; c.world.render = () => {}; c.game.setTeamSizes(N, 1); c.game.start(); c.paused = false; c.player.frozen = true; c.player.position.set(0, -50, 200); }, +(process.env.N || 6));
   await p.waitForFunction(() => window.__ctx.game.phase === 'live', null, { timeout: 60000 });
   await p.evaluate(() => { const c = window.__ctx, H = c.world.nav.highHolds, houses = [...new Set(H.map(h => h.house))];
     const bots = c.bots.list.filter(b => b.alive && b.team === c.player.team); c.bots.list.filter(b => b.team !== c.player.team).forEach(e => { e.frozen = true; e.position.set(0, 0, -20); }); window.__T = [];

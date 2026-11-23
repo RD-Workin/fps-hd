@@ -56,13 +56,13 @@ export function dressGrand(K) {
   // around the hall: west stalls, kiosk, cars along the south edge, trees and planters to break the long lines
   Stall(-151.6, 7, 1, 1); Stall(-151.6, 11, 1, 2); Tent(-148, 17.5, true); Kiosk(-150, 1.6, 0x2f5f4a);
   Car(-140.5, 19.6, true, 0xa2412f); Car(-120, 9.5, false, 0xd8d4cc); Car(-153, -1.6, true, 0x3d7a4a);
-  Tree(-122, 18.2, 6, 2.6); Tree(-147, -1.4, 6, 2.4); Tree(-117.2, 3, 5.5, 2.2);
+  Tree(-122, 18.2, 6, 2.6); Tree(-147, -1.4, 6, 2.4); Tree(-117.2, 5.8, 5.5, 2.2);
   Planter(-142.5, -2.6, -140.6, -0.6); Planter(-131.4, -2.6, -129.5, -0.6);               // either side of the monumental stairs
   LowWall(-125, 12.4, -122, 13, 1.1); LowWall(-147.6, 4, -145, 4.6, 1.1); Jersey(-131, 20.4, true, 3);
   Pallets(-157, 12, 2, R); Stack(-158.4, 8.2, 1, 1.1); Barrel(-157.6, 14.6, BLUE); Barrel(-156.9, 15.3, RUST); Bench(-136, -2.8, 0);
   wallDecal(DECAL.D, 'x', 1, -160, 10, 4.4, 2.2, 2.2); wallDecal(DECAL.S_MARCHE, 'z', 1, -4, -150, 4.8, 4, 1);
-  for (const [x, z] of [[-156, 20], [-114, 14], [-156, -2]]) Lamp(x, z, 0);
-  for (const z of [1, 19]) wire(V(-160, 7.4, z), V(-112, 7.6, z + 1.0), 0.8);
+  for (const [x, z] of [[-156, 20], [-114, 14], [-150.6, -3]]) Lamp(x, z, 0);
+  for (const z of [1, 19]) wire(V(z < 10 ? -151.6 : -160, 7.4, z), V(z < 10 ? -126.6 : -112, 7.6, z + 1.0), 0.8);
   // Place du Tisserand (+1.5, west): market tents, loom crates, a delivery van
   Floor(-174, -160, 4, 22, 'stone', 0xd2c4aa);
   Tent(-169.5, 8.4, false); Tent(-165, 18.4, true); Car(-171.4, 16.8, false, 0xe8e2d2); Stack(-163.2, 13.4, 2, 1.0); Crate(-162, 14.4, 0.9);
