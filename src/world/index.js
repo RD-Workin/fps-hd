@@ -14,6 +14,7 @@ import { extendKit } from './kit2.js';
 import { buildAtmosphere, buildDistant, buildDust, buildComposer } from './env.js';
 import { createShadowCache } from './shadowCache.js';
 import { buildStoreys, storeyFloorAt, HOUSE_HOLDS } from './storeys.js';
+import { createBreakables } from './breakables.js';
 import { createNight } from './night.js';
 
 export function createWorld(ctx) {
@@ -70,6 +71,7 @@ export function createWorld(ctx) {
   const floorAt = (x, z, y) => storeyFloorAt(x, z, y) ?? T.floorAt(x, z);
   const K = extendKit(createKit(G, Tx, T, physics, addSolid, scene));
   buildShip(K); dressZones(K); dressGrand(K);
+  const breakables = createBreakables(ctx, { T, navColliders, Tx }); // boards / fences / doors that bullets break
   const { waterMat } = K.finish();
   buildDistant(G, scene);
   const noAO = [];
@@ -183,6 +185,7 @@ export function createWorld(ctx) {
       holdsHigh: Object.fromEntries(ALL_SITES.map(s => [s.name, HOUSE_HOLDS.filter(h => Math.hypot(h.x - s.x, h.z - s.z) < 50)])), grid: { x0: GX0, z0: GZ0, w: GW, h: GH, cell: CELL, rows: T.g.map(r => r.join('')) } },
     sun: atm.sun, quality, post, shadows: SH, // post / shadows: debug & perf bench access
     setQuality,
+    breakables,
     // Ops de nuit: night lighting variant (see night.js). Changing it changes the light count -> shaders recompile:
     // call from the menu (main.js warms the shaders up again on 'world:night').
     get night() { return night.on; },
