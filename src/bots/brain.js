@@ -86,7 +86,7 @@ export class Brain {
       const df = bomb.state === 'planted' && bomb.defuser?.alive ? bomb.defuser : null;
       const rushers = df ? [...list].filter(b => hd(b.position, bomb.position) < 40).sort((a, b) => hd(a.position, bomb.position) - hd(b.position, bomb.position)).slice(0, 3) : [];
       list.forEach((b, i) => {
-        if (rushers.includes(b)) { b.goal = { x: bomb.position.x, z: bomb.position.z, tol: 2.5, speed: 'run', look: df.position, watch: df.position, push: true, noCover: true, noHunt: true }; b.lastKnown = df.position.clone?.() || b.lastKnown; return; }
+        if (rushers.includes(b)) { b.goal = { x: bomb.position.x, z: bomb.position.z, tol: 1, speed: 'run', look: df.position, watch: df.position, push: true, noCover: true, noHunt: true }; b.lastKnown = df.position.clone?.() || b.lastKnown; return; }
         // far away (pressure teams on the big map): don't cross the map one by one; hold and cut the rotations there
         if (bomb.state === 'planted' && hd(b.position, bomb.position) > 60) {
           b._lurk ||= { x: b.position.x, z: b.position.z };
