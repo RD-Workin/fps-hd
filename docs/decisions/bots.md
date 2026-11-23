@@ -77,14 +77,16 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
   position ennemie signalée par un coéquipier < 40 m). ATK recrue : pas de regroupement avant l'assaut ;
   DEF : rotation plus lente/rapide (fenêtre 10 / 20 / 25 s, seuil 45 / 30 / 20 %, rayon de menace 14 / 24 / 30 m).
 - HUD : réglage « Difficulté des ennemis » (localStorage `nova.hud.skill`), appliqué en direct.
-## Capture du drapeau (brain.assignCTF)
-- Rôles par équipe (stables sur la manche) : ~25 % défenseurs (moitié sur le socle via guardAround, moitié sur les lignes à
-  16-30 m de la base, regard vers l'extérieur), le reste attaque. Chaque attaquant (re)né prend la ligne la moins utilisée
-  (world.ctf.lanes, inversées côté citadelle) : toutes les rues de la carte sont parcourues.
-- Priorités : porteur bot → base (goal.push : court en tirant, sans chercher de couverture) ; 2 plus proches → drapeau au sol
-  (rendre le nôtre / prendre le leur) ; défenseurs + bots à < 35 m traquent le porteur ennemi (moitié de l'équipe max) ;
-  dès que notre camp tient le drapeau, tout bot à < 25 m du porteur (bot ou joueur) passe en escorte (formation devant,
-  flancs, arrière, goal.escort). goal.exact : pas déplacé par spreadGoals.
+## Capture du drapeau (brain.assignCTF) — rôles dynamiques (v2)
+- Rôles recalculés à chaque tick sur les bots VIVANTS : jamais que des défenseurs. Part de défense 20 % (30 % si on mène,
+  10 % si on est mené ; dernières 2 min / prolongation : 10 %, 0 % si mené), 0 avec ≤ 2 bots ou si notre drapeau n'est pas
+  à la base, toujours ≥ 1 attaquant. Garde de 35-60 s puis le défenseur passe à l'attaque, relevé par l'attaquant le plus proche.
+- Défense mobile : interception des ennemis vus à < 40 m du drapeau (intel), sinon patrouille entre les points du socle
+  (guardAround) et des lignes à 16-30 m (laneHolds), 3-7 s de guet par point, huntRange 30.
+- Attaquants : lignes attribuées par binômes, à tour de rôle (toutes les lignes servent, personne ne part seul).
+- Priorités : porteur bot → base (goal.push) ; 2 plus proches → drapeau au sol ; porteur ennemi traqué (défenseurs + bots à
+  < 35 m, moitié de l'équipe) ; escorte ≤ 6 bots à < 25 m de notre porteur. Impasse (les deux drapeaux pris) : 2 gardes
+  autour de notre porteur caché, tout le reste chasse le porteur adverse.
 
 ## Ops de nuit (lamps.js)
 - Perception (`nightSight`) quand `world.night` : un ennemi non éclairé n'est remarqué qu'à 16 m (× `nightView` :
