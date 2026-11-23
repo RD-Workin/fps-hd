@@ -75,3 +75,18 @@ des A* traversant la carte (12 ms chacun) relancés à chaque image quand ils é
   reposé dès qu'il revient dans le champ (sphère de test = sphère de culling des maillages, 2,3 m).
 - **Chemins** (`bots/pathcache.js`) : cache par cellule d'arrivée de 4 m (réutilisé si le bot voit l'un des 4 premiers
   points en ligne droite, départ à moins de 6 m), cache des échecs 2 s, budget par image en ms (1,5 ms, 8 recherches max).
+
+### Rendu en 40c40 (même partie rejouée : `SEED=1..3 node scripts/perf/passes.cjs … 39 40 high 20`)
+| draw calls / image (moyenne des 3 graines) | avant | après |
+|---|---|---|
+| total | 563 | 426 (−24 %) |
+| rafraîchissement des ombres | 459 | 297 (−35 %) |
+| passe AO | 150 | 121 |
+| triangles / image | 1 685 k | 1 529 k |
+Le décor seul fait ~107 draw calls (`NOSOLD=1`) : le reste, ce sont les soldats.
+- **Brassard fusionné** dans le maillage du corps (3 LOD, attribut `aBand`, teinte d'équipe dans le shader) : 1 draw call et
+  1 squelette de moins par soldat et par passe. Vérifié au chargement : même squelette, même texture, même bind.
+- **Passes ombre / AO** : sans brassard ni chargeur ; le chargeur n'est plus dessiné au-delà de 30 m.
+- **Grande bataille** (> 40 soldats) : pas d'ombre dynamique au-delà de 60 m ; les soldats visibles au-delà de 60 m sont
+  dessinés par `soldiers/crowd.js` en 2 draw calls pour tous (corps + fusil instanciés, matrices des os dans une texture
+  flottante, une ligne par soldat). Capture comparée : mêmes poses et couleurs, seule l'AO des silhouettes lointaines manque.
