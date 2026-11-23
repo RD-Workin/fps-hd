@@ -10,12 +10,16 @@ export const RULES = {
   ROUNDS_TO_WIN: 4, SWAP_AFTER: 3,
 };
 
-export const TEAM_SIZE = 10; // default 10v10: player + 9 allies vs 10 enemies (menu: 0-19 allies, 1-20 enemies)
-export const MAX_ALLIES = 19, MAX_ENEMIES = 20;
+export const TEAM_SIZE = 10; // default 10v10: player + 9 allies vs 10 enemies (menu: 0-39 allies, 1-40 enemies, 40c40 = big battle)
+export const MAX_ALLIES = 39, MAX_ENEMIES = 40;
 export const ALLY_NAMES = ['Faucon', 'Vipère', 'Loup', 'Corbeau', 'Aigle', 'Renard', 'Panthère', 'Bison', 'Héron', 'Cerf',
-  'Milan', 'Ours', 'Castor', 'Lièvre', 'Hibou', 'Martin', 'Sanglier', 'Busard', 'Chamois'];
+  'Milan', 'Ours', 'Castor', 'Lièvre', 'Hibou', 'Martin', 'Sanglier', 'Busard', 'Chamois',
+  'Blaireau', 'Gerfaut', 'Isard', 'Puma', 'Tétras', 'Lynx des neiges', 'Albatros', 'Bouquetin', 'Élan', 'Fennec',
+  'Grizzly', 'Jaguar', 'Loutre', 'Mouflon', 'Orque', 'Pélican', 'Rorqual', 'Tigre', 'Vison', 'Zèbre'];
 export const ENEMY_NAMES = ['Spectre', 'Cobra', 'Orage', 'Lynx', 'Mistral', 'Scorpion', 'Chacal', 'Tonnerre', 'Fantôme', 'Vautour',
-  'Mamba', 'Typhon', 'Hyène', 'Furie', 'Brasier', 'Crotale', 'Sirocco', 'Goule', 'Cyclone', 'Kraken'];
+  'Mamba', 'Typhon', 'Hyène', 'Furie', 'Brasier', 'Crotale', 'Sirocco', 'Goule', 'Cyclone', 'Kraken',
+  'Aspic', 'Blizzard', 'Cendre', 'Dague', 'Éclipse', 'Foudre', 'Grêle', 'Harpie', 'Iceberg', 'Javelot',
+  'Lame', 'Magma', 'Nuée', 'Ouragan', 'Piranha', 'Rafale', 'Silex', 'Tarentule', 'Venin', 'Zénith'];
 
 const other = t => (t === 'ATK' ? 'DEF' : 'ATK');
 const hdist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
