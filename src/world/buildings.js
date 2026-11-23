@@ -48,7 +48,7 @@ export function buildBuildings(G, T, addSolid) {
   const white = [1, 1, 1];
   const outF = (x, z) => T.levelCell(x, z);
   const ringMax = (r) => { let m = 0; for (let j = r.j0 - 1; j <= r.j1; j++) for (let i = r.i0 - 1; i <= r.i1; i++) { const c = T.at(i, j); if (c in LEVEL) m = Math.max(m, LEVEL[c]); else if (c in STAIRS) m = Math.max(m, 3); } return m; };
-  const styleAt = (x, z) => (x > 28 && z > -24 ? 'warehouse' : (z < -28 && Math.abs(x) < 34) || (x < -60 && z < -12 && z > -30) || (x > 60 && z < -40) ? 'stone' : Math.abs(x) < 27 && z < 5 && z > -28 ? 'white' : 'plaster');
+  const styleAt = (x, z) => x > 80 ? (z < -26 && z > -60 ? 'stone' : 'warehouse') : x < -80 ? (z < -4 ? ((Math.floor(x / 22) + Math.floor(z / 18)) % 3 === 0 ? 'stone' : 'white') : 'plaster') : (x > 28 && z > -24 ? 'warehouse' : (z < -28 && Math.abs(x) < 34) || (x < -60 && z < -12 && z > -30) || (x > 60 && z < -40) ? 'stone' : Math.abs(x) < 27 && z < 5 && z > -28 ? 'white' : 'plaster');
   let bi = 0;
   const one = (r, y0, base) => {
     const [x0, x1, z0, z1] = [GX0 + r.i0 * CELL, GX0 + r.i1 * CELL, GZ0 + r.j0 * CELL, GZ0 + r.j1 * CELL];

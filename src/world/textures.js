@@ -464,7 +464,7 @@ function genFacadeAtlas() {
 // ---------- decal atlas (alpha): 2048 x 2048 ----------
 // Regions in pixel coords [x, y, w, h]
 export const DECAL = {
-  A: [0, 0, 512, 512], B: [512, 0, 512, 512], ARROW: [1024, 0, 512, 512], TAG: [1536, 0, 512, 512],
+  A: [0, 0, 256, 256], B: [256, 0, 256, 256], C: [0, 256, 256, 256], D: [256, 256, 256, 256], ARROW: [1024, 0, 512, 512], TAG: [1536, 0, 512, 512],
   S_MARCHE: [0, 512, 1024, 256], S_CAFE: [1024, 512, 1024, 256], S_PHARMA: [0, 768, 1024, 256], S_HOTEL: [1024, 768, 1024, 256],
   S_BOULANG: [0, 1024, 1024, 256], S_DOCKS: [1024, 1024, 1024, 256], NOVA: [0, 1280, 1024, 256], HAZARD: [1024, 1280, 1024, 256],
   OIL: [0, 1536, 512, 512], CRACK: [512, 1536, 512, 512], DIRT: [1024, 1536, 512, 512], MANHOLE: [1536, 1536, 512, 512],
@@ -478,13 +478,15 @@ function genDecalAtlas() {
     g.putImageData(id, x, y);
   };
   const letter = (reg, ch, col) => {
-    const [x, y, w, h] = reg; g.save(); g.translate(x + w / 2, y + h / 2);
+    const [x, y, w, h] = reg; g.save(); g.translate(x + w / 2, y + h / 2); g.scale(w / 512, h / 512);
     g.strokeStyle = col; g.lineWidth = 26; g.beginPath(); g.arc(0, 0, 220, 0, Math.PI * 2); g.stroke();
     g.fillStyle = col; g.font = '900 340px Impact, "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, 0, 18);
     g.restore(); roughen(x, y, w, h, 0.38, ch.charCodeAt(0) * 0.1);
   };
   letter(DECAL.A, 'A', '#d8352a');
   letter(DECAL.B, 'B', '#d8352a');
+  letter(DECAL.C, 'C', '#d8352a');
+  letter(DECAL.D, 'D', '#d8352a');
   { // arrow
     const [x, y, w, h] = DECAL.ARROW; g.save(); g.translate(x + w / 2, y + h / 2); g.fillStyle = '#f0ece0';
     g.beginPath(); g.moveTo(-200, -60); g.lineTo(60, -60); g.lineTo(60, -140); g.lineTo(220, 0); g.lineTo(60, 140); g.lineTo(60, 60); g.lineTo(-200, 60); g.closePath(); g.fill(); g.restore(); roughen(x, y, w, h, 0.4, 3);

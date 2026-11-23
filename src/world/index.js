@@ -9,6 +9,7 @@ import { buildBuildings } from './buildings.js';
 import { createKit } from './props.js';
 import { buildShip } from './ship.js';
 import { dressZones } from './zones.js';
+import { dressGrand } from './grandZones.js';
 import { extendKit } from './kit2.js';
 import { buildAtmosphere, buildDistant, buildDust, buildComposer } from './env.js';
 import { createShadowCache } from './shadowCache.js';
@@ -63,7 +64,7 @@ export function createWorld(ctx) {
   buildTerrain(T, G, addSolid);
   buildBuildings(G, T, addSolid);
   const K = extendKit(createKit(G, Tx, T, physics, addSolid, scene));
-  buildShip(K); dressZones(K);
+  buildShip(K); dressZones(K); dressGrand(K);
   const { waterMat } = K.finish();
   buildDistant(G, scene);
   const noAO = [];
