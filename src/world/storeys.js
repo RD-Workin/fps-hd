@@ -11,9 +11,9 @@ export const HCHAR = { 0: 'h', 1.5: 'i', 3: 'I' };
 
 export const HOUSES = [
   // Vieille-Ville
-  { id: 'marche', x0: -144, x1: -128, z0: -6, z1: 2, base: 1.5, floors: 3, roof: true, stair: 'E', doors: [['S', -137]], win: 'NS' },        // Maison haute du Marché: over site D and Rue de l'Église
+  { id: 'marche', x0: -126, x1: -112, z0: -6, z1: 2, base: 1.5, floors: 3, roof: true, stair: 'E', doors: [['S', -119]], win: 'SW' },        // Maison haute du Marché: NE corner of the Grande Place, over site D
   { id: 'pecheurs', x0: -112, x1: -100, z0: 36, z1: 44, base: 0, floors: 2, roof: true, stair: 'E', doors: [['S', -109], ['N', -103]], win: 'SNW' }, // over the harbour (west insertion)
-  { id: 'remparts', x0: -168, x1: -156, z0: -42, z1: -32, base: 3, floors: 2, roof: true, stair: 'E', doors: [['N', -161], ['W', -35]], win: 'NW' }, // Haute-Ville, over Rue Haute
+  { id: 'remparts', x0: -140, x1: -128, z0: -58, z1: -48, base: 3, floors: 2, roof: true, stair: 'N', doors: [['S', -134]], win: 'S' }, // Haute-Ville, over Rue Haute and the Place Haute
   // Gare
   { id: 'aiguillage', x0: 82, x1: 90, z0: -28, z1: -20, base: 0, floors: 3, roof: true, stair: 'W', doors: [['E', -26]], win: 'SE', m: 'stone' }, // Poste d'aiguillage over the yard
   { id: 'depot', x0: 120, x1: 132, z0: 24, z1: 36, base: 0, floors: 2, roof: true, stair: 'W', doors: [['N', 128], ['S', 126], ['E', 30]], win: 'NSE', m: 'corr' }, // over the yard and Rue du Triage

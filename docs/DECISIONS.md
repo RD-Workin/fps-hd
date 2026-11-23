@@ -13,7 +13,8 @@ régulièrement (`git fetch origin claude/project-thread-h6ui6r && git merge FET
 
 ## Carte (world) — « Port-Cassis, grande carte » (v5)
 - Grille de cellules 2 m, x[-176,176] z[-64,56] (352 × 120 m). Centre = Citadelle v4 inchangée (x[-80,80]).
-  Ouest = Vieille-Ville (ruelles 2-4 m, 3 terrasses : +3 Haute-Ville, +1,5 Marché, 0 port de pêche). Est = Gare de triage
+  Ouest = Vieille-Ville v6 (grandes places encombrées reliées par des passages courts : port 0, Cour des Pêcheurs / Halle aux
+  poissons / Cour du Four 0, Grande Place du Marché +1,5 avec halle couverte sur le site D, Parvis / Jardins / Place Haute +3). Est = Gare de triage
   (quais de voyageurs +1,5, voies au sol, trains de fret, hall de gare 7 m sous plafond, entrepôts, quai de fret).
 - Données : `src/world/layout.js` (Citadelle) + `src/world/grand.js` (extension : `GRAND_CARVES`, `ROOMS` → murs générés,
   `ALL_SITES`, `INSERTIONS`, `POSTS`, `OBJECTIVES`, `REGION`, labels, chokes).
@@ -28,7 +29,7 @@ régulièrement (`git fetch origin claude/project-thread-h6ui6r && git merge FET
     Sites C/D : pas de holds faits main → `brain.holdSpots` les calcule.
 - Spawns : ATK = insertions côtières (`ouest` port de pêche, `port` Citadelle, `est` quai de fret), DEF = postes par site
   (D Rue Haute, C Place de la Gare, A/B cour de la citadelle). Ombres ajustées à la région des sites actifs.
-- Étages superposés (fait, `src/world/storeys.js`) : 6 maisons (`marche` site D, `pecheurs`, `remparts`, `aiguillage`,
+- Étages superposés (fait, `src/world/storeys.js`) : 6 maisons (`marche` angle NE de la Grande Place, `pecheurs`, `remparts`, `aiguillage`,
   `depot`, `capitainerie`), 2-3 étages + toit-terrasse, escaliers en lacets, fenêtres à chaque étage.
   - `world.nav.floorAt(x, z, y?)` : avec `y`, renvoie le plancher de l'étage où l'on est (sinon comme avant).
   - `world.nav.highHolds` : `{x, z, y, yaw, high: true, roof?, house}` (fenêtres d'étage + coins de toit) ;

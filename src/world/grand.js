@@ -11,37 +11,60 @@ export const GRAND_CARVES = [
   ['.', -80, -76, 42, 56], [';', -80, -68, 20, 24], [',', -80, -74, -10, -6], [',', -80, -70, -46, -42],
   ['.', 76, 80, 42, 56], ['.', 76, 80, 36, 42], ['.', 76, 82, -6, 2], [',', 70, 80, -40, -34],
 
-  // ======================= VIEILLE-VILLE (west) =======================
-  // Haute-Ville (+3)
-  [',', -174, -80, -46, -42],                 // Rue Haute (-> Jardins)
-  [',', -170, -80, -10, -6],                  // Rue de l'Église (-> site A)
-  [',', -166, -112, -58, -56],                // ruelle des Remparts
-  [',', -170, -168, -58, -10],                // ruelle Ouest (1 cell)
-  [',', -150, -146, -58, -10],                // rue des Tanneurs (2 cells)
-  [',', -128, -126, -56, -36],                // Rue Haute -> Placette
-  [',', -136, -118, -36, -22],                // Placette du Puits
-  [',', -146, -136, -30, -28],                // Tanneurs -> Placette
-  [',', -124, -122, -22, -10],                // Placette -> Rue de l'Église
-  [',', -114, -110, -42, -10],                // rue du Notable (2 cells)
-  [',', -96, -92, -42, -10],                  // rue du Four (2 cells)
-  ['C', -170, -168, -40, -30],                // covered passage under a house (ruelle Ouest)
-  ['C', -150, -146, -22, -16],                // voûte des Tanneurs
-  // Marché (+1.5)
-  ['^', -170, -168, -6, -2], ['^', -150, -146, -6, -2], ['^', -114, -110, -6, -2], ['^', -96, -92, -6, -2],
-  [';', -170, -168, -2, 26], [';', -150, -146, -2, 2], [';', -114, -110, -2, 26], [';', -96, -92, -2, 20],
-  [';', -150, -122, 2, 18],                   // Place du Marché (site D)
-  [';', -136, -132, 18, 20], [';', -150, -148, 18, 20],
-  [';', -174, -80, 20, 24],                   // Rue du Marché (-> Cour des Pêcheurs)
-  [';', -110, -96, 10, 12],                   // passage du Four
-  [';', -140, -136, 24, 26],
-  // harbour (0)
-  ['^', -170, -168, 26, 30], ['^', -140, -136, 26, 30], ['^', -114, -110, 26, 30],
-  ['.', -170, -168, 30, 44], ['.', -140, -136, 30, 44], ['.', -114, -110, 30, 44], ['.', -100, -96, 34, 44],
-  ['.', -174, -80, 34, 36],                   // Rue des Pêcheurs (1 cell)
-  ['.', -174, -80, 44, 56],                   // Port de pêche
-  ['^', -92, -88, 24, 28], ['.', -92, -88, 28, 34], // Escalier du Port: Rue du Marché -> harbour
-  // cross alleys (more ways round each block)
-  [',', -168, -150, -26, -24], [',', -146, -128, -52, -50], [',', -110, -96, -18, -16], [';', -168, -150, 16, 18], ['.', -168, -140, 30, 32], ['.', -136, -114, 40, 42],
+  // ======================= VIEILLE-VILLE (west), v6 =======================
+  // Big open squares packed with cover (props in grandZones.js), linked by short passages and through-buildings; no
+  // street runs straight for long. Harbour 0 (ATK), Grande Place du Marché +1.5 (site D), Haute-Ville +3 (DEF).
+  // ---- harbour (0)
+  ['.', -176, -80, 44, 56], // quay
+  ['.', -174, -82, 40, 44], // waterfront
+  // ---- lower town (0)
+  ['.', -174, -164, 28, 40], // west passage (wide)
+  ['.', -160, -138, 26, 40], // Cour des Pêcheurs (big courtyard)
+  ['.', -164, -160, 30, 34], // link west passage <-> courtyard
+  ['c', -134, -118, 30, 38], // Halle aux poissons (interior)
+  ['.', -138, -134, 32, 36], // halle west door (wide)
+  ['.', -128, -124, 26, 30], // halle north door -> stairs
+  ['.', -130, -126, 38, 40], ['.', -122, -120, 38, 40], // halle south doors (wall row z(38,40))
+  ['.', -118, -116, 30, 32], // halle east door
+  ['.', -116, -96, 28, 40], // Cour du Four (east courtyard)
+  ['.', -92, -86, 28, 40], // Escalier du Port bottom
+  ['.', -96, -92, 32, 36],
+  // ---- stairs harbour -> market (rise toward -z)
+  ['^', -172, -168, 22, 28], ['^', -150, -146, 22, 26], ['^', -128, -124, 22, 26], ['^', -110, -106, 22, 28], ['^', -92, -88, 24, 28],
+  // ---- market terrace (+1.5)
+  [';', -160, -112, -4, 22], // Grande Place du Marché (48 x 26) -> site D at (-136, 10)
+  ['#', -160, -152, -4, 4], // NW corner block
+  ['#', -118, -112, 16, 22], // SE corner block
+  ['#', -160, -156, 16, 22], // SW corner block
+  [';', -174, -160, 4, 22], // Place du Tisserand (west, merges with the Grande Place)
+  ['#', -176, -170, 12, 16], // notch
+  ['#', -162, -158, 6, 12], // house between the Tisserand and the place
+  [';', -172, -162, -6, 4], // west stairs landing
+  ['e', -110, -102, 2, 14], // Café du Marché (interior)
+  ['#', -112, -110, 2, 14], [';', -112, -110, 4, 6], [';', -112, -110, 10, 12], // café west wall + 2 doors
+  [';', -100, -94, -4, 14], // east street (short)
+  [';', -102, -100, 6, 8], // café east door
+  [';', -112, -94, 14, 22], // Placette du Four
+  [';', -96, -80, 18, 24], // Rue du Marché -> Citadelle
+  // ---- stairs market -> Haute-Ville
+  ['^', -170, -166, -10, -6], ['^', -140, -132, -10, -4], ['^', -100, -96, -8, -4],
+  // ---- Haute-Ville (+3)
+  [',', -150, -118, -34, -10], // Parvis de Saint-Roch (32 x 24)
+  ['#', -150, -144, -34, -28], // notch NW
+  [',', -174, -156, -40, -10], // Jardins du Cloître
+  ['#', -162, -156, -24, -18], // garden pavilion block
+  [',', -156, -150, -22, -14], // gardens <-> parvis
+  [',', -170, -140, -52, -40], // Place Haute (DEF post)
+  [',', -146, -140, -40, -34], [',', -128, -122, -38, -34], // Place Haute / Rue Haute -> parvis
+  [',', -142, -120, -50, -44], // Rue Haute 1
+  [',', -122, -104, -46, -38], // Rue Haute 2 (jog)
+  [',', -106, -86, -40, -34], // Rue Haute 3 (jog)
+  [',', -90, -80, -46, -38], // Rue Haute 4 -> Jardins (citadel)
+  ['C', -116, -104, -34, -22], // Maison du Notable (interior +3)
+  [',', -118, -116, -30, -26], // notable west door
+  [',', -104, -100, -26, -24], // notable east door
+  [',', -104, -80, -14, -8], [',', -90, -80, -10, -6], // Rue de l'Église -> site A
+  [',', -100, -94, -24, -14], // east lane parvis/notable -> rue de l'Église
 
   // ======================= GARE DE TRIAGE (east) =======================
   ['.', 80, 174, 44, 56],                     // quai de fret
@@ -66,12 +89,7 @@ export const GRAND_CARVES = [
 // Enterable rooms: covered floor + thin walls on the listed sides. side: N (z = z0), S (z = z1), W (x = x0), E (x = x1).
 // open: [centre, kind] with kind 'door' (1.6 m), 'win' (1.8 m), 'gate' (3.2 m). ch: covered char (c 0, e +1.5, C +3, H hall 0).
 export const ROOMS = [
-  // Vieille-Ville
-  { ch: 'C', x0: -110, x1: -96, z0: -36, z1: -24, y: 3, sides: { W: [[-33, 'door'], [-28, 'win']], E: [[-34, 'win'], [-27, 'door']] } },          // Maison du Notable
-  { ch: 'e', x0: -122, x1: -114, z0: 4, z1: 14, y: 1.5, sides: { W: [[6, 'win'], [9, 'door'], [12, 'win']], E: [[11, 'door']] } },                  // Café du Marché
-  { ch: 'e', x0: -168, x1: -150, z0: 6, z1: 14, y: 1.5, sides: { W: [[10, 'door']], E: [[7.5, 'win'], [10.5, 'door'], [13, 'win']] } },             // Atelier du Tisserand
-  { ch: 'c', x0: -160, x1: -146, z0: 36, z1: 44, y: 0, sides: { N: [[-153, 'door']], S: [[-157, 'win'], [-151, 'gate']] } },                        // Remise des pêcheurs
-  { ch: 'c', x0: -130, x1: -118, z0: 36, z1: 44, y: 0, sides: { N: [[-122, 'door']], S: [[-127, 'gate'], [-121, 'win']] } },                        // Saurisserie
+  // Vieille-Ville: interiors are carved directly (Halle aux poissons, Café, Maison du Notable)
   // Gare
   { ch: 'c', m: 'corr', x0: 86, x1: 104, z0: 24, z1: 36, y: 0, sides: { N: [[92, 'door'], [99, 'win']], S: [[90, 'gate'], [99, 'gate']], E: [[30, 'door']] } },   // Entrepôt 1
   { ch: 'c', m: 'corr', x0: 146, x1: 166, z0: 24, z1: 36, y: 0, sides: { N: [[152, 'door'], [160, 'win']], S: [[150, 'gate'], [161, 'gate']] } },               // Entrepôt 2
@@ -131,14 +149,14 @@ export const OBJECTIVES = {
 export const REGION = { D: [-176, -40], A: [-90, 10], B: [10, 90], C: [40, 176] };
 
 export const GRAND_LABELS = [
-  ['Haute-Ville', -140, -50], ['Rue Haute', -100, -44], ['Placette', -127, -29], ['Notable', -103, -30], ['Tanneurs', -148, -24],
-  ["Rue de l'Église", -120, -8], ['Marché', -136, 10], ['Café du Marché', -118, 9], ['Tisserand', -159, 10], ['Rue du Marché', -100, 22],
-  ['Port de pêche', -140, 50], ['Remise', -153, 40], ['Saurisserie', -124, 40], ['Escalier du Port', -90, 30],
+  ['Place Haute', -155, -47], ['Rue Haute', -112, -42], ['Jardins du Cloître', -165, -28], ['Parvis Saint-Roch', -134, -24], ['Notable', -110, -28],
+  ["Rue de l'Église", -92, -11], ['Grande Place', -136, 0], ['Café', -106, 8], ['Tisserand', -167, 12], ['Placette du Four', -103, 18], ['Rue du Marché', -88, 21],
+  ['Cour des Pêcheurs', -149, 32], ['Halle aux poissons', -126, 34], ['Cour du Four', -106, 32], ['Port de pêche', -140, 50], ['Escalier du Port', -89, 32],
   ['Gare', 143, -34], ['Place de la Gare', 140, -48], ['Quais', 140, 6], ['Voies', 100, 4], ['Passage à niveau', 116, 4],
   ['Rue du Triage', 150, 22], ['Entrepôt 1', 95, 30], ['Entrepôt 2', 156, 30], ['Quai de fret', 140, 48], ['Dépôt', 133, 30],
   ['Descente du Bastion', 86, -37],
 ].map(([text, x, z]) => ({ text, x, z }));
 
 // CTF and chokes are unchanged (the Citadelle). Extra chokes for the defenders' roamers on the wings:
-export const GRAND_CHOKES = [[-169, 0], [-148, 0], [-112, 0], [-94, 0], [-138, 28], [-112, 28], [-127, -30], [-80, 22], [-80, -8],
+export const GRAND_CHOKES = [[-168, -8], [-136, -8], [-98, -6], [-170, 25], [-148, 24], [-126, 24], [-108, 25], [-90, 26], [-111, 8], [-153, -18], [-125, -36], [-80, 22], [-80, -8],
   [116, 22], [116, -26], [90, 0], [168, 0], [133, 30], [80, -2], [78, 39], [89, -37]];
