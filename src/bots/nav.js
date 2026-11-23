@@ -136,6 +136,69 @@ export class NavGrid {
     }
   }
 
+  // ---- multi-storey houses: small per-floor grids linked by stair portals ----
+  // houses: [{id, rect:{x0,x1,z0,z1}, floors: Map(k -> {k, y, grid, rect}), portals: [{k, bottom:{x,z}, top:{x,z}}], base}]
+  // A floor k >= 1 is picked when (x, z) is inside the house and y is within [F_k - 1.2, F_k + 2.4]; floor 0 = this grid.
+  setLayers(houses) { this.houses = houses && houses.length ? houses : null; }
+  layerAt(x, z, y) {
+    if (y == null || !this.houses) return null;
+    for (const h of this.houses) {
+      const r = h.rect; if (x < r.x0 - 0.3 || x > r.x1 + 0.3 || z < r.z0 - 0.3 || z > r.z1 + 0.3) continue;
+      for (const L of h.floors.values()) if (y > L.y - 1.2 && y < L.y + 2.4) return L;
+      return null;
+    }
+    return null;
+  }
+  // {h, p} when (x, z, y) is on the flight of portal p (between its two floors), else null
+  stairAt(x, z, y) {
+    if (!this.houses || y == null) return null;
+    for (const h of this.houses) {
+      const r = h.rect; if (x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1) continue;
+      for (const p of h.portals) {
+        const ya = p.k === 0 ? h.base : h.floors.get(p.k)?.y, yb = h.floors.get(p.k + 1)?.y; if (ya == null || yb == null || y < ya + 0.3 || y > yb - 0.3) continue;
+        if (x < Math.min(p.bottom.x, p.top.x) - 0.9 || x > Math.max(p.bottom.x, p.top.x) + 0.9 || z < Math.min(p.bottom.z, p.top.z) - 0.9 || z > Math.max(p.bottom.z, p.top.z) + 0.9) continue;
+        return { h, p };
+      }
+      return null;
+    }
+    return null;
+  }
+  findPath(sx, sz, gx, gz, maxIter = 40000, penalty = null, sy = null, gy = null) {
+    let A = this.layerAt(sx, sz, sy); const B = this.layerAt(gx, gz, gy);
+    const st = this.stairAt(sx, sz, sy);
+    if (!A && !B && !st) return this._findPath(sx, sz, gx, gz, maxIter, penalty);
+    const out = []; let cx = sx, cz = sz;
+    if (st) { // standing on a flight of stairs: finish it first (up or down), the floor grids have a hole there
+      const { h, p } = st, wantK = B && B.house === h ? B.k : 0, up = wantK > p.k, q = up ? p.top : p.bottom;
+      out.push({ x: q.x, z: q.z, hard: true }); cx = q.x; cz = q.z; A = (up || p.k > 0) ? h.floors.get(up ? p.k + 1 : p.k) : null;
+    }
+    const seg = (grid, tx, tz, hardEnd) => { // walk inside one floor grid, then mark the end as a hard waypoint
+      if (Math.hypot(tx - cx, tz - cz) > 0.3) { const p = grid === this ? this._findPath(cx, cz, tx, tz, maxIter) : grid._findPath(cx, cz, tx, tz, 4000); if (!p) return false; out.push(...p); }
+      if (hardEnd) out.push({ x: tx, z: tz, hard: true });
+      cx = tx; cz = tz; return true;
+    };
+    const gridOf = (h, k) => (k === 0 ? this : h.floors.get(k).grid);
+    // down from A to the ground (or to B's floor when both are in the same house)
+    if (A) {
+      const h = A.house, stopK = B && B.house === h ? Math.min(B.k, A.k) : 0;
+      for (let k = A.k; k > stopK; k--) { const p = h.portals[k - 1]; if (!seg(gridOf(h, k), p.top.x, p.top.z, true)) return null; out.push({ x: p.bottom.x, z: p.bottom.z, hard: true }); cx = p.bottom.x; cz = p.bottom.z; }
+      if (B && B.house === h) {
+        for (let k = stopK; k < B.k; k++) { const p = h.portals[k]; if (!seg(gridOf(h, k), p.bottom.x, p.bottom.z, true)) return null; out.push({ x: p.top.x, z: p.top.z, hard: true }); cx = p.top.x; cz = p.top.z; }
+        if (!seg(gridOf(h, B.k), gx, gz, false)) return null;
+        return out;
+      }
+    }
+    if (B) { // up into B's house
+      const h = B.house;
+      for (let k = 0; k < B.k; k++) { const p = h.portals[k]; if (!seg(gridOf(h, k), p.bottom.x, p.bottom.z, true)) return null; out.push({ x: p.top.x, z: p.top.z, hard: true }); cx = p.top.x; cz = p.top.z; }
+      if (!seg(gridOf(h, B.k), gx, gz, false)) return null;
+      return out;
+    }
+    if (!seg(this, gx, gz, false)) return null;
+    return out;
+  }
+  _L(x, z, y) { const L = this.layerAt(x, z, y); return L ? L.grid : this; }
+
   // ---- helpers ----
   cellX(x) { return Math.floor((x - this.minX) / this.cell); }
   cellZ(z) { return Math.floor((z - this.minZ) / this.cell); }
@@ -146,8 +209,8 @@ export class NavGrid {
   }
   centerX(i) { return this.minX + ((i % this.w) + 0.5) * this.cell; }
   centerZ(i) { return this.minZ + (((i / this.w) | 0) + 0.5) * this.cell; }
-  isWalkable(x, z) { const i = this.index(x, z); return i >= 0 && !this.blocked[i]; }
-  clearance(x, z) { const i = this.index(x, z); return i < 0 ? 0 : this.clear[i]; }
+  isWalkable(x, z, y) { if (y != null && this.houses) { const g = this._L(x, z, y); if (g !== this) return g.isWalkable(x, z); } const i = this.index(x, z); return i >= 0 && !this.blocked[i]; }
+  clearance(x, z, y) { if (y != null && this.houses) { const g = this._L(x, z, y); if (g !== this) return g.clearance(x, z); } const i = this.index(x, z); return i < 0 ? 0 : this.clear[i]; }
 
   nearestWalkable(i, maxR = 16) {
     if (i < 0) return -1;
@@ -169,7 +232,8 @@ export class NavGrid {
     return -1;
   }
   /** nearest walkable point {x,z} to (x,z) (clamped into grid) */
-  snap(x, z) {
+  snap(x, z, y) {
+    if (y != null && this.houses) { const g = this._L(x, z, y); if (g !== this) return g.snap(x, z); }
     const cx = Math.min(this.w - 1, Math.max(0, this.cellX(x))), cz = Math.min(this.h - 1, Math.max(0, this.cellZ(z)));
     const i = this.nearestWalkable(cz * this.w + cx, 30);
     if (i < 0) return null;
@@ -178,7 +242,8 @@ export class NavGrid {
   }
 
   /** straight walkable segment test on the inflated grid */
-  los(ax, az, bx, bz) {
+  los(ax, az, bx, bz, y) {
+    if (y != null && this.houses) { const g = this._L(ax, az, y); if (g !== this) return g.los(ax, az, bx, bz); }
     const dx = bx - ax, dz = bz - az;
     const len = Math.hypot(dx, dz);
     const step = this.cell * 0.35;
@@ -192,7 +257,8 @@ export class NavGrid {
   }
 
   /** random walkable point within radius r of (x,z); rand: () => [0,1) */
-  randomPointNear(x, z, r, rand = Math.random, minClear = 1, tries = 24) {
+  randomPointNear(x, z, r, rand = Math.random, minClear = 1, tries = 24, y = null) {
+    if (y != null && this.houses) { const g = this._L(x, z, y); if (g !== this) return g.randomPointNear(x, z, r, rand, minClear, tries); }
     for (let k = 0; k < tries; k++) {
       const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * r;
       const px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
@@ -205,7 +271,7 @@ export class NavGrid {
   /**
    * A* from (sx,sz) to (gx,gz). Returns array of {x,z} (smoothed, starting AFTER the start point) or null.
    */
-  findPath(sx, sz, gx, gz, maxIter = 40000, penalty = null) {
+  _findPath(sx, sz, gx, gz, maxIter = 40000, penalty = null) {
     const s = this.nearestWalkable(this.index(sx, sz), 8);
     const gi0 = this.index(gx, gz);
     const goal = this.nearestWalkable(gi0, 20);
@@ -225,6 +291,10 @@ export class NavGrid {
       return (dx + dz) + (SQRT2 - 2) * Math.min(dx, dz);
     };
     const links = this.links && this.links.size ? this.links : null;
+    // long trips across the grand map: weighted A* (greedier, explores a narrow band) with a larger budget, else a
+    // 300 m route exhausts maxIter and the bot walks straight into a wall
+    const far = !penalty && Math.hypot(gx - sx, gz - sz) > 60, HW = far ? 1.6 : 1.02;
+    if (far) maxIter = Math.max(maxIter, 150000);
     G[s] = 0; P[s] = -1; ST[s] = gen;
     heap.push(s, hfun(s));
     let found = false, iter = 0;
@@ -254,7 +324,7 @@ export class NavGrid {
           const ng = gc + cost;
           if (ST[j] !== gen || ng < G[j]) {
             ST[j] = gen; G[j] = ng; P[j] = cur;
-            heap.push(j, ng + hfun(j) * 1.02);
+            heap.push(j, ng + hfun(j) * HW);
           }
         }
       }
@@ -262,7 +332,7 @@ export class NavGrid {
       if (ls) for (const l of ls) {
         const j = l.to; if (CL[j] === gen) continue;
         const ng = gc + l.cost;
-        if (ST[j] !== gen || ng < G[j]) { ST[j] = gen; G[j] = ng; P[j] = cur; heap.push(j, ng + hfun(j) * 1.02); }
+        if (ST[j] !== gen || ng < G[j]) { ST[j] = gen; G[j] = ng; P[j] = cur; heap.push(j, ng + hfun(j) * HW); }
       }
     }
     if (!found) return null;
