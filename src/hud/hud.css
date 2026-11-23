@@ -532,3 +532,19 @@
 .nv-hud.is-zombie .nv-wins, .nv-hud.is-zombie .nv-bombpill { display: none; }
 .nv-hud.is-zombie .nv-tm.them .sc { color: #9fd36a; }
 .nv-hud.is-zombie .nv-tm.them .side { color: #b7e08a; }
+
+/* carte entière (N, 3e cran) : remplace la minimap en haut à gauche */
+.nv-bigmap { position: absolute; top: 16px; left: 16px; width: min(64vw, 1040px); display: none; flex-direction: column; gap: 6px; padding: 8px 10px;
+  background: rgba(4, 10, 16, .78); border: 1px solid rgba(64, 217, 255, .3); border-radius: 6px; z-index: 6; pointer-events: none; }
+.nv-bigmap.on { display: flex; }
+.nv-bigmap canvas { width: 100%; height: auto; display: block; }
+.nv-hud.is-bigmap .nv-mm { display: none; }
+.nv-bm-head { display: flex; gap: 14px; align-items: baseline; color: #cfe6f5; letter-spacing: .2em; font-size: 12px; text-transform: uppercase; }
+.nv-bm-head b { color: #40d9ff; font-weight: 700; }
+.nv-bm-obj { color: #ffcf4d; letter-spacing: .06em; font-size: 14px; text-transform: none; font-weight: 600; }
+.nv-bm-leg { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; color: #b8cfdd; font-size: 11px; letter-spacing: .06em; }
+.nv-bm-leg i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: -9px; }
+.nv-bm-leg i.me { background: #fff; border-radius: 1px; clip-path: polygon(50% 0, 100% 100%, 50% 75%, 0 100%); }
+.nv-bm-leg i.al { background: #40d9ff; } .nv-bm-leg i.en { background: #ff4a3a; }
+.nv-bm-leg i.si { border: 2px dashed #ffcf4d; background: transparent; } .nv-bm-leg i.bo { background: #ffcf4d; border-radius: 2px; }
+.nv-bm-leg span { opacity: .55; margin-left: 8px; }
