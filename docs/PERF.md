@@ -90,3 +90,16 @@ Le décor seul fait ~107 draw calls (`NOSOLD=1`) : le reste, ce sont les soldats
 - **Grande bataille** (> 40 soldats) : pas d'ombre dynamique au-delà de 60 m ; les soldats visibles au-delà de 60 m sont
   dessinés par `soldiers/crowd.js` en 2 draw calls pour tous (corps + fusil instanciés, matrices des os dans une texture
   flottante, une ligne par soldat). Capture comparée : mêmes poses et couleurs, seule l'AO des silhouettes lointaines manque.
+
+### Décor découpé en tuiles (`core/chunks.js`)
+Le monde est fusionné par matériau en maillages de ~350 m (`world_stone`, `world_leaf`…) : le frustum culling ne pouvait
+jamais en écarter un, donc les passes couleur et AO dessinaient toute la carte (~520 k triangles) quel que soit le regard.
+Après `createWorld`, `chunkStatics(scene)` découpe chaque maillage statique de plus de 15 k triangles en tuiles de 96 m
+(index par tuile, tampons de sommets partagés, donc pas de mémoire GPU en plus hors index). Rendu identique au pixel près
+(7 points de vue, culling actif / coupé, 0 pixel différent). Tuiles de 48 m essayées : −22 % de triangles mais +76 % de
+draw calls, donc 96 m et seuil de 15 k triangles.
+| 40c40, 3 graines | avant | après |
+|---|---|---|
+| triangles / image | 1 549 k | 1 116 k (−28 %) |
+| draw calls / image | 450 | 444 |
+| triangles passe AO | 567 k | 390 k |

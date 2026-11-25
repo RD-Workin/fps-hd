@@ -6,6 +6,7 @@ import { SKILLS, SKILL_IDS } from './skill.js';
 import { Brain } from './brain.js';
 import { createBotLamps } from './lamps.js';
 import { wrapPathCache, takePathBudget, PATH_BUDGET } from './pathcache.js';
+import { createSpatialGrid } from './spatial.js';
 export { DIFFICULTY, SKILLS, SKILL_IDS };
 
 const _oc = new THREE.Vector3();
@@ -42,6 +43,9 @@ export function createBots(ctx) {
     // up to 3 A* per frame, but stop once ~2 ms went into path-finding this frame (long cross-map paths at round start
     // used to stack 3 x 6 ms in one frame = visible hitch); a bot that waits a frame keeps following its previous path
     pathSpent: 0,
+    grid: createSpatialGrid(), // spatial.js (perf / 40c40)
+    near(x, z, r, cb) { return this.grid.near(x, z, r, cb); },
+    inBox(minX, minZ, maxX, maxZ, cb) { return this.grid.inBox(minX, minZ, maxX, maxZ, cb); },
     takePathBudget() { return takePathBudget(this); }, // pathcache.js (perf / 40c40)
     // difficulty: the team facing the player plays `level`, the player's own team always 'normal'
     level: 'normal',
@@ -106,6 +110,7 @@ export function createBots(ctx) {
     update(dt) {
       ensureNav();
       mgr.budget = PATH_BUDGET.count; mgr.pathSpent = 0;
+      mgr.grid.rebuild(ctx.actors); // spatial.js: mgr.near / mgr.inBox for the bots this frame
       brain.update(dt);
       for (const b of mgr.list) b.update(dt);
       mgr.lamps.update(dt);

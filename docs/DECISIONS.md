@@ -78,4 +78,11 @@ régulièrement (`git fetch origin claude/project-thread-h6ui6r && git merge FET
 - En grande bataille (> 40 soldats), les soldats visibles à > 60 m sont dessinés par `soldiers/crowd.js` (2 draw calls pour
   tous : corps + fusil instanciés, squelettes dans une texture) et ne projettent pas d'ombre dynamique ; leurs propres
   maillages sont masqués (`model.impl.inCrowd`). Le brassard est fusionné dans le corps (attribut `aBand`).
+- `src/bots/spatial.js` : grille de 4 m des acteurs, reconstruite une fois par image au début de `bots.update`.
+  `mgr.near(x, z, r, cb(actor, d2))` (distance horizontale exacte) et `mgr.inBox(minX, minZ, maxX, maxZ, cb(actor))`
+  (grossier : retester). Morts compris, le bot lui-même compris. `cb` qui renvoie true arrête la requête (qui renvoie true).
+- `src/core/chunks.js` : `chunkStatics(scene)` appelé dans `main.js` juste après `createWorld`. Les maillages statiques
+  de plus de 15 k triangles et de plus de 60 m (enfants directs de la scène, sauf `world_decal`) sont remplacés par des
+  tuiles de 96 m (même nom, même matériau, `userData.chunkOf`). Carte : si vous gardez une référence à un `world_*` après
+  sa création (pour le masquer, changer son matériau…), passez par le matériau ou ajoutez son nom à `CHUNK.skip`.
 - Bancs : `scripts/perf/split.cjs` (bots : animation / A* / perception), `profile.cjs`, `cpu.cjs`, `passes.cjs`.
