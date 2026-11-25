@@ -70,7 +70,7 @@ export function dressGrand(K) {
   Dumpster(-170.6, -4.6, true); Crate(-163, -5, 1.0); Barrel(-170.6, 2.6, BLUE);           // west stairs landing
   // Café du Marché ('e', +1.5): tables, counter, shelves
   Floor(-110, -102, 2, 14, 'wood', 0xa8855e); Counter(-103.6, 3, -102.6, 9, 1.05); CafeTable(-108, 4.6); CafeTable(-107.6, 9.6); CafeTable(-105, 12.4);
-  Shelf('z', -1, -102, 10, 13.6, 2.2);
+  Shelf('x', -1, -102, 10, 13.6, 2.2); // café east wall
   // east street + Placette du Four (+1.5): café terrace, tree, carts
   Dumpster(-95.6, -2.6, false); Crate(-98.6, 2.6); Crate(-98.6, 3.8, 1.0); Barrel(-95.4, 7.2, RUST);
   CafeTable(-110, 16.4, 0); CafeTable(-106.4, 17.8, 2); Tree(-101, 19.4, 5.5, 2.4); Planter(-97.6, 15.4, -95.4, 17.6); Cart(-112, 20.6, R);
@@ -103,7 +103,7 @@ export function dressGrand(K) {
   for (const x of [-138, -112, -94]) Lamp(x, x < -120 ? -44.6 : -38.6, 0);
   // Maison du Notable ('C', +3)
   Floor(-116, -104, -34, -22, 'wood', 0x9c7b56); Rug(-113, -107, -31, -25, 1);
-  Counter(-114.6, -33.4, -110, -32.4, 0.95, 0x7d5a36); Shelf('x', 1, -34, -109, -105, 2.4); Rack(-106.2, -24.6, -104.4, -22.8, 2.2); CafeTable(-110, -27.4);
+  Counter(-114.6, -33.4, -110, -32.4, 0.95, 0x7d5a36); Shelf('z', 1, -34, -109, -105, 2.4); Rack(-106.2, -24.6, -104.4, -22.8, 2.2); CafeTable(-110, -27.4);
   // east lane + Rue de l'Église
   Crate(-96, -19.6); Crate(-96, -18.4, 1.0); Barrel(-99.2, -15.2, BLUE); Cart(-92, -11.2, 0); Pot(-102.4, -13); Barrel(-84.6, -9.4, BLUE);
   for (const x of [-100, -86]) Lamp(x, -13.6, 0);
@@ -112,7 +112,7 @@ export function dressGrand(K) {
   for (const [x, z] of [[-92.4, -22.6], [-90, -22.6], [-87.6, -22.6], [-91.2, -16.2], [-88.4, -16.2]]) LowWall(x - 0.5, z - 0.18, x + 0.5, z + 0.18, 0.95);
   Cypress(-85.4, -23, 6.5); Cypress(-93.2, -14.8, 6); Counter(-86.4, -17.6, -84.6, -15.2, 1.2, 0x8b8578); Stack(-96.4, -22.6, 2, 1.1); Sandbags(-99.6, -16.6, -97.6, -15.6, 1.0);
   for (const z of [-50, -38, -16]) laundry(V(-170, 7.4, z), V(-150, 7.6, z + 0.6));
-  vine('z', 1, -150, -26, -20, 3.2, 7.6); vine('x', -1, -34, -116, -110, 3.3, 7.4, 0xe07a2a); vine('z', -1, -112, 4, 10, 1.6, 5.8);
+  vine('x', 1, -150, -26, -20, 3.2, 7.6); vine('z', -1, -38, -116, -110, 3.3, 7.4, 0xe07a2a); vine('x', -1, -112, 4, 10, 1.6, 5.8); // (ax = the wall's normal axis: these were swapped and sat 60-110 m north of the map)
   for (const [x, z] of [[-168.6, -52], [-118.6, -33.4], [-150, 21.2], [-127, -0.8]]) Pot(x, z);
 
   function marketHall(x0, x1, z0, z1) { // open market hall: stone pillars every ~4 m, timber roof out of reach (5.3 m)

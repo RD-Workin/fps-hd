@@ -46,7 +46,7 @@ ctx.player = new Player(ctx);
 
 preloadSoldiers(renderer);        // start fetching the HD soldier glb right away
 ctx.world = createWorld(ctx);     // map, lights, sky, post-processing, colliders, spawns, sites
-ctx.worldChunks = chunkStatics(scene); // perf: map-wide static meshes split into 96 m tiles so frustum culling works (core/chunks.js)
+ctx.worldChunks = chunkStatics(scene, { bounds: ctx.world.bounds }); // perf: map-wide static meshes split into 96 m tiles so frustum culling works (core/chunks.js)
 ctx.weapon = createWeapon(ctx);   // viewmodel, shooting, recoil, reload, effects
 ctx.bots = createBots(ctx);       // AI actors
 ctx.game = createGame(ctx);       // Search & Destroy rules

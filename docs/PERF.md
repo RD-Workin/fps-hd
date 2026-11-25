@@ -104,6 +104,12 @@ draw calls, donc 96 m et seuil de 15 k triangles.
 | draw calls / image | 450 | 444 |
 | triangles passe AO | 567 k | 390 k |
 
+Décor hors carte (nov. 2026) : tout ce qui dépasse la zone jouable (+4 m) est regroupé en UN chunk par côté (N/S/E/O)
+au lieu d'une tuile tous les 96 m (`opts.bounds`) : 29 → 10 chunks lointains, 76 → 57 au total. 40c40 graine 7 :
+1 181 → 1 092 draw calls par image (passe couleur 806 → 761, AO 357 → 313). Au passage, 3 vignes et 2 étagères de
+`grandZones.js` avaient l'axe inversé et flottaient 50 à 110 m au nord de la carte (7,8 k triangles invisibles + 2
+collisions fantômes) : remises sur leurs murs (Parvis, Rue Haute, Grande Place, Café, Notable).
+
 ### Feuillage et compteur d'i/s (nov. 2026)
 - Touffes de feuillage < 0,35 m (fleurs, jardinières, tas de filets) en icosaèdre 20 triangles au lieu de 80
   (`world/kit2.js`, `blob`, accord du thread carte) : décor statique 556 k → 481 k triangles (−75 k, −13 %).
