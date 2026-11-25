@@ -46,17 +46,22 @@ export class Squads {
     const teams = [], laneUse = {};
     P.laneShift ??= Math.floor(Math.random() * 4);
     const nT = groups.length, cen = g => ({ x: g.reduce((a, b) => a + b.position.x, 0) / g.length, z: g.reduce((a, b) => a + b.position.z, 0) / g.length });
-    let farK = -1, farD = 110; // a team that landed > 110 m from the main site is the natural pressure team
-    groups.forEach((g, k) => { if (g.length && !g.includes(carrier)) { const d = hd(cen(g), site.center); if (d > farD) { farD = d; farK = k; } } });
+    // site allocation: ~55 % of the teams (the carrier's first) on the main site; the rest pressure the other active
+    // sites, at least one team per site when there are enough teams (every objective fixed, defenders can't all
+    // rotate), each site taking the closest free team. Small games (< 3 teams) all go main.
+    const tgtOf = new Map(), free = groups.map((g, k) => k).filter(k => groups[k].length && !groups[k].includes(carrier));
+    const nPress = nT >= 3 ? Math.min(free.length, Math.floor(nT * 0.45)) : 0;
+    for (let n = 0; n < nPress && others.length; n++) {
+      const st = others[n % others.length];
+      free.sort((a, b) => hd(cen(groups[a]), st.center) - hd(cen(groups[b]), st.center));
+      tgtOf.set(free.shift(), st);
+    }
     groups.forEach((g, k) => {
       if (!g.length) return;
       const from = { x: g.reduce((a, b) => a + b.position.x, 0) / g.length, z: g.reduce((a, b) => a + b.position.z, 0) / g.length };
       let tgt = site;
       const hasCarrier = carrier && g.includes(carrier);
-      const near = [...B.sites()].sort((a, b) => hd(from, a.center) - hd(from, b.center))[0];
-      // concentration of force: only ONE team (the farthest from the main site, 3+ teams) pressures another site
-      if (!hasCarrier && nT >= 3 && k === farK && near && near !== site) tgt = near;
-      else if (farK < 0 && !hasCarrier && others.length && nT >= 3 && k === nT - 1) tgt = [...others].sort((a, b) => hd(from, a.center) - hd(from, b.center))[0];
+      if (tgtOf.has(k)) tgt = tgtOf.get(k);
       const hand = (routes[tgt.name] || []).filter(l => hd({ x: l[0][0], z: l[0][1] }, from) < 30);
       const lanes = hand.length ? hand : B.autoRoutes(from, tgt);
       const u = laneUse[tgt.name] = (laneUse[tgt.name] ?? -1) + 1; // teams on the same site take different streets
@@ -110,6 +115,7 @@ export class Squads {
         for (const t of pending) { t.state = 'go'; t.goAt = now; if (!contact) B.pushUtility?.(t); }
       }
     }
+    this.overwatch(alive);
     for (const t of P.teams) this.teamGoals(t, alive, game, carrier, now);
   }
 
@@ -126,7 +132,16 @@ export class Squads {
     }
   }
 
-  alive(t, set) { return t.members.filter(b => b.alive && set.has(b)); }
+  // members on the move with the team (the marksman left on a cleared roof / window is out of the team's drill)
+  alive(t, set) { const ow = this.brain.plan.ow; return t.members.filter(b => b.alive && set.has(b) && !ow?.has(b)); }
+  // the marksman: holds the window / roof spot, crouched behind the sill (standing behind a parapet), weapon on the site
+  overwatch(set) {
+    const ow = this.brain.plan.ow; if (!ow) return;
+    for (const [b, s] of ow) {
+      if (!b.alive || !set.has(b)) { ow.delete(b); continue; }
+      b.goal = { x: s.x, z: s.z, y: s.y, tol: 0.7, speed: 'tac', look: s.look, watch: s.look, crouch: !s.roof, anchor: s, huntRange: 3, noCover: true, exact: true };
+    }
+  }
   head(t) { return t.members.find(b => b.alive); }
   staged(t, set) {
     const m = this.alive(t, set); if (!m.length || !t.stage) return 1;
