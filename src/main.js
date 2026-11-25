@@ -80,15 +80,26 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 // Perf overlay: F3 or ?fps — fps, frame ms, draw calls, triangles, bots ms (see docs/PERF.md)
-const perf = { on: /[?&]fps/.test(location.search), el: null, frames: 0, acc: 0, botsMs: 0, last: '' };
-addEventListener('keydown', e => { if (e.code === 'F3') { e.preventDefault(); perf.on = !perf.on; if (perf.el) perf.el.style.display = perf.on ? 'block' : 'none'; } });
+// Perf overlay (docs/PERF.md): F3, ?fps or menu « Compteur d'i/s ». Average fps, worst frame and 1 % low over the last
+// 2 s, frame ms, draw calls, triangles, bots ms, pixel ratio. ctx.perf.set(on) (HUD), state kept in localStorage.
+const perf = { on: /[?&]fps/.test(location.search), el: null, frames: 0, acc: 0, botsMs: 0, hist: new Float32Array(240), hn: 0 };
+try { if (localStorage.getItem('nova.fps') === '1') perf.on = true; } catch { /* private mode */ }
+ctx.perf = {
+  get on() { return perf.on; },
+  set(on) { perf.on = !!on; if (perf.el) perf.el.style.display = perf.on ? 'block' : 'none'; try { localStorage.setItem('nova.fps', perf.on ? '1' : '0'); } catch { /* ignore */ } ctx.events.emit('perf:toggle', { on: perf.on }); },
+};
+ctx.events.emit('perf:toggle', { on: perf.on }); // the HUD (created above) shows the saved state
+addEventListener('keydown', e => { if (e.code === 'F3') { e.preventDefault(); ctx.perf.set(!perf.on); } });
 function perfTick(dt, botsMs) {
   if (!perf.on) return;
   if (!perf.el) { perf.el = Object.assign(document.createElement('div'), { style: 'position:fixed;right:8px;top:50%;z-index:99;font:12px/1.35 monospace;color:#9f9;background:#000a;padding:6px 8px;pointer-events:none;white-space:pre' }); document.body.appendChild(perf.el); }
   perf.frames++; perf.acc += dt; perf.botsMs += botsMs;
+  perf.hist[perf.hn++ % perf.hist.length] = dt;
   if (perf.acc >= 0.5) {
-    const i = renderer.info.render;
-    perf.el.textContent = `${(perf.frames / perf.acc).toFixed(0)} i/s  ${(perf.acc / perf.frames * 1000).toFixed(1)} ms\ndraw ${i.calls}  tri ${(i.triangles / 1000).toFixed(0)}k\nbots ${(perf.botsMs / perf.frames).toFixed(2)} ms  px ${renderer.getPixelRatio().toFixed(2)}`;
+    const i = renderer.info.render, n = Math.min(perf.hn, perf.hist.length), h = Array.from(perf.hist.subarray(0, n)).sort((x, y) => y - x);
+    const worst = h[0] * 1000, low1 = 1 / (h[Math.floor(n * 0.01)] || 1), fps = perf.frames / perf.acc;
+    perf.el.style.color = fps >= 55 ? '#9f9' : fps >= 40 ? '#fd6' : '#f77';
+    perf.el.textContent = `${fps.toFixed(0)} i/s  ${(perf.acc / perf.frames * 1000).toFixed(1)} ms\n1 % bas ${low1.toFixed(0)} i/s  pire ${worst.toFixed(0)} ms\ndraw ${i.calls}  tri ${(i.triangles / 1000).toFixed(0)}k\nbots ${(perf.botsMs / perf.frames).toFixed(2)} ms  px ${renderer.getPixelRatio().toFixed(2)}\nacteurs ${ctx.actors.length}`;
     perf.frames = 0; perf.acc = 0; perf.botsMs = 0;
   }
 }

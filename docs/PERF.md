@@ -103,3 +103,10 @@ draw calls, donc 96 m et seuil de 15 k triangles.
 | triangles / image | 1 549 k | 1 116 k (−28 %) |
 | draw calls / image | 450 | 444 |
 | triangles passe AO | 567 k | 390 k |
+
+### Feuillage et compteur d'i/s (nov. 2026)
+- Touffes de feuillage < 0,35 m (fleurs, jardinières, tas de filets) en icosaèdre 20 triangles au lieu de 80
+  (`world/kit2.js`, `blob`, accord du thread carte) : décor statique 556 k → 481 k triangles (−75 k, −13 %).
+- Compteur d'i/s : F3, `?fps` ou menu Réglages « Compteur d'i/s » (mémorisé). Affiche i/s moyen, « 1 % bas » et pire image
+  sur les ~240 dernières images, ms/image, draw calls, triangles, ms des bots, pixel ratio, nombre d'acteurs.
+  Couleur : vert ≥ 55 i/s, jaune ≥ 40, rouge en dessous.

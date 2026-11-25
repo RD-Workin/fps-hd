@@ -111,6 +111,7 @@ function markup() {
         <label data-only="ctf">Vies par manche</label><div data-only="ctf" class="nv-range"><input type="range" data-set="clives" min="0" max="15" step="1"><output></output></div>
         <label data-sd>Camp de départ</label><div class="nv-seg" data-sd data-set="side"><button data-v="ATK">ATTAQUE</button><button data-v="DEF">DÉFENSE</button><button data-v="RND">ALÉATOIRE</button></div>
         <label>Qualité graphique</label><div class="nv-seg" data-set="quality"><button data-v="low">BASSE</button><button data-v="high">HAUTE</button></div>
+        <label>Compteur d'i/s</label><div class="nv-seg" data-set="fps"><button data-v="0">MASQUÉ</button><button data-v="1">AFFICHÉ (F3)</button></div>
         <label>Sensibilité souris</label><div class="nv-range"><input type="range" data-set="sens" min="0.4" max="6" step="0.1"><output></output></div>
         <label>Volume</label><div class="nv-range"><input type="range" data-set="vol" min="0" max="100" step="1"><output></output><button class="nv-mute" data-sfx title="Couper le son (M)">${ICONS.speaker}</button></div>
       </div></div>
@@ -145,7 +146,7 @@ export function createHud(ctx) {
     sb: $('.nv-sb'), sbMeta: $('.nv-sb .meta'), sbTb: $('.nv-sb .tb'), menu: $('.nv-menu'), note: $('.nv-note'), pinfo: $('.nv-pinfo'),
     sbEnd: $('.nv-sb-end'), sbEndMeta: $('.nv-sb-end .meta'), sbEndTb: $('.nv-sb-end .tb'), scoresBtn: $('[data-act="scores"]'),
     result: $('.nv-result'), statgrid: $('.nv-statgrid'), playBtn: $('[data-act="play"]'), restartBtn: $('[data-act="restart"]'),
-    mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), side: $('[data-set="side"]'), skill: $('[data-set="skill"]'), night: $('[data-set="night"]'), lamp: $('.nv-lamp'), subT: $('.nv-sub .sub-t'), allies: $('[data-set="allies"]'), enemies: $('[data-set="enemies"]'), perfwarn: $('.nv-perfwarn'), preset: $('[data-set="preset"]'), rtime: $('[data-set="rtime"]'), obj: $('[data-set="obj"]'), btime: $('[data-set="btime"]'),
+    mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), fps: $('[data-set="fps"]'), side: $('[data-set="side"]'), skill: $('[data-set="skill"]'), night: $('[data-set="night"]'), lamp: $('.nv-lamp'), subT: $('.nv-sub .sub-t'), allies: $('[data-set="allies"]'), enemies: $('[data-set="enemies"]'), perfwarn: $('.nv-perfwarn'), preset: $('[data-set="preset"]'), rtime: $('[data-set="rtime"]'), obj: $('[data-set="obj"]'), btime: $('[data-set="btime"]'),
     mode: $('[data-set="mode"]'), zprog: $('[data-set="zprog"]'), ccaps: $('[data-set="ccaps"]'), cmin: $('[data-set="cmin"]'), cstep: $('[data-set="cstep"]'), clives: $('[data-set="clives"]'),
     flags: $('.nv-flags'), flagUs: $('.nv-flags .us'), flagThem: $('.nv-flags .them'), deathK: $('.nv-death .k'), deathR: $('.nv-death .r'),
     bombLb: $('.nv-bombpill .lb'), tagLine: $('.nv-tag'), desc: $('.nv-desc'), legObj: $('.nv-sb-leg .obj'),
@@ -197,6 +198,7 @@ export function createHud(ctx) {
     try { ctx.game?.setMode?.(settings.mode); ctx.game?.setZombieProgression?.(settings.zprog); ctx.game?.setZombieAllies?.(settings.zallies); } catch (e) { console.warn('[hud] mode', e); }
     try { ctx.world?.setQuality?.(settings.quality); } catch (e) { console.warn('[hud] setQuality', e); }
     for (const b of E.quality.children) b.classList.toggle('on', b.dataset.v === settings.quality);
+    for (const b of E.fps.children) b.classList.toggle('on', b.dataset.v === (ctx.perf?.on ? '1' : '0'));
     try { ctx.game?.setTeamSizes?.(settings.allies, settings.enemies); } catch (e) { console.warn('[hud] team sizes', e); }
     for (const [el, v, mn, mx] of [[E.allies, settings.mode === 'zombie' ? settings.zallies : settings.allies, 0, settings.mode === 'zombie' ? 19 : 39], [E.enemies, settings.enemies, 1, 40]]) {
       el.max = mx; el.value = v; el.nextElementSibling.value = v; el.style.setProperty('--p', ((v - mn) / (mx - mn) * 100) + '%');
@@ -260,6 +262,8 @@ export function createHud(ctx) {
     E.sound.classList.toggle('muted', muted); E.sound.classList.toggle('on', muted);
     E.vol.value = v; E.vol.nextElementSibling.value = v; E.vol.style.setProperty('--p', v + '%');
   }
+  E.fps.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { ctx.perf?.set(v === '1'); applySettings(); } });
+  ctx.events?.on?.('perf:toggle', () => { for (const b of E.fps.children) b.classList.toggle('on', b.dataset.v === (ctx.perf?.on ? '1' : '0')); });
   E.quality.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.quality = v; save(settings); applySettings(); } });
   E.side.addEventListener('click', e => { const v = e.target.closest('button')?.dataset.v; if (v) { settings.side = v; save(settings); applySettings(); if (ctx.game?.started) toast('Camp appliqué à la prochaine partie'); } });
   E.skill.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { settings.skill = b.dataset.v; save(settings); applySettings(); if (ctx.game?.started) toast(`Difficulté des ennemis : ${b.textContent}`); } });
