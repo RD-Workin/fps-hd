@@ -515,19 +515,41 @@ export function createHud(ctx) {
     for (const a of ctx.actors || []) if (!best || scoreOf(a) > scoreOf(best) || (scoreOf(a) === scoreOf(best) && stat(a).kills > stat(best).kills)) best = a;
     return best && scoreOf(best) > 0 ? best : null;
   }
+  // Rows the live board can show without leaving the screen (gap rows included). Row height measured on the last build.
+  const SB_TOP = 3; // leaders always listed above the window around the player
+  let sbRowH = 0;
+  function sbRows(tbEl) {
+    const td = tbEl.querySelector('td.n');
+    if (td?.offsetHeight) sbRowH = td.offsetHeight + 3; // + border-spacing
+    return Math.max(SB_TOP + 6, Math.floor((innerHeight * 0.92 - 130) / (sbRowH || 30)));
+  }
   function buildScoreboard(metaEl = E.sbMeta, tbEl = E.sbTb, final = false) {
     const g = ctx.game, p = ctx.player, actors = ctx.actors || [], mvp = final ? matchMvp() : null;
     const sorted = list => list.sort((a, b) => scoreOf(b) - scoreOf(a) || stat(b).kills - stat(a).kills);
     const ours = sorted(actors.filter(isAlly)), theirs = sorted(actors.filter(a => !isAlly(a)));
-    const row = a => {
+    const row = (a, i) => {
       const s = stat(a), x = extra.get(a) || { assists: 0, hs: 0 }, isMvp = a === mvp;
-      return `<tr class="${a.alive || final ? '' : 'dead'} ${a.isPlayer ? 'me' : ''} ${isMvp ? 'mvp' : ''}"><td class="n"><div class="nm"><span class="st"></span><span class="nmt">${esc(a.name)}</span>` +
+      return `<tr class="${a.alive || final ? '' : 'dead'} ${a.isPlayer ? 'me' : ''} ${isMvp ? 'mvp' : ''}"><td class="n"><div class="nm"><span class="rk">${i + 1}</span><span class="st"></span><span class="nmt">${esc(a.name)}</span>` +
         `${isMvp ? '<b class="mvpb">MVP</b>' : ''}${!final && a.hasBomb && isAlly(a) ? ICONS.bomb : ''}${!final && a.hasFlag ? '<b class="flagb">⚑</b>' : ''}` +
         `${!final && a.ctf ? `<small class="lives${a.ctf.out ? ' out' : ''}">${a.ctf.out ? 'ÉLIMINÉ' : a.ctf.lives + ' VIE' + (a.ctf.lives > 1 ? 'S' : '')}</small>` : ''}</div></td>` +
         `<td class="num">${s.kills}</td><td class="num">${x.assists}</td><td class="num">${s.deaths}</td><td class="num">${x.hs}</td>` +
         `<td class="num">${(s.plants || 0) + (s.defuses || 0) + (s.captures || 0) + (s.returns || 0)}</td><td class="num">${s.mvps || 0}</td><td class="num sc">${scoreOf(a)}</td></tr>`;
     };
-    const tbl = (k, name, list) => `<table class="${k}"><tr><th class="team">${name}</th><th>É</th><th>A</th><th>M</th><th>TÊTE</th><th>OBJ</th><th>MVP</th><th>SCORE</th></tr>${list.map(row).join('')}</table>`;
+    // Live board (Tab) in big battles (40c40): too many rows for the screen, so each column shows the top of the ranking,
+    // then a window centred on the player's rank (same ranks on both sides, rows stay aligned), "··· n" rows for the cut parts.
+    // The final board shows every row and scrolls to the player instead (toggleEndScores).
+    const meIdx = Math.max(0, ours.findIndex(a => a.isPlayer)), cap = final ? Infinity : sbRows(tbEl);
+    const gap = n => `<tr class="gap"><td colspan="8">··· ${n} joueur${n > 1 ? 's' : ''}</td></tr>`;
+    const rows = list => {
+      const L = list.length, all = () => list.map(row).join('');
+      if (L <= cap) return all();
+      const c = Math.min(meIdx, L - 1), W = cap - SB_TOP - 2, start = Math.max(0, Math.min(c - (W >> 1), L - W));
+      const seg = (a, b) => list.slice(a, b).map((x, k) => row(x, a + k)).join('');
+      if (start <= SB_TOP + 1) return seg(0, cap - 1) + gap(L - (cap - 1)); // player near the top: no middle cut
+      if (start + W >= L - 1) { const from = L - (cap - SB_TOP - 1); return seg(0, SB_TOP) + gap(from - SB_TOP) + seg(from, L); } // near the bottom
+      return seg(0, SB_TOP) + gap(start - SB_TOP) + seg(start, start + W) + gap(L - start - W);
+    };
+    const tbl = (k, name, list) => `<table class="${k}"><tr><th class="team">${name}</th><th>É</th><th>A</th><th>M</th><th>TÊTE</th><th>OBJ</th><th>MVP</th><th>SCORE</th></tr>${rows(list)}</table>`;
     const side = t => (isCtf() ? (t === 'DEF' ? 'CITADELLE' : 'PORT') : t === 'DEF' ? 'DÉFENSE' : 'ATTAQUE');
     const lbl = final ? ['ALLIÉS', 'ENNEMIS'] : [`ALLIÉS · ${side(p?.team)}`, `ENNEMIS · ${side(p?.team === 'ATK' ? 'DEF' : 'ATK')}`];
     html(metaEl, (final ? (mvp ? `MVP DU MATCH <b class="g">${esc(mvp.name)}</b> &nbsp; ` : '') : `MANCHE <b>${g?.round ?? 1}</b> &nbsp; `) +
@@ -538,6 +560,11 @@ export function createHud(ctx) {
     on = on ?? !E.sbEnd.classList.contains('on');
     if (on) buildScoreboard(E.sbEndMeta, E.sbEndTb, true);
     E.sbEnd.classList.toggle('on', on);
+    if (on) { // long list (40c40): open scrolled so the player's row sits in the middle
+      const me = E.sbEndTb.querySelector('tr.me'), box = E.sbEnd;
+      box.scrollTop = 0;
+      if (me && box.scrollHeight > box.clientHeight) box.scrollTop = me.getBoundingClientRect().top - box.getBoundingClientRect().top - (box.clientHeight - me.offsetHeight) / 2;
+    }
   }
   const pinEnd = on => { E.sbEnd.dataset.pinned = on ? '1' : ''; toggleEndScores(on); };
   E.scoresBtn.addEventListener('click', () => pinEnd(!E.sbEnd.classList.contains('on')));
