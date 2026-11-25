@@ -116,3 +116,16 @@ collisions fantômes) : remises sur leurs murs (Parvis, Rue Haute, Grande Place,
 - Compteur d'i/s : F3, `?fps` ou menu Réglages « Compteur d'i/s » (mémorisé). Affiche i/s moyen, « 1 % bas » et pire image
   sur les ~240 dernières images, ms/image, draw calls, triangles, ms des bots, pixel ratio, nombre d'acteurs.
   Couleur : vert ≥ 55 i/s, jaune ≥ 40, rouge en dessous.
+
+### Animation des soldats en 40c40 (nov. 2026, profil du thread escouades)
+Mesure : `posecost` (40c40, graine 7, rendu coupé, 15 s), temps de `pose()` des 79 soldiers par image.
+- `carry()` (squelette porté entre deux poses) faisait le produit 4x4 générique sur 68 matrices par soldat : c'était un
+  tiers du temps de pose. Le déplacement du root est toujours un lacet + translation, donc un produit dédié de 12
+  multiplications-additions par matrice (`yawPremul`, retombe sur le produit générique sinon ; écart max 1e-15).
+- Hors champ au-delà de 40 m, le squelette est caché et seules les hitbox suivent : pose complète toutes les 16 images
+  en 40c40 (au lieu de 6) et toutes les 8 en partie normale. Re-pose immédiate quand le soldat revient dans le champ.
+| par image | avant | après |
+|---|---|---|
+| poses complètes | 19,6 | 15,0 |
+| temps `pose()` | 3,39 ms | 2,66 ms (−22 %) |
+| temps bots total | 4,87 ms | 4,12 ms (−15 %) |
