@@ -434,11 +434,25 @@ export class Bot {
     const nav = this.mgr.nav; if (!nav) return dest;
     const t = this.ctx.time;
     const changed = !this.pathGoal || Math.hypot(this.pathGoal.x - dest.x, this.pathGoal.z - dest.z) > 1.2 || Math.abs((this.pathGoal.y ?? 0) - (dest.y ?? 0)) > 1.5;
+    // goal slid a few metres (follow / formation goals move with the leader): if the path's end walks straight to the
+    // new goal on the same level, retarget the end instead of a new A* (most of the 40c40 A* calls)
+    if (changed && this.path?.length && this.pathGoal && Math.hypot(this.pathGoal.x - dest.x, this.pathGoal.z - dest.z) < 5 &&
+      Math.abs((this.pathGoal.y ?? 0) - (dest.y ?? 0)) < 0.5 && Math.abs((dest.y ?? this.position.y) - this.position.y) < 1.5) {
+      const L = this.path.length, from = L > 1 ? this.path[L - 2] : this.position;
+      if (nav.los(from.x, from.z, dest.x, dest.z, this.position.y)) {
+        this.path[L - 1] = { ...this.path[L - 1], x: dest.x, z: dest.z }; this.pathI = Math.min(this.pathI, L - 1);
+        this.pathGoal = { x: dest.x, z: dest.z, y: dest.y }; this.mgr.pathPatched = (this.mgr.pathPatched || 0) + 1;
+        return this.followPathStep();
+      }
+    }
     if ((changed || !this.path || t > this.repathT) && this.mgr.takePathBudget()) {
       const tp = performance.now(); this.path = nav.findPath(this.position.x, this.position.z, dest.x, dest.z, undefined, undefined, this.position.y, dest.y); this.pathI = 0; this.mgr.pathSpent += performance.now() - tp;
       this.pathGoal = { x: dest.x, z: dest.z, y: dest.y }; this.repathT = t + rand(2.5, 4);
     }
     if (!this.path || !this.path.length) return changed ? null : dest;
+    return this.followPathStep();
+  }
+  followPathStep() {
     while (this.pathI < this.path.length - 1 && Math.hypot(this.path[this.pathI].x - this.position.x, this.path[this.pathI].z - this.position.z) < 0.45) this.pathI++;
     const wp = this.path[this.pathI];
     if (this.pathI === this.path.length - 1 && Math.hypot(wp.x - this.position.x, wp.z - this.position.z) < 0.25) return null;
