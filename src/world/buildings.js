@@ -106,8 +106,9 @@ function buildSegment(G, r, style0, x0, x1, z0, z1, h, alongX, outF, shopSigns, 
     G.stone.box(x0 - 0.04, ph, z0 - 0.04, x1 + 0.04, ph + 0.08, z1 + 0.04, trim, 'ny');
     for (const [k, [a, b, c, d]] of par) if (E[k]) G.stone.box(a - 0.04, hi, b - 0.04, c + 0.04, hi + 0.08, d + 0.04, trim, 'ny');
     sol([x0, y0, z0, x1, h - 0.05, z1]); // walkable roof
-    if (r() < 0.35) { const cx = x0 + 1.5 + r() * (x1 - x0 - 3), cz = z0 + 1.5 + r() * (z1 - z0 - 3); G.metal.box(cx - 0.6, h, cz - 0.6, cx + 0.6, h + 1.4, cz + 0.6, col(0xb9bdc0)); sol([cx - 0.6, h - 0.05, cz - 0.6, cx + 0.6, h + 1.4, cz + 0.6]); }
-    ROOF_SEGS.push({ x0, x1, z0, z1, h: h - 0.05, y0, flat: true, style, edge: E });
+    let vent = null;
+    if (r() < 0.35) { const cx = x0 + 1.5 + r() * (x1 - x0 - 3), cz = z0 + 1.5 + r() * (z1 - z0 - 3); vent = { x0: cx - 0.6, x1: cx + 0.6, z0: cz - 0.6, z1: cz + 0.6 }; G.metal.box(cx - 0.6, h, cz - 0.6, cx + 0.6, h + 1.4, cz + 0.6, col(0xb9bdc0)); sol([cx - 0.6, h - 0.05, cz - 0.6, cx + 0.6, h + 1.4, cz + 0.6]); }
+    ROOF_SEGS.push({ x0, x1, z0, z1, h: h - 0.05, y0, flat: true, style, edge: E, vent });
   }
   // facades on the 4 faces
   const faces = [{ ax: 'x', s: 1, p: x1, t0: z0, t1: z1 }, { ax: 'x', s: -1, p: x0, t0: z0, t1: z1 }, { ax: 'z', s: 1, p: z1, t0: x0, t1: x1 }, { ax: 'z', s: -1, p: z0, t0: x0, t1: x1 }];
