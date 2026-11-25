@@ -5,8 +5,11 @@ import * as THREE from 'three';
 export function extendKit(K) {
   const { G, col, mat4, solid, r, P, F, lift } = K;
   const R = Math.PI / 2;
-  const SPH = new THREE.IcosahedronGeometry(1, 1), CYL8 = new THREE.CylinderGeometry(1, 1, 1, 8), CYL14 = new THREE.CylinderGeometry(1, 1, 1, 14);
+  const SPH = new THREE.IcosahedronGeometry(1, 1), SPH0 = new THREE.IcosahedronGeometry(1, 0), CYL8 = new THREE.CylinderGeometry(1, 1, 1, 8), CYL14 = new THREE.CylinderGeometry(1, 1, 1, 14);
   const CONE = new THREE.ConeGeometry(1, 1, 9);
+  // foliage blob (perf thread, docs/PERF.md): small blobs (< 0.35 m: flowers, planters, net piles) use the 20-triangle
+  // icosahedron instead of the 80-triangle one, same look at that size
+  const blob = (m, c) => G.leaf.add(m.getMaxScaleOnAxis() < 0.35 ? SPH0 : SPH, m, c);
   const GREENS = [0x5f8a3c, 0x6c9742, 0x4f7636, 0x7da24a];
   const green = () => col(GREENS[(r() * GREENS.length) | 0], 0.85 + r() * 0.3);
   // rotated footprint helper: half extents of a (w along local x, d along local z) box turned by ry in {0, R}
@@ -15,18 +18,18 @@ export function extendKit(K) {
   // ---------- vegetation ----------
   const cypress = (x, z, h = 7) => {
     G.bark.add(CYL8, mat4(x, 0.5, z, 0, 0.14, 1, 0.14), col(0x6b5038));
-    G.leaf.add(SPH, mat4(x, 1 + (h - 1) / 2, z, r() * 3, 0.75, (h - 1) / 2, 0.75), col(0x34502c, 0.9 + r() * 0.2));
-    G.leaf.add(SPH, mat4(x + 0.1, 1 + (h - 1) * 0.36, z - 0.08, r() * 3, 0.88, (h - 1) * 0.3, 0.88), col(0x2e4827));
+    blob(mat4(x, 1 + (h - 1) / 2, z, r() * 3, 0.75, (h - 1) / 2, 0.75), col(0x34502c, 0.9 + r() * 0.2));
+    blob(mat4(x + 0.1, 1 + (h - 1) * 0.36, z - 0.08, r() * 3, 0.88, (h - 1) * 0.3, 0.88), col(0x2e4827));
     solid(x - 0.35, 0, z - 0.35, x + 0.35, Math.min(h, 4), z + 0.35, 'wood');
   };
   const bush = (x, z, rad = 0.7, y = 0, c = null) => {
-    for (let i = 0; i < 4; i++) { const a = r() * 6.28, d = rad * 0.45 * r(); G.leaf.add(SPH, mat4(x + Math.cos(a) * d, y + rad * 0.55 + r() * rad * 0.2, z + Math.sin(a) * d, r() * 3, rad * (0.6 + r() * 0.3), rad * (0.5 + r() * 0.2), rad * (0.6 + r() * 0.3)), c || green()); }
+    for (let i = 0; i < 4; i++) { const a = r() * 6.28, d = rad * 0.45 * r(); blob(mat4(x + Math.cos(a) * d, y + rad * 0.55 + r() * rad * 0.2, z + Math.sin(a) * d, r() * 3, rad * (0.6 + r() * 0.3), rad * (0.5 + r() * 0.2), rad * (0.6 + r() * 0.3)), c || green()); }
   };
-  const flowers = (x, z, rad, y, hex) => { for (let i = 0; i < 6; i++) { const a = r() * 6.28, d = rad * r(); G.leaf.add(SPH, mat4(x + Math.cos(a) * d, y + r() * 0.12, z + Math.sin(a) * d, 0, 0.11, 0.09, 0.11), col(hex, 0.9 + r() * 0.3)); } };
+  const flowers = (x, z, rad, y, hex) => { for (let i = 0; i < 6; i++) { const a = r() * 6.28, d = rad * r(); blob(mat4(x + Math.cos(a) * d, y + r() * 0.12, z + Math.sin(a) * d, 0, 0.11, 0.09, 0.11), col(hex, 0.9 + r() * 0.3)); } };
   const hedge = (x0, z0, x1, z1, h = 1.2) => { // dense clipped hedge: hides and blocks movement
     G.leaf.box(x0, 0, z0, x1, h, z1, col(0x48662f), 'ny', 1);
     const n = Math.ceil(Math.max(x1 - x0, z1 - z0) / 0.7);
-    for (let i = 0; i < n; i++) { const t = (i + 0.5) / n; G.leaf.add(SPH, mat4(x0 + (x1 - x0) * t, h - 0.05 + r() * 0.1, z0 + (z1 - z0) * t, r() * 3, Math.max(0.42, (x1 - x0) / n * 0.75), 0.3, Math.max(0.42, (z1 - z0) / n * 0.75)), green()); }
+    for (let i = 0; i < n; i++) { const t = (i + 0.5) / n; blob(mat4(x0 + (x1 - x0) * t, h - 0.05 + r() * 0.1, z0 + (z1 - z0) * t, r() * 3, Math.max(0.42, (x1 - x0) / n * 0.75), 0.3, Math.max(0.42, (z1 - z0) / n * 0.75)), green()); }
     solid(x0, 0, z0, x1, h, z1, 'dirt');
   };
   const planter = (x0, z0, x1, z1, plant = 'bush', h = 0.6) => { // stone planter box (low cover) with greenery
@@ -35,7 +38,7 @@ export function extendKit(K) {
     const L = Math.max(x1 - x0, z1 - z0), n = Math.max(1, Math.round(L / 1.1)), ax = (x1 - x0) >= (z1 - z0);
     for (let i = 0; i < n; i++) { const t = (i + 0.5) / n, px = ax ? x0 + (x1 - x0) * t : (x0 + x1) / 2, pz = ax ? (z0 + z1) / 2 : z0 + (z1 - z0) * t;
       if (plant === 'flowers') { bush(px, pz, 0.38, h + 0.02); flowers(px, pz, 0.4, h + 0.45, [0xd8468a, 0xf0c030, 0xe85a3a, 0xf4f0e8][(r() * 4) | 0]); }
-      else if (plant === 'cypress') { G.leaf.add(SPH, mat4(px, h + 1.5, pz, 0, 0.42, 1.5, 0.42), col(0x34502c)); }
+      else if (plant === 'cypress') { blob(mat4(px, h + 1.5, pz, 0, 0.42, 1.5, 0.42), col(0x34502c)); }
       else bush(px, pz, 0.55, h); }
     solid(x0, 0, z0, x1, h + (plant === 'cypress' ? 2.4 : 0.9), z1, 'concrete');
   };
@@ -48,12 +51,12 @@ export function extendKit(K) {
     const n = Math.round((t1 - t0) * (y1 - y0) * 2.2);
     for (let i = 0; i < n; i++) { const t = t0 + r() * (t1 - t0), y = y0 + Math.pow(r(), 0.7) * (y1 - y0), d = 0.08 + r() * 0.18, sc = 0.22 + r() * 0.2;
       const c = r() < 0.45 ? col(hex, 0.8 + r() * 0.4) : green();
-      if (ax === 'x') G.leaf.add(SPH, mat4(p + s * d, y, t, r() * 3, sc * 0.6, sc, sc), c); else G.leaf.add(SPH, mat4(t, y, p + s * d, r() * 3, sc, sc, sc * 0.6), c); }
+      if (ax === 'x') blob(mat4(p + s * d, y, t, r() * 3, sc * 0.6, sc, sc), c); else blob(mat4(t, y, p + s * d, r() * 3, sc, sc, sc * 0.6), c); }
   };
   const tree = (x, z, h = 6, rad = 2.6) => { // broad plane tree: trunk + canopy blobs
     G.bark.add(new THREE.CylinderGeometry(0.2, 0.32, h * 0.6, 9), mat4(x, h * 0.3, z), col(0xa89880));
     for (let i = 0; i < 3; i++) { const a = i * 2.1 + r(), L = h * 0.32; G.bark.add(new THREE.CylinderGeometry(0.08, 0.15, L, 6), mat4(x + Math.cos(a) * L * 0.3, h * 0.6 + L * 0.35, z + Math.sin(a) * L * 0.3, -a, 1, 1, 1, 0, 0.7), col(0xa89880)); }
-    for (let i = 0; i < 7; i++) { const a = r() * 6.28, d = rad * 0.55 * Math.sqrt(r()); G.leaf.add(SPH, mat4(x + Math.cos(a) * d, h * 0.78 + r() * h * 0.22, z + Math.sin(a) * d, r() * 3, rad * (0.5 + r() * 0.25), rad * (0.34 + r() * 0.15), rad * (0.5 + r() * 0.25)), green()); }
+    for (let i = 0; i < 7; i++) { const a = r() * 6.28, d = rad * 0.55 * Math.sqrt(r()); blob(mat4(x + Math.cos(a) * d, h * 0.78 + r() * h * 0.22, z + Math.sin(a) * d, r() * 3, rad * (0.5 + r() * 0.25), rad * (0.34 + r() * 0.15), rad * (0.5 + r() * 0.25)), green()); }
     solid(x - 0.3, 0, z - 0.3, x + 0.3, 3.5, z + 0.3, 'wood');
   };
 
@@ -90,7 +93,7 @@ export function extendKit(K) {
     for (const s of [-1, 1]) { G.wood.add(new THREE.BoxGeometry(1.9, 0.3, 0.05), mat4(x + Math.sin(ry) * s * 0.48, 0.9, z + Math.cos(ry) * s * 0.48, ry), c);
       G.wood.add(new THREE.TorusGeometry(0.42, 0.045, 6, 16), mat4(x + Math.sin(ry) * s * 0.58, 0.46, z + Math.cos(ry) * s * 0.58, ry), col(0x4a3520));
       G.wood.add(new THREE.BoxGeometry(1.1, 0.05, 0.05), mat4(x + Math.cos(ry) * 1.45 + Math.sin(ry) * s * 0.4, 0.74, z - Math.sin(ry) * 1.45 + Math.cos(ry) * s * 0.4, ry), c); }
-    for (let i = 0; i < 9; i++) G.leaf.add(SPH, mat4(x + (r() - 0.5) * 1.4 * (hx / 0.95 > 1.5 ? 1 : 0.5), 0.86 + r() * 0.12, z + (r() - 0.5) * 1.4 * (hz / 0.95 > 1.5 ? 1 : 0.5), 0, 0.15, 0.14, 0.15), col([0xd8462e, 0xf0a020, 0x7fae3a, 0xe9d36a][(r() * 4) | 0]));
+    for (let i = 0; i < 9; i++) blob(mat4(x + (r() - 0.5) * 1.4 * (hx / 0.95 > 1.5 ? 1 : 0.5), 0.86 + r() * 0.12, z + (r() - 0.5) * 1.4 * (hz / 0.95 > 1.5 ? 1 : 0.5), 0, 0.15, 0.14, 0.15), col([0xd8462e, 0xf0a020, 0x7fae3a, 0xe9d36a][(r() * 4) | 0]));
     solid(x - hx, 0, z - hz, x + hx, 1.05, z + hz, 'wood'); };
   const kiosk = (x, z, hex = 0x2f5f4a) => { // newsstand: full cover
     G.paint.box(x - 1.1, 0, z - 1.1, x + 1.1, 2.5, z + 1.1, col(hex), 'ny'); G.paint.box(x - 1.4, 2.5, z - 1.4, x + 1.4, 2.62, z + 1.4, col(hex, 0.7), '');
@@ -111,7 +114,7 @@ export function extendKit(K) {
     for (const x of [x0, x1]) for (const z of [z0, z1]) { G.wood.box(x - 0.09, 0, z - 0.09, x + 0.09, 2.6, z + 0.09, c, 'ny'); solid(x - 0.1, 0, z - 0.1, x + 0.1, 2.6, z + 0.1, 'wood'); }
     for (const z of [z0, z1]) G.wood.box(x0 - 0.3, 2.6, z - 0.06, x1 + 0.3, 2.75, z + 0.06, c, '');
     for (let x = x0; x <= x1 + 0.01; x += 0.7) G.wood.box(x - 0.04, 2.75, z0 - 0.3, x + 0.04, 2.85, z1 + 0.3, c, '');
-    for (let i = 0; i < (x1 - x0) * (z1 - z0) * 1.6; i++) G.leaf.add(SPH, mat4(x0 + r() * (x1 - x0), 2.9 + r() * 0.2, z0 + r() * (z1 - z0), r() * 3, 0.5, 0.16, 0.5), r() < 0.25 ? col(0xb04a9a) : green()); };
+    for (let i = 0; i < (x1 - x0) * (z1 - z0) * 1.6; i++) blob(mat4(x0 + r() * (x1 - x0), 2.9 + r() * 0.2, z0 + r() * (z1 - z0), r() * 3, 0.5, 0.16, 0.5), r() < 0.25 ? col(0xb04a9a) : green()); };
   const flag = (x, z, h = 8, v = 0) => { G.metal.add(CYL8, mat4(x, h / 2, z, 0, 0.05, h, 0.05), col(0xd8d4cc));
     G.cloth.quad([x, h - 1.3, z], [x + 2.0, h - 1.3, z], [x + 2.0, h - 0.1, z], [x, h - 0.1, z], [0, 0, 1], [v / 4 + 0.02, 0.9, (v + 1) / 4 - 0.02, 0.1], [1, 1, 1]); };
   const cannon = (x, z, ry = 0) => { const [hx, hz] = half(2.2, 1.2, ry), c = col(0x5a3f28);
@@ -132,7 +135,7 @@ export function extendKit(K) {
     G.paint.add(new THREE.BoxGeometry(1.1, 0.8, 1.0), mat4(x - Math.cos(ry) * 1.3, y + 1.3, z + Math.sin(ry) * 1.3, ry), col(0xf0ebe0)); G.glass.add(new THREE.BoxGeometry(1.14, 0.3, 0.8), mat4(x - Math.cos(ry) * 1.3, y + 1.42, z + Math.sin(ry) * 1.3, ry), col(0x2a3238));
     if (y > 0) for (const e of [-1.3, 1.1]) { const tx = x + Math.cos(ry) * e, tz = z - Math.sin(ry) * e; G.wood.add(new THREE.BoxGeometry(0.14, y + 0.25, 1.7), mat4(tx, (y + 0.25) / 2, tz, ry), col(0x6d4b2e)); }
     if (collide) solid(x - hx, 0, z - hz, x + hx, y + 0.98, z + hz, 'wood'); };
-  const netPile = (x, z, s = 1) => { for (let i = 0; i < 5; i++) G.leaf.add(SPH, mat4(x + (r() - 0.5) * 0.9 * s, 0.14 + r() * 0.14, z + (r() - 0.5) * 0.9 * s, r() * 3, 0.55 * s, 0.2, 0.5 * s), col([0x3f6e68, 0x8a7a50, 0x5a4a3a][(r() * 3) | 0]));
+  const netPile = (x, z, s = 1) => { for (let i = 0; i < 5; i++) blob(mat4(x + (r() - 0.5) * 0.9 * s, 0.14 + r() * 0.14, z + (r() - 0.5) * 0.9 * s, r() * 3, 0.55 * s, 0.2, 0.5 * s), col([0x3f6e68, 0x8a7a50, 0x5a4a3a][(r() * 3) | 0]));
     for (let i = 0; i < 4; i++) G.paint.add(SPH, mat4(x + (r() - 0.5) * 1.2 * s, 0.3 + r() * 0.1, z + (r() - 0.5) * 1.2 * s, 0, 0.13, 0.13, 0.13), col([0xe0662a, 0xf0c030, 0xd8d4cc][(r() * 3) | 0])); };
   const buoy = (x, y, z, hex = 0xd84a2a) => { G.paint.add(SPH, mat4(x, y, z, 0, 0.45, 0.4, 0.45), col(hex)); G.metal.add(CYL8, mat4(x, y + 0.7, z, 0, 0.03, 0.7, 0.03), col(0x2b2d2e)); };
 

@@ -4,15 +4,21 @@
 // into square tiles: one Mesh per (material, tile) that share the original vertex buffers (uploaded once) and only own
 // an index buffer of their triangles + a tight bounding sphere. Instanced meshes are split the same way by instance.
 // Done once after createWorld, before the shadow bake; nothing else changes (same materials, flags, userData).
+// opts.bounds (the playable area): geometry beyond it (skyline, landmarks, ship) goes into ONE chunk per side (N/S/E/W)
+// instead of a tile every 96 m: these were 29 of the 76 chunks, most of them a few dozen triangles (one draw call each).
 import * as THREE from 'three';
 
 // tile: m ; minTris: smaller meshes stay whole (a draw call costs more than their triangles)
-export const CHUNK = { tile: 96, minExtent: 60, minTris: 15000, skip: new Set(['world_decal']) };
+export const CHUNK = { tile: 96, minExtent: 60, minTris: 15000, farMargin: 4, skip: new Set(['world_decal']) };
 
 const _c = new THREE.Vector3(), _m = new THREE.Matrix4(), _b = new THREE.Box3(), _s = new THREE.Sphere();
 
 export function chunkStatics(scene, opts = {}) {
-  const tile = opts.tile ?? CHUNK.tile, stats = { meshes: 0, chunks: 0, instanced: 0 };
+  const tile = opts.tile ?? CHUNK.tile, stats = { meshes: 0, chunks: 0, instanced: 0, far: 0 };
+  const B = opts.bounds, mg = CHUNK.farMargin;
+  // tile key of a world XZ point; beyond the playable bounds: one key per side
+  const keyOf = (x, z) => !B ? Math.floor(x / tile) + ',' + Math.floor(z / tile)
+    : z < B.minZ - mg ? 'farN' : z > B.maxZ + mg ? 'farS' : x < B.minX - mg ? 'farW' : x > B.maxX + mg ? 'farE' : Math.floor(x / tile) + ',' + Math.floor(z / tile);
   const todo = [];
   scene.traverse(o => {
     if (!o.isMesh || !o.userData.static || o.isSkinnedMesh || CHUNK.skip.has(o.name) || o.parent !== scene) return;
@@ -26,25 +32,25 @@ export function chunkStatics(scene, opts = {}) {
     if (o.isInstancedMesh ? o.count > 8 && !o.instanceColor && o.instanceMatrix.usage === THREE.StaticDrawUsage : g.groups.length === 0) todo.push(o);
   });
   for (const o of todo) {
-    const parts = o.isInstancedMesh ? splitInstanced(o, tile) : splitMesh(o, tile);
+    const parts = o.isInstancedMesh ? splitInstanced(o, keyOf) : splitMesh(o, keyOf);
     if (!parts || parts.length < 2) continue;
     const i = scene.children.indexOf(o);
     o.removeFromParent();
     for (const p of parts) {
       p.name = o.name; p.material = o.material; p.castShadow = o.castShadow; p.receiveShadow = o.receiveShadow;
-      p.renderOrder = o.renderOrder; p.userData = { ...o.userData, chunkOf: o.name }; p.frustumCulled = o.frustumCulled;
+      p.renderOrder = o.renderOrder; p.userData = { ...o.userData, chunkOf: o.name, ...(p.userData.far ? { far: true } : null) }; p.frustumCulled = o.frustumCulled;
       p.layers.mask = o.layers.mask; p.visible = o.visible;
       p.matrixAutoUpdate = false; p.matrix.copy(o.matrix); p.matrixWorld.copy(o.matrixWorld);
       p.onBeforeRender = o.onBeforeRender;
       scene.children.splice(i, 0, p); p.parent = scene;
     }
-    stats.meshes++; stats.chunks += parts.length; if (o.isInstancedMesh) stats.instanced++;
+    stats.meshes++; stats.chunks += parts.length; stats.far += parts.filter(p => p.userData.far).length; if (o.isInstancedMesh) stats.instanced++;
   }
   return stats;
 }
 
 // triangles grouped by the tile of their centroid (world XZ); vertex buffers shared, one index buffer per tile
-function splitMesh(o, tile) {
+function splitMesh(o, keyOf) {
   const g = o.geometry, pos = g.attributes.position, idx = g.index, mw = o.matrixWorld;
   const triCount = (idx ? idx.count : pos.count) / 3;
   const v = k => (idx ? idx.getX(k) : k);
@@ -52,40 +58,41 @@ function splitMesh(o, tile) {
   for (let t = 0; t < triCount; t++) {
     const a = v(3 * t), b = v(3 * t + 1), c = v(3 * t + 2);
     _c.set((pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3, (pos.getY(a) + pos.getY(b) + pos.getY(c)) / 3, (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3).applyMatrix4(mw);
-    const k = Math.floor(_c.x / tile) + ',' + Math.floor(_c.z / tile);
+    const k = keyOf(_c.x, _c.z);
     let l = buckets.get(k); if (!l) buckets.set(k, (l = [])); l.push(a, b, c);
   }
   if (buckets.size < 2) return null;
   const big = pos.count > 65535, out = [];
-  for (const l of buckets.values()) {
+  for (const [k, l] of buckets) {
     const ng = new THREE.BufferGeometry();
     for (const [name, attr] of Object.entries(g.attributes)) ng.setAttribute(name, attr); // shared, uploaded once
     ng.setIndex(new THREE.BufferAttribute(big ? Uint32Array.from(l) : Uint16Array.from(l), 1));
     // bounds of this tile's vertices only (computeBoundingSphere would use every vertex of the shared buffer)
     _b.makeEmpty(); for (const i of l) _b.expandByPoint(_c.fromBufferAttribute(pos, i));
     ng.boundingBox = _b.clone(); ng.boundingSphere = _b.getBoundingSphere(new THREE.Sphere());
-    out.push(new THREE.Mesh(ng, o.material));
+    const m = new THREE.Mesh(ng, o.material); if (k.startsWith('far')) m.userData.far = true;
+    out.push(m);
   }
   return out;
 }
 
 // instances grouped by the tile of their position; each tile gets its own InstancedMesh (same geometry and material)
-function splitInstanced(o, tile) {
+function splitInstanced(o, keyOf) {
   const buckets = new Map();
   for (let i = 0; i < o.count; i++) {
     o.getMatrixAt(i, _m); _c.setFromMatrixPosition(_m).applyMatrix4(o.matrixWorld);
-    const k = Math.floor(_c.x / tile) + ',' + Math.floor(_c.z / tile);
+    const k = keyOf(_c.x, _c.z);
     let l = buckets.get(k); if (!l) buckets.set(k, (l = [])); l.push(i);
   }
   if (buckets.size < 2) return null;
   const out = [];
-  for (const l of buckets.values()) {
+  for (const [k, l] of buckets) {
     const m = new THREE.InstancedMesh(o.geometry, o.material, l.length);
     l.forEach((src, j) => {
       o.getMatrixAt(src, _m); m.setMatrixAt(j, _m);
       if (o.instanceColor) { o.getColorAt(src, _tmpCol); m.setColorAt(j, _tmpCol); }
     });
-    m.computeBoundingSphere();
+    m.computeBoundingSphere(); if (k.startsWith('far')) m.userData.far = true;
     out.push(m);
   }
   return out;
