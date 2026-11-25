@@ -68,7 +68,8 @@ export class Player {
       this.recoilPitch -= this.recoilPitch * rec; this.recoilYaw -= this.recoilYaw * rec;
 
       const crouch = input.crouch;
-      const targetH = crouch ? this.crouchHeight : this.standHeight;
+      let targetH = crouch ? this.crouchHeight : this.standHeight;
+      if (targetH > this.height) targetH = Math.max(this.height, Math.min(targetH, physics.headroom(this.position.x, this.position.y, this.position.z, this.radius, targetH) - 0.02)); // no standing up into a ceiling
       this.height += (targetH - this.height) * Math.min(1, dt * 12);
       let speed = crouch ? 2.6 : input.walk ? 3.0 : 5.6;
       if (this.ctx.weapon?.aiming) speed *= 0.8;
