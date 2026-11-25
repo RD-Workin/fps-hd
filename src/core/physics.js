@@ -124,6 +124,9 @@ export class Physics {
         const c = cols[cand ? cand[k] : k], b = c.box;
         if (pos.x + radius <= b.min.x || pos.x - radius >= b.max.x || pos.z + radius <= b.min.z || pos.z - radius >= b.max.z) continue;
         if (pos.y + height <= b.min.y || pos.y >= b.max.y - 0.001) continue;
+        // already inside an overhead box before this step (standing up under a lintel / slab): never shove the actor out
+        // sideways through it (it used to land metres away, or on top of the slab); just let it walk out
+        if (b.min.y > pos.y + 0.9) { const p0 = pos[axis] - vel[axis] * dt; if (axis === 'x' ? p0 + radius > b.min.x && p0 - radius < b.max.x : p0 + radius > b.min.z && p0 - radius < b.max.z) continue; }
         // step up small ledges
         if (b.max.y - pos.y <= stepUp && this._free(pos.x, b.max.y, pos.z, radius, height, c)) { pos.y = b.max.y; continue; }
         if (axis === 'x') { pos.x = vel.x > 0 ? b.min.x - radius - 1e-4 : (vel.x < 0 ? b.max.x + radius + 1e-4 : (pos.x < (b.min.x + b.max.x) / 2 ? b.min.x - radius - 1e-4 : b.max.x + radius + 1e-4)); }
@@ -134,16 +137,27 @@ export class Physics {
     if (out()) return null;
     // vertical
     vel.y -= this.gravity * dt;
+    const y0 = pos.y;
     pos.y += vel.y * dt;
     for (let k = 0; k < n; k++) {
       const b = cols[cand ? cand[k] : k].box;
       if (pos.x + radius <= b.min.x || pos.x - radius >= b.max.x || pos.z + radius <= b.min.z || pos.z - radius >= b.max.z) continue;
       if (pos.y + height <= b.min.y || pos.y >= b.max.y) continue;
-      if (vel.y <= 0) { pos.y = b.max.y; vel.y = 0; res.onGround = true; }
+      if (vel.y <= 0) { if (b.max.y > y0 + stepUp) continue; pos.y = b.max.y; vel.y = 0; res.onGround = true; } // a box overhead is not a floor
       else { pos.y = b.min.y - height; vel.y = 0; }
     }
     if (pos.y <= 0) { pos.y = 0; if (vel.y < 0) vel.y = 0; res.onGround = true; }
     return res;
+  }
+  // free height above the feet at (x, y, z), capped at maxH (crouch -> stand under a ceiling / lintel)
+  headroom(x, y, z, r, maxH) {
+    let h = maxH; const cols = this.colliders;
+    for (const i of this._query(x - r, z - r, x + r, z + r)) {
+      const b = cols[i].box;
+      if (x + r <= b.min.x || x - r >= b.max.x || z + r <= b.min.z || z - r >= b.max.z) continue;
+      if (b.min.y > y + 0.3 && b.min.y - y < h) h = b.min.y - y;
+    }
+    return h;
   }
   _free(x, y, z, r, h, ignore) {
     const cols = this.colliders;

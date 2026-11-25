@@ -6,6 +6,7 @@ import { BOUNDS, CORE_BOUNDS, SPAWNS, LABELS, NAV, CTF, GX0, GZ0, GW, GH, CELL }
 import { ALL_SITES, INSERTIONS, POSTS, OBJECTIVES, REGION } from './grand.js';
 import { createTerrain, buildTerrain } from './terrain.js';
 import { buildBuildings } from './buildings.js';
+import { buildRoofAccess, roofNav, roofFloorAt } from './roofaccess.js';
 import { createKit } from './props.js';
 import { buildShip } from './ship.js';
 import { dressZones } from './zones.js';
@@ -68,10 +69,13 @@ export function createWorld(ctx) {
   const B3 = a => new THREE.Box3(new THREE.Vector3(a[0], a[1], a[2]), new THREE.Vector3(a[3], a[4], a[5]));
   const storeyNav = buildStoreys(G, addSolid, B3, col);
   // floor under (x, z): with a height y, the storey of a multi-storey house the actor stands on (else the terrain)
-  const floorAt = (x, z, y) => storeyFloorAt(x, z, y) ?? T.floorAt(x, z);
+  let roofLayers = []; // filled once the roof stairs exist (below)
+  const floorAt = (x, z, y) => storeyFloorAt(x, z, y) ?? roofFloorAt(roofLayers, x, z, y) ?? T.floorAt(x, z);
   const K = extendKit(createKit(G, Tx, T, physics, addSolid, scene));
   buildShip(K); dressZones(K); dressGrand(K);
   const breakables = createBreakables(ctx, { T, navColliders, Tx }); // boards / fences / doors that bullets break
+  const roofStairs = buildRoofAccess(G, T, physics, addSolid, col); // outdoor stairs up to the walkable flat roofs
+  { const R = roofNav(roofStairs, T); roofLayers = R.nav; storeyNav.push(...R.nav); HOUSE_HOLDS.push(...R.holds); } // bots: roofs = one-floor 'houses'
   const { waterMat } = K.finish();
   buildDistant(G, scene);
   const noAO = [];
@@ -185,7 +189,7 @@ export function createWorld(ctx) {
       holdsHigh: Object.fromEntries(ALL_SITES.map(s => [s.name, HOUSE_HOLDS.filter(h => Math.hypot(h.x - s.x, h.z - s.z) < 50)])), grid: { x0: GX0, z0: GZ0, w: GW, h: GH, cell: CELL, rows: T.g.map(r => r.join('')) } },
     sun: atm.sun, quality, post, shadows: SH, // post / shadows: debug & perf bench access
     setQuality,
-    breakables,
+    breakables, roofStairs,
     // Ops de nuit: night lighting variant (see night.js). Changing it changes the light count -> shaders recompile:
     // call from the menu (main.js warms the shaders up again on 'world:night').
     get night() { return night.on; },

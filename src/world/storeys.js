@@ -149,7 +149,6 @@ export function buildStoreys(G, addSolid, B3, col) {
       const blocks = k > 0 ? [below.strip, ...(up ? [up.strip] : [])] : [];
       if (k > 0) { // slab with the hole of the stair coming from below
         const hole = below.strip;
-        G.stone.box(h.x0 - 0.18, y - SLAB, h.z0 - 0.18, h.x1 + 0.18, y - SLAB + 0.02, h.z1 + 0.18, band, 'py'); // underside rim
         for (const r of cut({ x0: h.x0 - 0.18, x1: h.x1 + 0.18, z0: h.z0 - 0.18, z1: h.z1 + 0.18 }, hole)) {
           G.stone.box(r.x0, y - SLAB, r.z0, r.x1, y, r.z1, band, '');
           addSolid(B3([r.x0, y - SLAB, r.z0, r.x1, y, r.z1]), 'concrete', { floor: true });
@@ -209,7 +208,10 @@ export function buildStoreys(G, addSolid, B3, col) {
       if (k > 0) layers.push({ k, y, rect: { ...I }, blocks });
     }
     // cornices between storeys (outside)
-    for (let k = 1; k <= h.floors; k++) { const y = g.F(k); G.stone.box(h.x0 - 0.22, y - 0.3, h.z0 - 0.22, h.x1 + 0.22, y - 0.12, h.z1 + 0.22, band, ''); }
+    // (a ring of four strips along the walls: a full box here used to close the stair hole from below)
+    for (let k = 1; k <= h.floors; k++) { const y = g.F(k), a = 0.22, i = 0.16;
+      for (const r of [[h.x0 - a, h.z0 - a, h.x1 + a, h.z0 + i], [h.x0 - a, h.z1 - i, h.x1 + a, h.z1 + a], [h.x0 - a, h.z0 + i, h.x0 + i, h.z1 - i], [h.x1 - i, h.z0 + i, h.x1 + a, h.z1 - i]])
+        G.stone.box(r[0], y - 0.3, r[1], r[2], y - 0.12, r[3], band, ''); }
     nav.push({ house: h, layers, portals: g.stairs.map(s => ({ k: s.k, bottom: s.bottom, top: s.top })) });
   }
   return nav;
