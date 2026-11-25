@@ -129,3 +129,20 @@ model.js (procedural soldier), nav.js (grid A*, `node src/bots/navtest.mjs`), se
   | 10c10 auto (30 manches) | collés 59 %, 3,0 m, 75 % ATK (8 manches) | collés 27 %, 4,8 m, **50 % ATK**, tués 211 / 212 |
   | 20c20 auto (12 manches) | collés 52 %, 3,9 m, 67 % ATK (6 manches) | collés 32 %, 4,2 m, 33 % ATK (10 poses, 6 désamorcées) |
   Bots CPU : 0,83 ms (10c10), 1,5 ms (20c20, contre 1,34 avant). À suivre : 20c20 penche DEF (reprises groupées fortes).
+
+## Escouades, itération 6 (équilibre 20c20, perf)
+- Assaut **tout ou rien** par site : quand l'exécution part (toutes en place, 14 s après la première, contact avec ≥ 66 %
+  des hommes en place, ou fin de manche), toutes les équipes du site partent ; plus d'équipe seule dans un site tenu.
+- Porteur : entre une fois le site tenu (un coéquipier dedans et aucun contact depuis 2 s) ou 8 s après le départ.
+- Bombe tombée : un seul bot la récupère (deux si > 25 m), les bots à < 30 m couvrent le ramassage, tournés vers l'extérieur.
+- Après la pose : un garde regarde la bombe, les autres font face à la reprise (défenseurs vus < 80 m depuis 10 s, sinon
+  vers leurs postes). Défenseurs aux étages (`brain.highSpots`, `world.nav.holdsHigh` filtrés par vue sur le site) :
+  1-2 par site ; le premier appui de chaque équipe d'attaque contrôle ces fenêtres en approchant.
+- Perf : `autoRoutes` en cache pour toute la partie (par grille de nav, départ arrondi à 20 m) et précalculées pendant le gel
+  (`squads.warmRoutes`, un jeu par tick) : plus de pic d'A* au go en 40c40.
+- Banc : 10c10 auto 50 % ATK (24 manches, tués 183/172), 20c20 auto 42 % (12 manches, avant 25 %).
+- Itération 7 : défenseur seul sur un site débordé (≥ 3 attaquants vus, ≤ 1 défenseur) → repli à ~24 m vers ses postes,
+  caché (`fallbackSpot`), en attendant la reprise. Après la pose, postes ATK `guardAround(.., 'post')` : 7-18 m, à couvert,
+  de préférence de l'autre côté de la bombe par rapport à la reprise ; défusage entendu → les 3 attaquants les plus
+  proches (< 40 m) foncent sur la bombe. **Variance du banc** : en 20c20, 16 manches donnent ±20 points d'une série à
+  l'autre ; décider sur ≥ 32 manches. 20c20 auto, 32 manches : 22 % → 31 % ATK avec la ruée au défusage.

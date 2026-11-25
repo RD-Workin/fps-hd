@@ -9,6 +9,7 @@
 // and all of them execute TOGETHER from their different streets (pincer), with smoke + flash. A team that takes
 // contact splits: one base of fire holds and watches the threat, one flanker goes around it, the rest hold.
 // Cost: per brain tick (0.4 s) O(members) + one flank search (≤ 14 nav samples) per team in contact, cached 3 s.
+import { HouseClear } from './squadHouses.js';
 const hd = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const rand = (a, b) => a + Math.random() * (b - a);
 const TRAIL_STEP = 1.5, TRAIL_MAX = 48;   // breadcrumbs of the point: 72 m of history
@@ -16,7 +17,7 @@ const GAP = 4.5;                           // spacing between team members along
 const LATERAL = 1.7;                       // side offset for staggered column when the street is wide enough
 
 export class Squads {
-  constructor(brain) { this.brain = brain; }
+  constructor(brain) { this.brain = brain; this.houses = new HouseClear(this); }
   get nav() { return this.brain.mgr.nav; }
 
   // ------------------------------------------------------------------ teams
@@ -76,7 +77,7 @@ export class Squads {
   // ------------------------------------------------------------------ per tick
   update(list, site, game, carrier) {
     const B = this.brain, P = B.plan, now = B.ctx.time;
-    if (P.liveAt == null) { for (const b of list) b.goal = null; return; } // teams form at the go (bomb handed out, site chosen)
+    if (P.liveAt == null) { for (const b of list) b.goal = null; this.warmRoutes(list); return; } // teams form at the go
     if (!P.teams || P.teamSite !== site.name || (carrier && !P.member.has(carrier))) this.build(list, site, carrier);
     const alive = new Set(list); if (carrier) alive.add(carrier);
     // late joiners (picked up the bomb, etc.): put them in the closest team
@@ -94,20 +95,35 @@ export class Squads {
       // defence wrong info) and only execute if the main push is gone
       if (s !== site && mainAlive) continue;
       const pending = teams.filter(t => t.state !== 'go'); if (!pending.length) continue;
-      const ready = pending.filter(t => t.state === 'stage' && this.staged(t, alive) >= 0.7 || !t.stage);
+      const ready = pending.filter(t => !t.clear && (t.state === 'stage' && this.staged(t, alive) >= 0.7 || !t.stage));
       const first = Math.min(...pending.map(t => t.t0 ?? Infinity));
       // a staged team spotted launches the execute only if most of the pincer is in place (else it holds and fights)
-      const contact = pending.some(t => t.state === 'stage' && t.contact && now - t.contact.t < 1.5) && ready.length * 2 >= pending.length;
+      // (all or nothing: when the execute starts, every team of the site goes; never a lone team into a held site)
+      const men = ts => ts.reduce((a, t) => a + this.alive(t, alive).length, 0);
+      const contact = pending.some(t => t.state === 'stage' && t.contact && now - t.contact.t < 1.5) && men(ready) >= men(pending) * 0.66;
       const regroup = B.mgr.skillForTeam?.('ATK')?.regroup ?? true;
       // wait for the slowest team still on its way (≈ 4 m/s), 6 s minimum after the first is in place, 14 s max
       let eta = 0;
       for (const t of pending) if (t.state === 'move' && t.stage) { const h = this.head(t); if (h) eta = Math.max(eta, hd(h.position, t.stage) / 4); }
-      const waited = now - first, waitOver = waited > 14 || (waited > 6 && eta < 2);
+      const clearing = pending.some(t => t.clear), waited = now - first, waitOver = waited > (clearing ? 30 : 14) || (!clearing && waited > 6 && eta < 2);
       if (!regroup || ready.length === pending.length || waitOver || contact || timeLeft < 45) {
-        for (const t of pending) if (t.state === 'stage' || !regroup || timeLeft < 45 || !t.stage) { t.state = 'go'; t.goAt = now; if (!contact) B.pushUtility?.(t); }
+        for (const t of pending) { t.state = 'go'; t.goAt = now; if (!contact) B.pushUtility?.(t); }
       }
     }
     for (const t of P.teams) this.teamGoals(t, alive, game, carrier, now);
+  }
+
+  // freeze time: compute the A* routes of each insertion cluster to each active site, ONE set per brain tick, so the
+  // go doesn't pay them all in one frame (40c40 spike). autoRoutes caches them for the whole game.
+  warmRoutes(list) {
+    const B = this.brain, todo = this._warm ||= { done: new Set() };
+    const cl = [];
+    for (const b of list) { const c = cl.find(c => hd(c, b.position) < 30); if (!c) cl.push({ x: b.position.x, z: b.position.z }); }
+    for (const c of cl) for (const s of B.sites()) {
+      const key = Math.round(c.x / 20) + ',' + Math.round(c.z / 20) + s.name;
+      if (todo.done.has(key)) continue;
+      todo.done.add(key); B.autoRoutes(c, s); return;
+    }
   }
 
   alive(t, set) { return t.members.filter(b => b.alive && set.has(b)); }
@@ -151,6 +167,10 @@ export class Squads {
       if (!t.prog || hd(point.position, t.prog) > 6) t.prog = { x: point.position.x, z: point.position.z, t: now };
       else if (now - t.prog.t > 14) { this.reroute(t, point); t.prog = { x: point.position.x, z: point.position.z, t: now }; }
     }
+
+    // ---- room clearing (squadHouses.js): a house in our way holds an enemy or overlooks the site -> a pair clears it
+    if ((t.state === 'move' || t.state === 'stage') && this.houses.update(t, m, carrier, now)) return;
+    if (t.clear && t.state === 'go') t.clear = null; // the execute started: the pair rejoins
 
     // ---- staging: spread around the staging point, crouched, weapons toward the site
     if (t.state === 'stage') {

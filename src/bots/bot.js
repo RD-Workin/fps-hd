@@ -141,8 +141,9 @@ export class Bot {
       if (!inFov) continue;
       // LOS to head then chest
       const head = e.getEyePosition ? e.getEyePosition(_b) : _b.copy(e.position).setY(e.position.y + 1.6);
-      let vis = ctx.physics.lineOfSight(eye, head) && !smoke?.blocksSight(eye, head);
-      if (!vis) { _b.copy(e.position); _b.y += (e.height || 1.8) * 0.55; vis = ctx.physics.lineOfSight(eye, _b) && !smoke?.blocksSight(eye, _b); }
+      const inArm = d < 3; // inside a smoke, someone within arm's reach is still made out
+      let vis = ctx.physics.lineOfSight(eye, head) && (inArm || !smoke?.blocksSight(eye, head));
+      if (!vis) { _b.copy(e.position); _b.y += (e.height || 1.8) * 0.55; vis = ctx.physics.lineOfSight(eye, _b) && (inArm || !smoke?.blocksSight(eye, _b)); }
       if (!vis) continue;
       // distant & dark: small chance to miss a target in peripheral vision
       if (!known && d > 35 * S.view && Math.random() < S.peripheralMiss) continue;
