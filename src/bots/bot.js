@@ -395,6 +395,7 @@ export class Bot {
       if (blocker) {
         end = blocker.point;
         fx?.impact?.(blocker.point, blocker.normal, blocker.collider?.material || 'concrete');
+        this.ctx.events.emit('weapon:impact', { collider: blocker.collider, point: blocker.point, dmg: D.damage, by: this }); // breakables
         fx?.tracer?.(muzzle.clone(), end.clone());
         fx?.muzzleFlash?.(muzzle.clone(), _c.subVectors(end, muzzle).normalize().clone());
         this.ctx.events.emit('bot:fire', { bot: this, origin: muzzle.clone(), hit: false, target: tg });
@@ -413,7 +414,7 @@ export class Bot {
       dir.addScaledVector(side, spread).addScaledVector(UP, rand(-0.6, 0.9) / Math.max(4, dist)).normalize();
       const hitW = this.ctx.physics.raycast(eye, dir, 200);
       end = hitW ? hitW.point : eye.clone().addScaledVector(dir, 120);
-      if (hitW) fx?.impact?.(hitW.point, hitW.normal, hitW.collider?.material || 'concrete');
+      if (hitW) { fx?.impact?.(hitW.point, hitW.normal, hitW.collider?.material || 'concrete'); this.ctx.events.emit('weapon:impact', { collider: hitW.collider, point: hitW.point, dmg: D.damage, by: this }); }
     }
     fx?.tracer?.(muzzle.clone(), end.clone ? end.clone() : end);
     fx?.muzzleFlash?.(muzzle.clone(), _c.subVectors(end, muzzle).normalize().clone());

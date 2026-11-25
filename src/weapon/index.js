@@ -206,6 +206,7 @@ export function createWeapon(ctx) {
         events.emit('weapon:hit', { actor: bh.actor, headshot: !!bh.headshot, killed, point: bh.point, weapon: def.id });
       } else if (wh) {
         ctx.effects?.impact?.(wh.point, wh.normal, wh.collider.material); if (tracer) ctx.effects?.tracer?.(_mz, wh.point);
+        events.emit('weapon:impact', { collider: wh.collider, point: wh.point, dmg: sniper ? 90 : def.dmg, by: player }); // breakables (world/breakables.js)
       } else if (tracer) ctx.effects?.tracer?.(_mz, _end.copy(_o).addScaledVector(_d, 300));
       if (sniper) player.addRecoil(0.05 + Math.random() * 0.012, (Math.random() - 0.5) * 0.014);
       else {

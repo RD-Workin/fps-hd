@@ -13,7 +13,8 @@ régulièrement (`git fetch origin claude/project-thread-h6ui6r && git merge FET
 
 ## Carte (world) — « Port-Cassis, grande carte » (v5)
 - Grille de cellules 2 m, x[-176,176] z[-64,56] (352 × 120 m). Centre = Citadelle v4 inchangée (x[-80,80]).
-  Ouest = Vieille-Ville (ruelles 2-4 m, 3 terrasses : +3 Haute-Ville, +1,5 Marché, 0 port de pêche). Est = Gare de triage
+  Ouest = Vieille-Ville v6 (grandes places encombrées reliées par des passages courts : port 0, Cour des Pêcheurs / Halle aux
+  poissons / Cour du Four 0, Grande Place du Marché +1,5 avec halle couverte sur le site D, Parvis / Jardins / Place Haute +3). Est = Gare de triage
   (quais de voyageurs +1,5, voies au sol, trains de fret, hall de gare 7 m sous plafond, entrepôts, quai de fret).
 - Données : `src/world/layout.js` (Citadelle) + `src/world/grand.js` (extension : `GRAND_CARVES`, `ROOMS` → murs générés,
   `ALL_SITES`, `INSERTIONS`, `POSTS`, `OBJECTIVES`, `REGION`, labels, chokes).
@@ -28,8 +29,12 @@ régulièrement (`git fetch origin claude/project-thread-h6ui6r && git merge FET
     Sites C/D : pas de holds faits main → `brain.holdSpots` les calcule.
 - Spawns : ATK = insertions côtières (`ouest` port de pêche, `port` Citadelle, `est` quai de fret), DEF = postes par site
   (D Rue Haute, C Place de la Gare, A/B cour de la citadelle). Ombres ajustées à la région des sites actifs.
-- Étages superposés (fait, `src/world/storeys.js`) : 6 maisons (`marche` site D, `pecheurs`, `remparts`, `aiguillage`,
-  `depot`, `capitainerie`), 2-3 étages + toit-terrasse, escaliers en lacets, fenêtres à chaque étage.
+- Étages superposés (fait, `src/world/storeys.js`) : 8 maisons (`marche` angle NE de la Grande Place, `boulangerie` mitoyenne,
+  `grenier` angle NO, `pecheurs`, `remparts`, `aiguillage`, `depot`, `capitainerie`), 2-3 étages + toit-terrasse, escaliers en lacets,
+  fenêtres à chaque étage. v2 : cage d'escalier fermée sur le toit (`geom(h).kiosk`), mobilier par étage et encombrement des toits
+  (`furnish`, placé hors escaliers / portes / fenêtres ; bloque la physique et la grille nav de l'étage ; un tenant de fenêtre
+  recouvert par un meuble bas est retiré de `HOUSE_HOLDS`), maisons traversantes (Grande Place → Marché → Boulangerie → rue est).
+  `skip: 'W'` = mur mitoyen fourni par la maison voisine (pas de mur ni de parapet de ce côté).
   - `world.nav.floorAt(x, z, y?)` : avec `y`, renvoie le plancher de l'étage où l'on est (sinon comme avant).
   - `world.nav.highHolds` : `{x, z, y, yaw, high: true, roof?, house}` (fenêtres d'étage + coins de toit) ;
     `world.nav.holdsHigh[site]` = ceux à < 50 m du site.
@@ -38,7 +43,12 @@ régulièrement (`git fetch origin claude/project-thread-h6ui6r && git merge FET
     **Un but d'étage doit porter `y`** (`goal = {x, z, y, ...}`) : bot.js passe `this.position.y` / `dest.y` et l'arrivée
     exige |Δy| < 1,5 m quand `goal.y` est défini.
   - Trajets > 60 m : A* pondéré (×1,6) et budget 150 000 itérations (traversée complète ≈ 8-17 ms, une fois, puis cache).
-  - Tests : `scripts/perf/climbtest.cjs` (6 bots montent sur les 6 toits puis redescendent), `scripts/perf/pathtest.cjs`.
+  - Tests : `N=9 node scripts/perf/climbtest.cjs` (un bot par maison monte au toit puis redescend), `scripts/perf/pathtest.cjs`.
+- Murs cassables (fait, `src/world/breakables.js`) : planches, palissades et portes (Vieille-Ville). Collider physique
+  `{box, material:'wood', breakable}` + collider nav. Les balles (joueur : `src/weapon/index.js`, bots : `bot.js`) émettent
+  `events.emit('weapon:impact', {collider, point, dmg, by})` ; à 0 PV : mesh remplacé par des restes, colliders retirés,
+  `bots.nav.reblock(x0, z0, x1, z1, colliders)` rouvre les cellules (et vide le cache de chemins), `'world:breach'` émis.
+  Tout est restauré à `'round:start'`. Test : `scripts/perf/breachtest.cjs`.
 
 ## Jeu (R&D)
 - `game.objectiveMode` 'auto' | 'classic' | '2' | '3' | '4' (`setObjectiveMode`) ; auto : 2 sites ≤ 12 par camp, 3 ≤ 25, 4 au-delà.

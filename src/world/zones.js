@@ -31,7 +31,7 @@ export function dressZones(K) {
   Crate(-27, 44.2); Crate(-25.8, 44.2); Crate(-26.4, 44.2, 1.2, 1); Tyres(-30.5, 43.6, 3); Planter(-12, 42.6, -6, 43.6, 'flowers'); Planter(6, 42.6, 12, 43.6, 'flowers');
   Bench(-9, 44.6, 0); Bench(9, 44.6, 0);
   // Capitainerie block: flag, parked car, pallets
-  Flag(25.5, 45, 9, 1); Car(19, 50.2, true, 0x7a8a6a); Pallets(26.5, 43.2, 3); Barrel(13, 44.6, OCHRE);
+  Flag(25.5, 45, 9, 1); Car(15.2, 50.2, true, 0x7a8a6a); Pallets(26.5, 43.2, 3); Barrel(13, 44.6, OCHRE);
   // east quay: containers in front of the Hangar, boat, truck
   Container(48, 44.5, true, 0x3d7a4a); Container(49, 51, true, 0xa2412f); Container(49, 51, true, OCHRE, 2.6);
   Boat(60, 52, 0, 0x3d7a4a); NetPile(63.6, 48.6); Stack(57, 45, 2); Crate(58.2, 45); Truck(73, 49, 0x5d6b4a); Tyres(65, 54, 2);

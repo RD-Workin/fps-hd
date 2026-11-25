@@ -1,0 +1,25 @@
+// node scripts/perf/breachtest.cjs [shotprefix] : breakables check — nav before/after a breach, restore at round start
+const { chromium } = require('playwright');
+(async () => { const [shot] = process.argv.slice(2);
+  const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-proxy-server'] });
+  const p = await b.newPage({ viewport: { width: 1280, height: 720 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.route(u => !u.href.startsWith('http://localhost'), r => r.abort()); await p.goto('http://localhost:4173/', { waitUntil: 'commit' });
+  await p.waitForFunction(() => window.__ctx && window.__ctx.bots, null, { timeout: 120000 });
+  await p.evaluate(() => { const c = window.__ctx; c.game.setTeamSizes(1, 1); c.game.start(); c.paused = false; c.hud?.showMenu?.(null); });
+  await p.waitForTimeout(4000);
+  const view = async (name, x, z, yaw, y) => { if (!shot) return; await p.evaluate(([x, z, yaw, y]) => { const c = window.__ctx, P = c.player; c.bots.list.forEach(b => { b.alive = false; b.model && (b.model.root.visible = false); }); P.frozen = true; P.position.set(x, y ?? (c.world.nav.floorAt(x, z) ?? 0), z); P.yaw = yaw * Math.PI / 180; P.pitch = 0; c.paused = false; c.hud?.showMenu?.(null); }, [x, z, yaw, y]); await p.waitForTimeout(1200); await p.screenshot({ path: `${shot}_${name}.png` }); };
+  await view('before', -144, 34, -90);
+  console.log(await p.evaluate(() => { const c = window.__ctx, nav = c.bots.nav, B = c.world.breakables.list, o = [];
+    const len = q => { if (!q) return 'NULL'; let L = 0, px = -146, pz = 34; for (const v of q) { L += Math.hypot(v.x - px, v.z - pz); px = v.x; pz = v.z; } return L.toFixed(0) + ' m'; };
+    o.push('breakables ' + B.length + ' colliders ' + c.physics.colliders.length);
+    const before = len(nav._findPath ? nav._findPath(-146, 34, -128, 34) : nav.findPath(-146, 34, -128, 34));
+    const h = B[0]; for (let k = 0; k < 10 && !h.broken; k++) c.events.emit('weapon:impact', { collider: h.phys, point: h.b3.getCenter(new h.b3.min.constructor()), dmg: 25 });
+    const after = len(nav._findPath ? nav._findPath(-146, 34, -128, 34) : nav.findPath(-146, 34, -128, 34));
+    o.push(`halle west door: broken=${h.broken} path courtyard->halle before ${before}, after ${after}; colliders ${c.physics.colliders.length}; ray through: ${!c.physics.raycast(new h.b3.min.constructor(-140, 1, 34), new h.b3.min.constructor(1, 0, 0), 8) ? 'free' : 'blocked'}`);
+    c.events.emit('round:start', {});
+    o.push(`after round:start broken=${h.broken} path ${len(nav._findPath ? nav._findPath(-146, 34, -128, 34) : nav.findPath(-146, 34, -128, 34))} colliders ${c.physics.colliders.length}`);
+    return o.join('\n'); }));
+  await p.evaluate(() => { const c = window.__ctx, h = c.world.breakables.list[0]; c.world.breakables.hit(h, 999); });
+  await view('after', -144, 34, -90);
+  console.log('errors', JSON.stringify(errs.slice(0, 5)));
+  await b.close(); })();

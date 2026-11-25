@@ -123,6 +123,44 @@ export class NavGrid {
   }
 
   /**
+   * Re-rasterize the rectangle [x0,x1]x[z0,z1] from `colliders` (a breakable wall was destroyed or restored), then
+   * recompute the clearance around it (bucket BFS limited to the rectangle + 13 cells).
+   */
+  reblock(x0, z0, x1, z1, colliders) {
+    const cs = this.cell, r = this.radius, w = this.w, h = this.h;
+    const ci = x => Math.max(1, Math.min(w - 2, Math.floor((x - this.minX) / cs))), cj = z => Math.max(1, Math.min(h - 2, Math.floor((z - this.minZ) / cs)));
+    const i0 = ci(x0 - r), i1 = ci(x1 + r), j0 = cj(z0 - r), j1 = cj(z1 + r);
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) this.blocked[j * w + i] = 0;
+    const X0 = this.minX + i0 * cs, X1 = this.minX + (i1 + 1) * cs, Z0 = this.minZ + j0 * cs, Z1 = this.minZ + (j1 + 1) * cs;
+    for (const c of colliders) {
+      const b = c.box;
+      if (b.max.x + r < X0 || b.min.x - r > X1 || b.max.z + r < Z0 || b.min.z - r > Z1) continue;
+      if (b.max.y <= this.yMin || b.min.y >= this.yMax) continue;
+      if (b.max.y <= this.stepHeight && b.min.y <= this.yMin) continue;
+      for (let j = j0; j <= j1; j++) {
+        const cz = this.minZ + (j + 0.5) * cs; if (cz < b.min.z - r || cz > b.max.z + r) continue;
+        for (let i = i0; i <= i1; i++) { const cx = this.minX + (i + 0.5) * cs; if (cx >= b.min.x - r && cx <= b.max.x + r) this.blocked[j * w + i] = 1; }
+      }
+    }
+    // clearance: cells of the expanded rectangle E start at 255; seeds = blocked cells in E + the ring just outside E
+    const M = 13, a0 = Math.max(0, i0 - M), a1 = Math.min(w - 1, i1 + M), b0 = Math.max(0, j0 - M), b1 = Math.min(h - 1, j1 + M);
+    const cl = this.clear, buckets = Array.from({ length: 13 }, () => []);
+    for (let j = b0; j <= b1; j++) for (let i = a0; i <= a1; i++) { const k = j * w + i; cl[k] = this.blocked[k] ? 0 : 255; if (!cl[k]) buckets[0].push(k); }
+    for (let j = b0 - 1; j <= b1 + 1; j++) for (let i = a0 - 1; i <= a1 + 1; i++) {
+      if (i >= a0 && i <= a1 && j >= b0 && j <= b1) continue; if (i < 0 || j < 0 || i >= w || j >= h) continue;
+      const k = j * w + i; if (cl[k] < 12) buckets[cl[k]].push(k);
+    }
+    for (let d = 0; d < 12; d++) for (let q = 0; q < buckets[d].length; q++) {
+      const k = buckets[d][q]; if (cl[k] !== d && !(d === cl[k])) continue;
+      const x = k % w, z = (k / w) | 0;
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, nz = z + dz; if (nx < a0 || nz < b0 || nx > a1 || nz > b1) continue;
+        const n = nz * w + nx; if (cl[n] > d + 1) { cl[n] = d + 1; if (d + 1 < 12) buckets[d + 1].push(n); }
+      }
+    }
+  }
+
+  /**
    * Off-grid one-way links (jump up a ledge, drop down): [{ax, az, bx, bz, cost (cells), up}].
    * A* may cross them; the path then carries the two ends as mandatory waypoints, the far one tagged `jump: 'up'|'down'`.
    */
