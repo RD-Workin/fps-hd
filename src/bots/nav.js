@@ -194,7 +194,8 @@ export class NavGrid {
       const r = h.rect; if (x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1) continue;
       for (const p of h.portals) {
         const ya = p.k === 0 ? h.base : h.floors.get(p.k)?.y, yb = h.floors.get(p.k + 1)?.y; if (ya == null || yb == null || y < ya + 0.3 || y > yb - 0.3) continue;
-        if (x < Math.min(p.bottom.x, p.top.x) - 0.9 || x > Math.max(p.bottom.x, p.top.x) + 0.9 || z < Math.min(p.bottom.z, p.top.z) - 0.9 || z > Math.max(p.bottom.z, p.top.z) + 0.9) continue;
+        const pts = [p.bottom, p.top, ...(p.via || [])];
+        if (x < Math.min(...pts.map(q => q.x)) - 0.9 || x > Math.max(...pts.map(q => q.x)) + 0.9 || z < Math.min(...pts.map(q => q.z)) - 0.9 || z > Math.max(...pts.map(q => q.z)) + 0.9) continue;
         return { h, p };
       }
       return null;
@@ -208,6 +209,7 @@ export class NavGrid {
     const out = []; let cx = sx, cz = sz;
     if (st) { // standing on a flight of stairs: finish it first (up or down), the floor grids have a hole there
       const { h, p } = st, wantK = B && B.house === h ? B.k : 0, up = wantK > p.k, q = up ? p.top : p.bottom;
+      for (const v of up ? (p.via || []) : [...(p.via || [])].reverse()) out.push({ x: v.x, z: v.z, hard: true }); // outdoor roof stairs: bends
       out.push({ x: q.x, z: q.z, hard: true }); cx = q.x; cz = q.z; A = (up || p.k > 0) ? h.floors.get(up ? p.k + 1 : p.k) : null;
     }
     const seg = (grid, tx, tz, hardEnd) => { // walk inside one floor grid, then mark the end as a hard waypoint
@@ -219,16 +221,16 @@ export class NavGrid {
     // down from A to the ground (or to B's floor when both are in the same house)
     if (A) {
       const h = A.house, stopK = B && B.house === h ? Math.min(B.k, A.k) : 0;
-      for (let k = A.k; k > stopK; k--) { const p = h.portals[k - 1]; if (!seg(gridOf(h, k), p.top.x, p.top.z, true)) return null; out.push({ x: p.bottom.x, z: p.bottom.z, hard: true }); cx = p.bottom.x; cz = p.bottom.z; }
+      for (let k = A.k; k > stopK; k--) { const p = h.portals[k - 1]; if (!seg(gridOf(h, k), p.top.x, p.top.z, true)) return null; for (const v of [...(p.via || [])].reverse()) out.push({ x: v.x, z: v.z, hard: true }); out.push({ x: p.bottom.x, z: p.bottom.z, hard: true }); cx = p.bottom.x; cz = p.bottom.z; }
       if (B && B.house === h) {
-        for (let k = stopK; k < B.k; k++) { const p = h.portals[k]; if (!seg(gridOf(h, k), p.bottom.x, p.bottom.z, true)) return null; out.push({ x: p.top.x, z: p.top.z, hard: true }); cx = p.top.x; cz = p.top.z; }
+        for (let k = stopK; k < B.k; k++) { const p = h.portals[k]; if (!seg(gridOf(h, k), p.bottom.x, p.bottom.z, true)) return null; for (const v of p.via || []) out.push({ x: v.x, z: v.z, hard: true }); out.push({ x: p.top.x, z: p.top.z, hard: true }); cx = p.top.x; cz = p.top.z; }
         if (!seg(gridOf(h, B.k), gx, gz, false)) return null;
         return out;
       }
     }
     if (B) { // up into B's house
       const h = B.house;
-      for (let k = 0; k < B.k; k++) { const p = h.portals[k]; if (!seg(gridOf(h, k), p.bottom.x, p.bottom.z, true)) return null; out.push({ x: p.top.x, z: p.top.z, hard: true }); cx = p.top.x; cz = p.top.z; }
+      for (let k = 0; k < B.k; k++) { const p = h.portals[k]; if (!seg(gridOf(h, k), p.bottom.x, p.bottom.z, true)) return null; for (const v of p.via || []) out.push({ x: v.x, z: v.z, hard: true }); out.push({ x: p.top.x, z: p.top.z, hard: true }); cx = p.top.x; cz = p.top.z; }
       if (!seg(gridOf(h, B.k), gx, gz, false)) return null;
       return out;
     }

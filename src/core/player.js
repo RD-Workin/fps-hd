@@ -68,7 +68,8 @@ export class Player {
       this.recoilPitch -= this.recoilPitch * rec; this.recoilYaw -= this.recoilYaw * rec;
 
       const crouch = input.crouch;
-      const targetH = crouch ? this.crouchHeight : this.standHeight;
+      let targetH = crouch ? this.crouchHeight : this.standHeight;
+      if (targetH > this.height) targetH = Math.max(this.height, Math.min(targetH, physics.headroom(this.position.x, this.position.y, this.position.z, this.radius, targetH) - 0.02)); // no standing up into a ceiling
       this.height += (targetH - this.height) * Math.min(1, dt * 12);
       let speed = crouch ? 2.6 : input.walk ? 3.0 : 5.6;
       if (this.ctx.weapon?.aiming) speed *= 0.8;
@@ -84,6 +85,11 @@ export class Player {
       this.velocity.z += (wish.z - this.velocity.z) * Math.min(1, accel * dt);
       if (this.onGround && input.jump && !this.frozen) { this.velocity.y = 7.2; this.onGround = false; }
       this.onGround = physics.moveActor(this.position, this.velocity, dt, this.radius, this.height).onGround;
+      // last-resort containment: the map edge is walled (visible edge walls on the outer roofs), this only catches a
+      // physics slip so the player can never end up wandering outside the playable area
+      const B = this.ctx.world?.bounds; if (B) { const P = this.position, m = this.radius + 0.05;
+        if (P.x < B.minX + m) P.x = B.minX + m; else if (P.x > B.maxX - m) P.x = B.maxX - m;
+        if (P.z < B.minZ + m) P.z = B.minZ + m; else if (P.z > B.maxZ - m) P.z = B.maxZ - m; }
       this.moveSpeed = Math.hypot(this.velocity.x, this.velocity.z);
       if (this.onGround) this.headBob += dt * this.moveSpeed * 1.9;
     }
