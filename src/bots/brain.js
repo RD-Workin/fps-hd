@@ -530,9 +530,11 @@ export class Brain {
       const c = new V(site.center.x, this.fy(site.center.x, site.center.z) + 1, site.center.z), ents = this.entries(site);
       // roof corners sit ~1 m inside the parapet: from there the parapet hides everything below. Shooters stand at the
       // parapet instead: the edge point nearest the site, and ±3 m along that edge (walkable on the roof layer)
-      const HC = this.squads.houses, cand = list.filter(h => !h.roof), done = new Set();
-      for (const h of list) if (h.roof && !done.has(h.house)) {
-        done.add(h.house); const H = HC.houses().find(q => q.id === h.house); if (!H) continue;
+      // (flat roofs on outside stairs, 'toit-N', already place their holds at the parapet: kept as they are)
+      const HC = this.squads.houses, hs = HC.houses(), mine = h => h.roof && hs.some(q => q.id === h.house);
+      const cand = list.filter(h => !mine(h)), done = new Set();
+      for (const h of list) if (mine(h) && !done.has(h.house)) {
+        done.add(h.house); const H = hs.find(q => q.id === h.house);
         const b = H.box, m = 0.65, cl = (v, a, c) => Math.max(a + m, Math.min(c - m, v));
         const px = cl(site.center.x, b.x0, b.x1), pz = cl(site.center.z, b.z0, b.z1);
         const alongX = Math.abs(site.center.z - (b.z0 + b.z1) / 2) / (b.z1 - b.z0) > Math.abs(site.center.x - (b.x0 + b.x1) / 2) / (b.x1 - b.x0);

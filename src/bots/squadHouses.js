@@ -19,7 +19,7 @@ export class HouseClear {
     const st = this.brain.ctx.world?.nav?.storeys;
     if (!st?.length) return [];
     if (this.cache && this.cache.src === st) return this.cache.list;
-    const list = st.map(s => {
+    const list = st.filter(s => !s.house.roofOf).map(s => { // flat roofs reached by an outside stair (roofOf) have no rooms to clear
       const h = s.house, box = { x0: h.x0, x1: h.x1, z0: h.z0, z1: h.z1 };
       const top = h.roof ? h.floors : h.floors - 1, F = k => h.base + k * SH;
       const doors = (h.doors || []).map(([side, c]) => {
