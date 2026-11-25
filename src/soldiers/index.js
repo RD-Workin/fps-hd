@@ -28,16 +28,26 @@ const CULL_R = 2.3, CULL_Y = 0.9;
 // In between, the posed skeleton is carried along with the root by one matrix per node (rigid move, no re-pose).
 // [max distance m, frames] on screen; off-screen soldiers only show through their shadow.
 // Big battles (more than CROWD soldiers in the match, e.g. 40c40) use the `crowd` table: LOD1 (10-30 m) is animated at 30 Hz too.
+const STALE_DIST = 40; // m: beyond, an off-screen soldier's skeleton is not carried between poses (its shadow is far away)
 export const POSE_RATE = {
-  normal: { onscreen: [[LOD_DIST[1], 1], [60, 2], [110, 3], [Infinity, 4]], offscreen: [[12, 2], [Infinity, 4]] },
-  crowd: { onscreen: [[LOD_DIST[0], 1], [45, 2], [90, 3], [Infinity, 4]], offscreen: [[12, 2], [40, 4], [Infinity, 6]] },
+  // off-screen beyond STALE_DIST (40 m) the skeleton is hidden (stale) and only its hitboxes follow: a full pose there only
+  // refreshes the hitbox posture, so it runs at ~4-8 Hz (it is re-posed at once when it comes back into view)
+  normal: { onscreen: [[LOD_DIST[1], 1], [60, 2], [110, 3], [Infinity, 4]], offscreen: [[12, 2], [STALE_DIST, 4], [Infinity, 8]] },
+  crowd: { onscreen: [[LOD_DIST[0], 1], [45, 2], [90, 3], [Infinity, 4]], offscreen: [[12, 2], [STALE_DIST, 4], [Infinity, 16]] },
 };
 export const CROWD = 40;
 export const CROWD_INSTANCING = true; // crowd.js: LOD2 soldiers drawn instanced in big battles
 const SHADOW_FAR = 60; // m (camera distance, crowd only): beyond, no dynamic shadow
-const STALE_DIST = 40; // m: beyond, an off-screen soldier's skeleton is not carried between poses (its shadow is far away)
 let SLOT = 0;
 const _D = new THREE.Matrix4(), _inv = new THREE.Matrix4();
+// carry(): the root only turns about y and moves, so D = newRoot * oldRoot^-1 is a yaw + translation. Premultiplying
+// 68 node matrices by it with the generic 4x4 product was a third of the soldiers' pose time in 40c40: this form does
+// 12 multiply-adds per matrix instead of 64 (falls back to the generic product if D is anything else).
+function isYawMove(D) { const e = D.elements; return Math.abs(e[1]) + Math.abs(e[4]) + Math.abs(e[6]) + Math.abs(e[9]) + Math.abs(e[5] - 1) + Math.abs(e[3]) + Math.abs(e[7]) + Math.abs(e[11]) + Math.abs(e[15] - 1) < 1e-6; }
+function yawPremul(M, D) {
+  const d = D.elements, c = d[0], sn = d[8], ns = d[2], c2 = d[10], tx = d[12], ty = d[13], tz = d[14], m = M.elements;
+  for (let k = 0; k < 16; k += 4) { const x = m[k], z = m[k + 2], w = m[k + 3]; m[k] = c * x + sn * z + tx * w; m[k + 1] += ty * w; m[k + 2] = ns * x + c2 * z + tz * w; }
+}
 
 // ---------------------------------------------------------------- asset loading (once)
 let assetPromise = null, asset = null;
@@ -474,14 +484,16 @@ class HDSoldier {
     const r = this.root; r.updateMatrix();
     if (!r.matrix.equals(this.proxyRoot)) {
       _D.multiplyMatrices(r.matrix, _inv.copy(this.proxyRoot).invert()); this.proxyRoot.copy(r.matrix);
-      for (const o of this.proxies) { o.matrixWorld.premultiply(_D); o.matrix.copy(o.matrixWorld); }
+      const rigid = isYawMove(_D);
+      for (const o of this.proxies) { if (rigid) yawPremul(o.matrixWorld, _D); else o.matrixWorld.premultiply(_D); o.matrix.copy(o.matrixWorld); }
     }
     // a stale skeleton is hidden (it would stay frozen where it left the view); only its far shadow disappears meanwhile
     if (away) { if (!this.stale && !r.matrix.equals(this.posedRoot)) { this.stale = true; r.visible = false; } return; }
     if (r.matrix.equals(this.posedRoot)) return;
     _D.multiplyMatrices(r.matrix, _inv.copy(this.posedRoot).invert());
     r.matrixWorld.copy(r.matrix); this.posedRoot.copy(r.matrix);
-    for (const o of this.nodes) o.matrixWorld.premultiply(_D);
+    if (isYawMove(_D)) for (const o of this.nodes) yawPremul(o.matrixWorld, _D);
+    else for (const o of this.nodes) o.matrixWorld.premultiply(_D);
     // attached skinned meshes cancel their own transform (bindMatrixInverse = matrixWorld^-1): keep the visible LOD in step
     // (showLod refreshes the others when they get shown)
     for (const o of this.lods[this.shown] || this.meshes) if (o.bindMode === 'attached') o.bindMatrixInverse.copy(o.matrixWorld).invert();
