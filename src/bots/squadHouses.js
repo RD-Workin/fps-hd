@@ -19,7 +19,7 @@ export class HouseClear {
     const st = this.brain.ctx.world?.nav?.storeys;
     if (!st?.length) return [];
     if (this.cache && this.cache.src === st) return this.cache.list;
-    const list = st.map(s => {
+    const list = st.filter(s => !s.house.roofOf).map(s => { // flat roofs reached by an outside stair (roofOf) have no rooms to clear
       const h = s.house, box = { x0: h.x0, x1: h.x1, z0: h.z0, z1: h.z1 };
       const top = h.roof ? h.floors : h.floors - 1, F = k => h.base + k * SH;
       const doors = (h.doors || []).map(([side, c]) => {
@@ -82,12 +82,22 @@ export class HouseClear {
       t.clear = { H: pk.H, D, steps: this.plan(pk.H, D), i: 0, at: now, stepAt: now, a: pair[0], b: pair[1], why: pk.why };
     }
     const C = t.clear;
-    const done = () => { t.clear = null; t.clearCool = now + 10; return false; };
-    if (!C.a.alive && !C.b.alive) return done();
-    if (now - C.at > 50 || C.i >= C.steps.length) return done();
+    const done = (ok) => {
+      // a house cleared for its view of the site: the pair member closest to the best window / roof spot stays up there
+      // as the team's marksman (overwatch over the execute, then over the planted bomb); only with 4+ alive members
+      if (ok && C.why === 'overwatch' && m.length >= 4) {
+        const sp = this.brain.highSpots(t.site.name).find(s => this.inside(C.H, s));
+        const who = sp && [C.a, C.b].filter(b => b.alive).sort((p, q) => hd(p.position, sp) - hd(q.position, sp))[0];
+        if (who) { this.brain.plan.ow ||= new Map(); this.brain.plan.ow.set(who, { ...sp, site: t.site.name }); }
+      }
+      t.clear = null; t.clearCool = now + 10; return false;
+    };
+    if (!C.a.alive && !C.b.alive) return done(false);
+    if (now - C.at > 50) return done(false);
+    if (C.i >= C.steps.length) return done(true);
     const S = C.steps[C.i], A = C.a.alive ? C.a : C.b, Bb = C.a.alive && C.b.alive ? C.b : null;
     const at = (b, g) => hd(b.position, g) < 1.6 && Math.abs(b.position.y - g.y) < 1.5;
-    if ((at(A, S.a) && (!Bb || at(Bb, S.b))) || now - C.stepAt > 7) { C.i++; C.stepAt = now; if (C.i >= C.steps.length) return done(); }
+    if ((at(A, S.a) && (!Bb || at(Bb, S.b))) || now - C.stepAt > 7) { C.i++; C.stepAt = now; if (C.i >= C.steps.length) return done(true); }
     const S2 = C.steps[C.i];
     const goal = (g, run) => ({ x: g.x, z: g.z, y: g.y, tol: 0.9, speed: run ? 'run' : 'tac', look: g.look, watch: g.look, crouch: !!S2.crouch, exact: true, noHunt: false, anchor: g, huntRange: 6 });
     A.goal = goal(S2.a, C.i === 0);

@@ -275,12 +275,14 @@ export class Bot {
         if (jump && this.onGround && l > 0.3) { this.velocity.y = 7.2; this.velocity.x = want.x; this.velocity.z = want.z; }
         this.jumpWp = wp.jump ? wp : null;
       }
-      // separation from nearby actors
-      for (const o of this.ctx.actors) {
-        if (o === this || !o.alive) continue;
+      // separation from nearby actors (spatial grid: only the cells around, radius 1.05 m + frame drift)
+      const sep = o => {
+        if (o === this || !o.alive) return false;
         const dx = this.position.x - o.position.x, dz = this.position.z - o.position.z, d2 = dx * dx + dz * dz;
         if (d2 < 1.1 && d2 > 1e-4) { const f = (1.05 - Math.sqrt(d2)) * 4; want.x += dx * f; want.z += dz * f; }
-      }
+        return false;
+      };
+      if (this.mgr.near) this.mgr.near(this.position.x, this.position.z, 1.3, sep); else for (const o of this.ctx.actors) sep(o);
     }
     const acc = 1 - Math.exp(-dt * 10);
     this.velocity.x += (want.x - this.velocity.x) * acc; this.velocity.z += (want.z - this.velocity.z) * acc;
@@ -355,12 +357,16 @@ export class Bot {
   // true if a living teammate stands between `from` and `to` (within ~0.55 m of the line)
   allyInLine(from, to) {
     const dx = to.x - from.x, dz = to.z - from.z, len2 = dx * dx + dz * dz; if (len2 < 1e-4) return false;
-    for (const a of this.ctx.actors) {
-      if (a === this || a === this.target || !a.alive || a.team !== this.team) continue;
+    const hit = a => {
+      if (a === this || a === this.target || !a.alive || a.team !== this.team) return false;
       const px = a.position.x - from.x, pz = a.position.z - from.z;
-      const u = (px * dx + pz * dz) / len2; if (u <= 0.02 || u >= 0.98) continue;
-      const ex = px - u * dx, ez = pz - u * dz; if (ex * ex + ez * ez < 0.3) return true;
-    }
+      const u = (px * dx + pz * dz) / len2; if (u <= 0.02 || u >= 0.98) return false;
+      const ex = px - u * dx, ez = pz - u * dz; return ex * ex + ez * ez < 0.3;
+    };
+    // spatial grid: the cells of the segment's bounding box (padded by the 0.55 m corridor + frame drift)
+    const w = Math.abs(to.x - from.x) + 1.6, h = Math.abs(to.z - from.z) + 1.6; // a long diagonal covers too many cells: scan the list
+    if (this.mgr.inBox && (w / 4 + 1) * (h / 4 + 1) < 48) return this.mgr.inBox(Math.min(from.x, to.x) - 0.8, Math.min(from.z, to.z) - 0.8, Math.max(from.x, to.x) + 0.8, Math.max(from.z, to.z) + 0.8, hit);
+    for (const a of this.ctx.actors) if (hit(a)) return true;
     return false;
   }
 
@@ -428,11 +434,25 @@ export class Bot {
     const nav = this.mgr.nav; if (!nav) return dest;
     const t = this.ctx.time;
     const changed = !this.pathGoal || Math.hypot(this.pathGoal.x - dest.x, this.pathGoal.z - dest.z) > 1.2 || Math.abs((this.pathGoal.y ?? 0) - (dest.y ?? 0)) > 1.5;
+    // goal slid a few metres (follow / formation goals move with the leader): if the path's end walks straight to the
+    // new goal on the same level, retarget the end instead of a new A* (most of the 40c40 A* calls)
+    if (changed && this.path?.length && this.pathGoal && Math.hypot(this.pathGoal.x - dest.x, this.pathGoal.z - dest.z) < 5 &&
+      Math.abs((this.pathGoal.y ?? 0) - (dest.y ?? 0)) < 0.5 && Math.abs((dest.y ?? this.position.y) - this.position.y) < 1.5) {
+      const L = this.path.length, from = L > 1 ? this.path[L - 2] : this.position;
+      if (nav.los(from.x, from.z, dest.x, dest.z, this.position.y)) {
+        this.path[L - 1] = { ...this.path[L - 1], x: dest.x, z: dest.z }; this.pathI = Math.min(this.pathI, L - 1);
+        this.pathGoal = { x: dest.x, z: dest.z, y: dest.y }; this.mgr.pathPatched = (this.mgr.pathPatched || 0) + 1;
+        return this.followPathStep();
+      }
+    }
     if ((changed || !this.path || t > this.repathT) && this.mgr.takePathBudget()) {
       const tp = performance.now(); this.path = nav.findPath(this.position.x, this.position.z, dest.x, dest.z, undefined, undefined, this.position.y, dest.y); this.pathI = 0; this.mgr.pathSpent += performance.now() - tp;
       this.pathGoal = { x: dest.x, z: dest.z, y: dest.y }; this.repathT = t + rand(2.5, 4);
     }
     if (!this.path || !this.path.length) return changed ? null : dest;
+    return this.followPathStep();
+  }
+  followPathStep() {
     while (this.pathI < this.path.length - 1 && Math.hypot(this.path[this.pathI].x - this.position.x, this.path[this.pathI].z - this.position.z) < 0.45) this.pathI++;
     const wp = this.path[this.pathI];
     if (this.pathI === this.path.length - 1 && Math.hypot(wp.x - this.position.x, wp.z - this.position.z) < 0.25) return null;

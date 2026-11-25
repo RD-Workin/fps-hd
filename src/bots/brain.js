@@ -87,6 +87,9 @@ export class Brain {
       const df = bomb.state === 'planted' && bomb.defuser?.alive ? bomb.defuser : null;
       const rushers = df ? [...list].filter(b => hd(b.position, bomb.position) < 40).sort((a, b) => hd(a.position, bomb.position) - hd(b.position, bomb.position)).slice(0, 3) : [];
       list.forEach((b, i) => {
+        // the marksman on a roof / window over the site keeps his perch (covers the retake from above)
+        const ow = P.ow?.get(b);
+        if (ow && !rushers.includes(b) && hd(ow, bomb.position) < 60) { b.goal = { x: ow.x, z: ow.z, y: ow.y, tol: 0.7, speed: 'tac', look: bomb.position, crouch: !ow.roof, anchor: ow, huntRange: 3, noCover: true, exact: true }; return; }
         if (rushers.includes(b)) { b.goal = { x: bomb.position.x, z: bomb.position.z, tol: 1, speed: 'run', look: df.position, watch: df.position, push: true, noCover: true, noHunt: true }; b.lastKnown = df.position.clone?.() || b.lastKnown; return; }
         // far away (pressure teams on the big map): don't cross the map one by one; hold and cut the rotations there
         if (bomb.state === 'planted' && hd(b.position, bomb.position) > 60) {
@@ -462,7 +465,12 @@ export class Brain {
         b.goal = { x: f.x, z: f.z, tol: 1.2, speed: 'run', look: f.look, crouch: true, anchor: f, huntRange: 6, noCover: true };
         return;
       }
-      if (hot && role !== hot && (role === 'mid' || !P.anchors?.has(b))) role = hot; // rotate everyone but one anchor per site
+      // rotate on the hot site: mid + the other sites' non-anchors; a big site (4+ defenders) sends only half, so a fake
+      // or a pressure team can't empty it (40v40: the whole defense used to pile on one site)
+      if (hot && role !== hot && (role === 'mid' || !P.anchors?.has(b))) {
+        const mates = role === 'mid' ? null : list.filter(o => P.roles.get(o) === role && !P.anchors?.has(o));
+        if (!mates || mates.length < 3 || mates.indexOf(b) % 2 === 1) role = hot;
+      }
       if (role === 'mid') {
         const ms = this.midSpots(); const k = counters.mid = (counters.mid ?? -1) + 1; const s = ms[k % ms.length];
         b.goal = { x: s.x, z: s.z, tol: 0.8, speed: 'run', look: s.look, anchor: s, huntRange: 12, crouch: false };
@@ -520,8 +528,25 @@ export class Brain {
     const res = [];
     if (list.length && site) {
       const c = new V(site.center.x, this.fy(site.center.x, site.center.z) + 1, site.center.z), ents = this.entries(site);
-      for (const h of list) {
-        const eye = new V(h.x, h.y + 1.5, h.z);
+      // roof corners sit ~1 m inside the parapet: from there the parapet hides everything below. Shooters stand at the
+      // parapet instead: the edge point nearest the site, and ±3 m along that edge (walkable on the roof layer)
+      // (flat roofs on outside stairs, 'toit-N', already place their holds at the parapet: kept as they are)
+      const HC = this.squads.houses, hs = HC.houses(), mine = h => h.roof && hs.some(q => q.id === h.house);
+      const cand = list.filter(h => !mine(h)), done = new Set();
+      for (const h of list) if (mine(h) && !done.has(h.house)) {
+        done.add(h.house); const H = hs.find(q => q.id === h.house);
+        const b = H.box, m = 0.65, cl = (v, a, c) => Math.max(a + m, Math.min(c - m, v));
+        const px = cl(site.center.x, b.x0, b.x1), pz = cl(site.center.z, b.z0, b.z1);
+        const alongX = Math.abs(site.center.z - (b.z0 + b.z1) / 2) / (b.z1 - b.z0) > Math.abs(site.center.x - (b.x0 + b.x1) / 2) / (b.x1 - b.x0);
+        for (const o of [0, -3, 3]) {
+          const ex = Math.abs(site.center.x - b.x0) < Math.abs(site.center.x - b.x1) ? b.x0 + m : b.x1 - m;
+          const ez = Math.abs(site.center.z - b.z0) < Math.abs(site.center.z - b.z1) ? b.z0 + m : b.z1 - m;
+          const x = alongX ? cl(px + o, b.x0, b.x1) : ex, z = alongX ? ez : cl(pz + o, b.z0, b.z1);
+          if (this.mgr.nav.isWalkable(x, z, h.y)) cand.push({ x, z, y: h.y, roof: true, house: h.house });
+        }
+      }
+      for (const h of cand) {
+        const eye = new V(h.x, h.y + 1.6, h.z);
         let seeC = 0; // centre + a ring over the site (the plant can be anywhere in it)
         for (let k = 0; k < 9; k++) { const a = k / 8 * Math.PI * 2, r = k ? site.radius * 0.7 : 0; if (phys.lineOfSight(eye, new V(c.x + Math.cos(a) * r, c.y, c.z + Math.sin(a) * r))) seeC++; }
         const seeE = ents.filter(e => phys.lineOfSight(eye, new V(e.x, this.fy(e.x, e.z) + 1.2, e.z))).length;
