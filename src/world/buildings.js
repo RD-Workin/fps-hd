@@ -2,7 +2,7 @@
 // balconies, awnings, shop signs, drainpipes. One AABB collider per block.
 import * as THREE from 'three';
 import { FACADE, DECAL, rng } from './textures.js';
-import { CELL, GX0, GZ0, LEVEL, COVERED, WALLS } from './layout.js';
+import { CELL, GX0, GZ0, GH, LEVEL, COVERED, WALLS } from './layout.js';
 import { HALL_CEIL } from './grand.js';
 import { rects } from './terrain.js';
 const STAIRS = { '^': 1, 'v': 1, '>': 1, '<': 1 };
@@ -41,6 +41,9 @@ function faceSlope(geo, f, t0, t1, y0, y1, dep, uv, c) {
   if ((f.ax === 'x') === flip) geo.quad(B, A, D, C, n, [u1, v0, u0, v1], c); else geo.quad(A, B, C, D, n, uv, c);
 }
 
+// Every roof segment built (walkable flat roofs / pitched roofs): {x0,x1,z0,z1,h (roof floor), y0, flat, style, edge}
+export const ROOF_SEGS = [];
+const GZE = GZ0 + GH * CELL, B3 = (a) => new THREE.Box3(new THREE.Vector3(a[0], a[1], a[2]), new THREE.Vector3(a[3], a[4], a[5]));
 // '#' cells -> merged rects -> segmented buildings (height from the highest neighbouring floor). Covered passages ('c'/'C')
 // get a building mass above head height. Facade columns sit on the floor level found in front of them.
 export function buildBuildings(G, T, addSolid) {
@@ -60,17 +63,18 @@ export function buildBuildings(G, T, addSolid) {
       let len = 6 + Math.floor(rr() * 5); if (L1 - (s + len) < 5) len = L1 - s;
       const e = Math.min(L1, s + len);
       const h = Math.round((hMin + rr() * (hMax - hMin)) * 2) / 2; hTop = Math.max(hTop, h);
-      buildSegment(G, rr, style, alongX ? s : x0, alongX ? e : x1, alongX ? z0 : s, alongX ? z1 : e, h, alongX, outF, shopSigns, white, y0);
+      buildSegment(G, rr, style, alongX ? s : x0, alongX ? e : x1, alongX ? z0 : s, alongX ? z1 : e, h, alongX, outF, shopSigns, white, y0, addSolid);
       s = e;
     }
-    addSolid(new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, hTop + 0.6, z1)), style === 'warehouse' ? 'metal' : 'concrete', { navH: y0 > 0 ? 0 : 12 });
+    // bots: the whole block stays one obstacle on the ground grid (roofs are not on the bot nav); physics is per segment
+    addSolid(new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, hTop + 0.6, z1)), style === 'warehouse' ? 'metal' : 'concrete', { navOnly: true, navH: y0 > 0 ? 0 : 12 });
   };
   for (const r of rects(T.g, c => c === '#')) one(r, 0, ringMax(r));
   for (const ch in COVERED) { const ceil = ch === 'H' ? HALL_CEIL : CEIL; for (const r of rects(T.g, c => c === ch)) one(r, COVERED[ch] + ceil, COVERED[ch] + ceil); }
   buildWalls(G, addSolid);
 }
 
-function buildSegment(G, r, style0, x0, x1, z0, z1, h, alongX, outF, shopSigns, white, y0 = 0) {
+function buildSegment(G, r, style0, x0, x1, z0, z1, h, alongX, outF, shopSigns, white, y0 = 0, addSolid = null) {
   const style = style0 === 'white' ? 'plaster' : style0;
   const tint = style0 === 'white' ? col(WHITE[(r() * WHITE.length) | 0]) : style === 'warehouse' ? col(WARE[(r() * WARE.length) | 0]) : style === 'stone' ? col(0xf0e2c8) : col(PLASTER[(r() * PLASTER.length) | 0]);
   const stoneC = col(0xe6d6bb, 0.9 + r() * 0.15), trim = col(0xd8cbb4);
@@ -83,14 +87,27 @@ function buildSegment(G, r, style0, x0, x1, z0, z1, h, alongX, outF, shopSigns, 
   if (style !== 'warehouse') {
     G.stone.box(x0 - 0.16, h - 0.38, z0 - 0.16, x1 + 0.16, h - 0.1, z1 + 0.16, trim, 'py');
   } else G.metal.box(x0 - 0.1, h - 0.3, z0 - 0.1, x1 + 0.1, h, z1 + 0.1, col(0x6b6f70), 'py');
-  if (pitched) roofPrism(G, x0 - 0.3, x1 + 0.3, z0 - 0.3, z1 + 0.3, h - 0.1, alongX, tint);
-  else {
+  const mat = style === 'warehouse' ? 'metal' : 'concrete', sol = (a) => addSolid && addSolid(B3(a), mat, { noNav: true });
+  // map edge: the outer parapet rises to a visible 2.6 m wall (no invisible wall, no walking off the map)
+  const E = { x0: x0 <= GX0 + 0.01, x1: x1 >= -GX0 - 0.01, z0: z0 <= GZ0 + 0.01, z1: z1 >= GZE - 0.01 };
+  if (pitched) {
+    roofPrism(G, x0 - 0.3, x1 + 0.3, z0 - 0.3, z1 + 0.3, h - 0.1, alongX, tint);
+    // walls up to the eaves, then the slope as thin stacked slabs (step 0.36 m: walkable up to the ridge)
+    sol([x0, y0, z0, x1, h - 0.1, z1]);
+    const half = (alongX ? z1 - z0 : x1 - x0) / 2, rise = Math.min(2.2, half * 2 * 0.28), n = 6;
+    for (let i = 1; i <= n; i++) { const d = half * (i - 1) / n, top = h - 0.1 + rise * (i - 0.4) / n;
+      sol(alongX ? [x0, h - 0.1, z0 + d, x1, top, z1 - d] : [x0 + d, h - 0.1, z0, x1 - d, top, z1]); }
+    ROOF_SEGS.push({ x0, x1, z0, z1, h: h - 0.1, y0, flat: false, style });
+  } else {
     G.concrete.box(x0, h - 0.1, z0, x1, h - 0.05, z1, col(0x8f877a), 'ny px nx pz nz');
-    const pc = style === 'warehouse' ? col(0x6b6f70) : tint, t = 0.25, ph = h + 0.6;
-    G.plaster.box(x0, h - 0.1, z0, x1, ph, z0 + t, pc); G.plaster.box(x0, h - 0.1, z1 - t, x1, ph, z1, pc);
-    G.plaster.box(x0, h - 0.1, z0 + t, x0 + t, ph, z1 - t, pc); G.plaster.box(x1 - t, h - 0.1, z0 + t, x1, ph, z1 - t, pc);
+    const pc = style === 'warehouse' ? col(0x6b6f70) : tint, t = 0.25, ph = h + 0.6, hi = h + 2.6;
+    const par = [['z0', [x0, z0, x1, z0 + t]], ['z1', [x0, z1 - t, x1, z1]], ['x0', [x0, z0 + t, x0 + t, z1 - t]], ['x1', [x1 - t, z0 + t, x1, z1 - t]]];
+    for (const [k, [a, b, c, d]] of par) { const top = E[k] ? hi : ph; G.plaster.box(a, h - 0.1, b, c, top, d, pc); sol([a, h - 0.05, b, c, top + 0.08, d]); }
     G.stone.box(x0 - 0.04, ph, z0 - 0.04, x1 + 0.04, ph + 0.08, z1 + 0.04, trim, 'ny');
-    if (r() < 0.35) { const cx = x0 + 1.5 + r() * (x1 - x0 - 3), cz = z0 + 1.5 + r() * (z1 - z0 - 3); G.metal.box(cx - 0.6, h, cz - 0.6, cx + 0.6, h + 1.4, cz + 0.6, col(0xb9bdc0)); }
+    for (const [k, [a, b, c, d]] of par) if (E[k]) G.stone.box(a - 0.04, hi, b - 0.04, c + 0.04, hi + 0.08, d + 0.04, trim, 'ny');
+    sol([x0, y0, z0, x1, h - 0.05, z1]); // walkable roof
+    if (r() < 0.35) { const cx = x0 + 1.5 + r() * (x1 - x0 - 3), cz = z0 + 1.5 + r() * (z1 - z0 - 3); G.metal.box(cx - 0.6, h, cz - 0.6, cx + 0.6, h + 1.4, cz + 0.6, col(0xb9bdc0)); sol([cx - 0.6, h - 0.05, cz - 0.6, cx + 0.6, h + 1.4, cz + 0.6]); }
+    ROOF_SEGS.push({ x0, x1, z0, z1, h: h - 0.05, y0, flat: true, style, edge: E });
   }
   // facades on the 4 faces
   const faces = [{ ax: 'x', s: 1, p: x1, t0: z0, t1: z1 }, { ax: 'x', s: -1, p: x0, t0: z0, t1: z1 }, { ax: 'z', s: 1, p: z1, t0: x0, t1: x1 }, { ax: 'z', s: -1, p: z0, t0: x0, t1: x1 }];
