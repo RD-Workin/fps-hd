@@ -1,6 +1,6 @@
 # Opération Nova — FPS Recherche & Destruction (navigateur)
 
-FPS original jouable dans le navigateur : une carte, deux modes (Recherche & Destruction et Capture du drapeau, jusqu'à 20c20 contre des bots).
+FPS original jouable dans le navigateur : une carte, quatre modes (Recherche & Destruction, Capture du drapeau, Zombies et Mêlée générale, jusqu'à 40c40 contre des bots).
 Three.js 0.170 + Vite 5, 100 % gratuit (code open source, assets procéduraux ou CC0/MIT).
 
 ```bash
@@ -21,6 +21,8 @@ Modes (au choix dans le menu) :
   inversés en manche 2, tirés au sort en manche 3). Réapparition 3 s qui s'allonge à chaque mort (plus fort en grandes équipes),
   remise à zéro à chaque capture de son équipe ; nombre de vies limité par manche. Réglages dans le menu.
 - Zombies : vagues de zombies sortant de la mer au port, munitions illimitées, nombre d'alliés au choix (ils vous suivent et tiennent la position avec vous), difficulté qui monte par le nombre, la vitesse ou les deux. Voir [docs/decisions/zombies.md](docs/decisions/zombies.md).
+- Mêlée générale : chacun pour soi contre 1 à 39 bots dans la Citadelle, nombre de vies au choix (5 par défaut) ; une mort coûte une vie et
+  on réapparaît ailleurs, le dernier en lice gagne (au bout de la durée max : classement aux vies puis aux éliminations). Voir [docs/decisions/ffa.md](docs/decisions/ffa.md).
 
 ## Architecture
 Contrat complet : [ARCHITECTURE.md](ARCHITECTURE.md). Chaque module expose `createX(ctx)` et ne lit les autres que via `ctx`.

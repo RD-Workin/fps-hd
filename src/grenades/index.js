@@ -1,4 +1,5 @@
 // Grenades module: smoke (fumigène) and flash grenades for the player and the bots. See docs/decisions/grenades.md.
+import { friends } from '../core/teams.js';
 // ctx.grenades = {
 //   busy (player is holding / throwing one), clouds, inventory(actor) -> {smoke, flash}, blocksSight(a, b) -> bool,
 //   smokeAt(p) -> 0..1, throwFrom(actor, kind, vel), solveThrow(actor, kind, target, opts) -> {vel, yaw, pitch} | null,
@@ -243,7 +244,7 @@ export function createGrenades(ctx) {
         // don't blind teammates who look at it
         let bad = false;
         for (const o of ctx.actors) {
-          if (!o.alive || o === actor || o.team !== actor.team) continue;
+          if (!o.alive || o === actor || !friends(o, actor)) continue;
           const oe = o.getEyePosition(_d); const dd = oe.distanceTo(end); if (dd > 28) continue;
           if (!physics.lineOfSight(oe, end)) continue;
           const f = facing(o, end); if (f > 0.25 || dd < 5) { bad = true; break; }

@@ -1,3 +1,4 @@
+import { friends } from './teams.js';
 // Central damage pipeline. Every hit (player or bot) goes through ctx.combat.applyDamage.
 export class Combat {
   constructor(ctx) { this.ctx = ctx; this.friendlyFire = true; this.friendlyFireScale = 1; }
@@ -5,7 +6,7 @@ export class Combat {
   applyDamage(target, amount, attacker, opts = {}) {
     const { ctx } = this;
     if (!target || !target.alive) return false;
-    const friendly = !!attacker && attacker !== target && attacker.team === target.team;
+    const friendly = friends(attacker, target);
     if (friendly && !this.friendlyFire) return false;
     if (friendly) {
       amount *= this.friendlyFireScale;

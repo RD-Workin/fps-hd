@@ -18,7 +18,7 @@ export function createBigMap(ctx, root) {
 
   const cols = () => ctx.world?.minimap?.colliders || ctx.physics?.colliders || [];
   function bounds() {
-    const b = ctx.game?.mode === 'zombie' || ctx.game?.mode === 'ctf' ? (ctx.world?.coreBounds || ctx.world?.bounds) : ctx.world?.bounds;
+    const b = ['zombie', 'ctf', 'ffa'].includes(ctx.game?.mode) ? (ctx.world?.coreBounds || ctx.world?.bounds) : ctx.world?.bounds;
     return b && isFinite(b.minX) ? { minX: b.minX - 4, maxX: b.maxX + 4, minZ: b.minZ - 4, maxZ: b.maxZ + 4 } : { minX: -60, maxX: 60, minZ: -50, maxZ: 50 };
   }
   function buildStatic() {
@@ -75,7 +75,7 @@ export function createBigMap(ctx, root) {
     for (const l of ctx.world?.minimap?.labels || []) if (l.x > bb.minX && l.x < bb.maxX && l.z > bb.minZ && l.z < bb.maxZ) g.fillText(String(l.text).toUpperCase(), X(l.x), Y(l.z));
     // sites: active ones bright, others dimmed
     const active = new Set((ctx.world?.bombSites || []).map(s => s.name));
-    const sites = ctx.game?.mode === 'ctf' || ctx.game?.mode === 'zombie' ? [] : (ctx.world?.allSites || ctx.world?.bombSites || []);
+    const sites = ['ctf', 'zombie', 'ffa'].includes(ctx.game?.mode) ? [] : (ctx.world?.allSites || ctx.world?.bombSites || []);
     for (const s of sites) {
       const on = active.has(s.name), r = (s.radius || 6) * k;
       g.globalAlpha = on ? 1 : 0.35;
@@ -118,7 +118,7 @@ export function createBigMap(ctx, root) {
     }
     // bomb
     const bomb = ctx.game?.bomb;
-    if (bomb && ctx.game?.mode !== 'ctf' && ctx.game?.mode !== 'zombie') {
+    if (bomb && !['ctf', 'zombie', 'ffa'].includes(ctx.game?.mode)) {
       let pos = null;
       if ((bomb.state === 'dropped' || bomb.state === 'planted') && bomb.position) pos = bomb.position;
       else if (bomb.state === 'planted' && bomb.site) pos = ctx.world?.bombSites?.find(s => s.name === bomb.site)?.center;
@@ -152,6 +152,7 @@ export function createBigMap(ctx, root) {
     const p = ctx.player, mode = ctx.game?.mode;
     if (mode === 'ctf') return 'Capture du drapeau';
     if (mode === 'zombie') return 'Survie';
+    if (mode === 'ffa') return 'Mêlée générale — chacun pour soi';
     const names = (ctx.world?.bombSites || []).map(s => s.name);
     const list = names.length > 1 ? names.slice(0, -1).join(', ') + ' ou ' + names[names.length - 1] : names[0] || '';
     const b = ctx.game?.bomb;

@@ -7,6 +7,7 @@ import { createMinimap } from './minimap.js';
 import { createBigMap } from './bigmap.js';
 import { createKillcam } from './killcam.js';
 import { createSpecView } from './specview.js';
+import { foes } from '../core/teams.js';
 
 const LS_KEY = 'nova.hud';
 const ROUND_STREAK = ['', '', 'DOUBLE ÉLIMINATION', 'TRIPLE ÉLIMINATION', 'QUADRUPLE ÉLIMINATION', 'AS — ÉQUIPE RASÉE'];
@@ -94,12 +95,15 @@ function markup() {
       <div class="nv-card nv-stats"><h3>VOTRE MATCH <small>JOUEUR</small></h3><div class="nv-statgrid"></div></div>
       <div class="nv-card nv-c-keys"><h3>COMMANDES <small>AZERTY</small></h3><div class="nv-keys">${keys}</div></div>
       <div class="nv-card"><h3>RÉGLAGES</h3><div class="nv-set">
-        <label>Mode de jeu</label><div class="nv-seg nv-seg-mode" data-set="mode"><button data-v="sd">RECHERCHE &amp; DESTRUCTION</button><button data-v="ctf">CAPTURE DU DRAPEAU</button><button data-v="zombie">ZOMBIES</button></div>
+        <label>Mode de jeu</label><div class="nv-seg nv-seg-mode" data-set="mode"><button data-v="sd">RECHERCHE &amp; DESTRUCTION</button><button data-v="ctf">CAPTURE DU DRAPEAU</button><button data-v="zombie">ZOMBIES</button><button data-v="ffa">MÊLÉE GÉNÉRALE</button></div>
         <label data-zm>Difficulté qui monte par</label><div class="nv-seg" data-zm data-set="zprog"><button data-v="count">NOMBRE</button><button data-v="speed">VITESSE</button><button data-v="both">LES DEUX</button></div>
-        <label>Bots alliés</label><div class="nv-range"><input type="range" data-set="allies" min="0" max="39" step="1"><output></output></div>
-        <label data-sd>Bots adverses</label><div class="nv-range" data-sd><input type="range" data-set="enemies" min="1" max="40" step="1"><output></output></div>
-        <label data-sd>Effectifs rapides</label><div class="nv-seg" data-sd data-set="preset"><button data-v="5">5c5</button><button data-v="10">10c10</button><button data-v="20">20c20</button><button data-v="40">40c40</button></div>
-        <div class="nv-perfwarn" data-sd></div>
+        <label data-noffa>Bots alliés</label><div class="nv-range" data-noffa><input type="range" data-set="allies" min="0" max="39" step="1"><output></output></div>
+        <label data-sd data-noffa>Bots adverses</label><div class="nv-range" data-sd data-noffa><input type="range" data-set="enemies" min="1" max="40" step="1"><output></output></div>
+        <label data-sd data-noffa>Effectifs rapides</label><div class="nv-seg" data-sd data-noffa data-set="preset"><button data-v="5">5c5</button><button data-v="10">10c10</button><button data-v="20">20c20</button><button data-v="40">40c40</button></div>
+        <div class="nv-perfwarn" data-sd data-noffa></div>
+        <label data-only="ffa">Adversaires (bots)</label><div data-only="ffa" class="nv-range"><input type="range" data-set="fbots" min="1" max="39" step="1"><output></output></div>
+        <label data-only="ffa">Vies par joueur</label><div data-only="ffa" class="nv-range"><input type="range" data-set="flives" min="1" max="15" step="1"><output></output></div>
+        <label data-only="ffa">Durée maximale</label><div data-only="ffa" class="nv-range"><input type="range" data-set="fmin" min="3" max="30" step="1"><output></output></div>
         <label>Ambiance</label><div class="nv-seg" data-set="night"><button data-v="day">JOUR</button><button data-v="night">OPS DE NUIT</button></div>
         <label data-sd>Difficulté des ennemis</label><div class="nv-seg" data-sd data-set="skill"><button data-v="easy">RECRUE</button><button data-v="normal">NORMAL</button><button data-v="veteran">VÉTÉRAN</button></div>
         <label data-only="sd">Objectifs</label><div data-only="sd" class="nv-seg" data-set="obj"><button data-v="auto">AUTO</button><button data-v="classic">A/B CITADELLE</button><button data-v="2">2 SITES</button><button data-v="3">3 SITES</button><button data-v="4">4 SITES</button></div>
@@ -109,7 +113,7 @@ function markup() {
         <label data-only="ctf">Durée de manche</label><div data-only="ctf" class="nv-range"><input type="range" data-set="cmin" min="3" max="20" step="1"><output></output></div>
         <label data-only="ctf">Pénalité par mort</label><div data-only="ctf" class="nv-range"><input type="range" data-set="cstep" min="0" max="12" step="1"><output></output></div>
         <label data-only="ctf">Vies par manche</label><div data-only="ctf" class="nv-range"><input type="range" data-set="clives" min="0" max="15" step="1"><output></output></div>
-        <label data-sd>Camp de départ</label><div class="nv-seg" data-sd data-set="side"><button data-v="ATK">ATTAQUE</button><button data-v="DEF">DÉFENSE</button><button data-v="RND">ALÉATOIRE</button></div>
+        <label data-sd data-noffa>Camp de départ</label><div class="nv-seg" data-sd data-noffa data-set="side"><button data-v="ATK">ATTAQUE</button><button data-v="DEF">DÉFENSE</button><button data-v="RND">ALÉATOIRE</button></div>
         <label>Qualité graphique</label><div class="nv-seg" data-set="quality"><button data-v="low">BASSE</button><button data-v="high">HAUTE</button></div>
         <label>Compteur d'i/s</label><div class="nv-seg" data-set="fps"><button data-v="0">MASQUÉ</button><button data-v="1">AFFICHÉ (F3)</button></div>
         <label>Sensibilité souris</label><div class="nv-range"><input type="range" data-set="sens" min="0.4" max="6" step="0.1"><output></output></div>
@@ -147,7 +151,7 @@ export function createHud(ctx) {
     sbEnd: $('.nv-sb-end'), sbEndMeta: $('.nv-sb-end .meta'), sbEndTb: $('.nv-sb-end .tb'), scoresBtn: $('[data-act="scores"]'),
     result: $('.nv-result'), statgrid: $('.nv-statgrid'), playBtn: $('[data-act="play"]'), restartBtn: $('[data-act="restart"]'),
     mutes: $$('.nv-mute'), sens: $('[data-set="sens"]'), vol: $('[data-set="vol"]'), quality: $('[data-set="quality"]'), fps: $('[data-set="fps"]'), side: $('[data-set="side"]'), skill: $('[data-set="skill"]'), night: $('[data-set="night"]'), lamp: $('.nv-lamp'), subT: $('.nv-sub .sub-t'), allies: $('[data-set="allies"]'), enemies: $('[data-set="enemies"]'), perfwarn: $('.nv-perfwarn'), preset: $('[data-set="preset"]'), rtime: $('[data-set="rtime"]'), obj: $('[data-set="obj"]'), btime: $('[data-set="btime"]'),
-    mode: $('[data-set="mode"]'), zprog: $('[data-set="zprog"]'), ccaps: $('[data-set="ccaps"]'), cmin: $('[data-set="cmin"]'), cstep: $('[data-set="cstep"]'), clives: $('[data-set="clives"]'),
+    mode: $('[data-set="mode"]'), zprog: $('[data-set="zprog"]'), ccaps: $('[data-set="ccaps"]'), cmin: $('[data-set="cmin"]'), cstep: $('[data-set="cstep"]'), clives: $('[data-set="clives"]'), fbots: $('[data-set="fbots"]'), flives: $('[data-set="flives"]'), fmin: $('[data-set="fmin"]'),
     flags: $('.nv-flags'), flagUs: $('.nv-flags .us'), flagThem: $('.nv-flags .them'), deathK: $('.nv-death .k'), deathR: $('.nv-death .r'),
     bombLb: $('.nv-bombpill .lb'), tagLine: $('.nv-tag'), desc: $('.nv-desc'), legObj: $('.nv-sb-leg .obj'),
   };
@@ -164,7 +168,7 @@ export function createHud(ctx) {
   const op = (el, v) => { v = Math.round(v * 100) / 100; if (memo(el, 'op', v)) el.style.opacity = v; };
 
   // ---------------------------------------------------------------- state
-  const settings = { obj: 'auto', night: 'day', skill: 'normal', mode: 'sd', zallies: 3, zprog: 'both', ccaps: 3, cmin: 10, cstep: 0, clives: 0, rtime: 0, btime: 0, allies: 9, enemies: 10, side: 'ATK', quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
+  const settings = { obj: 'auto', night: 'day', skill: 'normal', mode: 'sd', zallies: 3, zprog: 'both', ccaps: 3, cmin: 10, cstep: 0, clives: 0, fbots: 11, flives: 5, fmin: 10, rtime: 0, btime: 0, allies: 9, enemies: 10, side: 'ATK', quality: 'high', sens: +((input?.sensitivity ?? 0.0022) * 1000).toFixed(1), ...load() };
   let lastSpec = '';
   const tally = new Map(); // actor -> {kills, deaths}  (fallback when actor.stats missing)
   const me = { shots: 0, hits: 0, hs: 0, kills: 0, deaths: 0, roundKills: 0 };
@@ -228,6 +232,8 @@ export function createHud(ctx) {
   }
   // game mode (Recherche & Destruction / Capture du drapeau): menu texts, CTF settings rows, side labels
   const isCtf = () => ctx.game?.mode === 'ctf';
+  const isFfa = () => ctx.game?.mode === 'ffa';
+  const ord = n => (n === 1 ? '1er' : `${n}e`);
   function applyMode() {
     try { ctx.game?.setMode?.(settings.mode); } catch (e) { console.warn('[hud] mode', e); }
     try { ctx.game?.setCtfSettings?.({ caps: settings.ccaps, minutes: settings.cmin, step: settings.cstep || null, lives: settings.clives || null }); } catch (e) { console.warn('[hud] ctf', e); }
@@ -253,6 +259,17 @@ export function createHud(ctx) {
     if (z) {
       E.tagLine.textContent = `ZOMBIES · SURVIE PAR VAGUES · ${settings.zallies + 1} HUMAIN${settings.zallies ? 'S' : ''}`;
       E.desc.textContent = 'Les morts sortent de la mer et envahissent la ville par le port, par vagues, toujours plus nombreux ou plus rapides. Munitions illimitées. Vos alliés vous suivent et tiennent la position avec vous : choisissez bien où vous arrêter. Tenez le plus de vagues possible.';
+    }
+    // Mêlée générale: own rows (CSS .m-ffa), texts
+    const f = settings.mode === 'ffa';
+    E.menu.classList.toggle('m-ffa', f); root.classList.toggle('m-ffa', f);
+    try { ctx.game?.setFfaSettings?.({ bots: settings.fbots, lives: settings.flives, minutes: settings.fmin }); } catch (e) { console.warn('[hud] ffa', e); }
+    for (const [el, v, mn, mx, fmt] of [[E.fbots, settings.fbots, 1, 39, v => String(v)], [E.flives, settings.flives, 1, 15, v => String(v)], [E.fmin, settings.fmin, 3, 30, v => v + ' min']]) {
+      el.value = v; el.nextElementSibling.value = fmt(v); el.style.setProperty('--p', ((v - mn) / (mx - mn) * 100) + '%');
+    }
+    if (f) {
+      E.tagLine.textContent = `MÊLÉE GÉNÉRALE · ${settings.fbots + 1} JOUEURS · CHACUN POUR SOI`;
+      E.desc.textContent = `Tout le monde contre tout le monde dans la Citadelle, bots compris. Chacun a ${settings.flives} vie${settings.flives > 1 ? 's' : ''} : une mort en coûte une et vous fait réapparaître ailleurs quelques secondes plus tard. Sans vie, vous êtes éliminé. Le dernier encore en lice gagne ; au bout de ${settings.fmin} min, le classement se fait aux vies restantes puis aux éliminations.`;
     }
     if (g?.pendingMode && g.started) E.note.textContent = 'Mode appliqué à la prochaine partie (Recommencer)';
   }
@@ -282,6 +299,10 @@ export function createHud(ctx) {
     E[k].addEventListener('input', () => { settings[k] = +E[k].value; save(settings); applyMode(); });
     E[k].addEventListener('change', () => { if (ctx.game?.started) toast('Réglage appliqué à la prochaine manche'); });
   }
+  for (const k of ['fbots', 'flives', 'fmin']) {
+    E[k].addEventListener('input', () => { settings[k] = +E[k].value; save(settings); if (k === 'fbots') E[k].nextElementSibling.value = E[k].value; else applyMode(); });
+    E[k].addEventListener('change', () => { applyMode(); if (ctx.game?.started) toast('Réglage appliqué à la prochaine partie (Recommencer)'); });
+  }
   for (const b of E.mutes) b.addEventListener('click', () => { ctx.audio?.toggleMute?.(); reflectAudio(); });
   ev.on('audio:muted', ({ muted } = {}) => { reflectAudio(); if (!ctx.paused) toast(muted ? 'Son coupé' : 'Son activé', muted ? 'warn' : ''); });
   ev.on('audio:volume', reflectAudio);
@@ -303,7 +324,8 @@ export function createHud(ctx) {
     } else if (mode === 'pause') {
       E.playBtn.querySelector('span').textContent = 'REPRENDRE'; E.restartBtn.classList.remove('hide');
       E.restartBtn.querySelector('span').textContent = 'RECOMMENCER';
-      if (zmode()) E.pinfo.innerHTML = `VAGUE <b>${g?.zombie?.wave ?? 0}</b> &nbsp;·&nbsp; ZOMBIES ÉLIMINÉS <b>${g?.zombie?.kills ?? 0}</b>`;
+      if (isFfa()) E.pinfo.innerHTML = `MÊLÉE GÉNÉRALE &nbsp;·&nbsp; VIES <b>${ctx.player?.ffa?.out ? 0 : ctx.player?.ffa?.lives ?? 0}</b> &nbsp;·&nbsp; ÉLIMINATIONS <b>${ctx.player?.stats?.kills ?? 0}</b> &nbsp;·&nbsp; EN LICE <b>${g?.remaining ?? 0}</b>`;
+      else if (zmode()) E.pinfo.innerHTML = `VAGUE <b>${g?.zombie?.wave ?? 0}</b> &nbsp;·&nbsp; ZOMBIES ÉLIMINÉS <b>${g?.zombie?.kills ?? 0}</b>`;
       else E.pinfo.innerHTML = `MANCHE <b>${g?.round ?? 1}</b> &nbsp;·&nbsp; SCORE <b class="u">${g?.score?.us ?? 0}</b> — <b class="t">${g?.score?.them ?? 0}</b>` +
         (isCtf() ? ` &nbsp;·&nbsp; CAPTURES <b class="u">${g?.caps?.us ?? 0}</b> — <b class="t">${g?.caps?.them ?? 0}</b> &nbsp;·&nbsp; CÔTÉ <b>${ctx.player?.team === 'DEF' ? 'CITADELLE' : 'PORT'}</b>`
           : ` &nbsp;·&nbsp; CAMP <b>${ctx.player?.team === 'DEF' ? 'DÉFENSE' : 'ATTAQUE'}</b>`);
@@ -318,6 +340,13 @@ export function createHud(ctx) {
         E.result.className = 'nv-result lose zm'; E.result.querySelector('.r').textContent = 'SUBMERGÉS';
         E.result.querySelector('.u').textContent = g?.zombie?.wave ?? 0; E.result.querySelector('.t').textContent = g?.zombie?.kills ?? 0;
         E.result.querySelector('.note').textContent = `VAGUE ATTEINTE · ZOMBIES ÉLIMINÉS`;
+      }
+      if (isFfa()) {
+        const pl = ctx.player?.ffa?.place ?? g?.lastResult?.place ?? 0, w = g?.winner;
+        E.result.className = 'nv-result ffa ' + (pl === 1 ? 'win' : 'lose');
+        E.result.querySelector('.r').textContent = pl === 1 ? 'DERNIER SURVIVANT' : `${ord(pl).toUpperCase()} PLACE`;
+        E.result.querySelector('.u').textContent = ord(pl); E.result.querySelector('.t').textContent = ctx.player?.stats?.kills ?? 0;
+        E.result.querySelector('.note').textContent = pl === 1 ? 'PLACE · ÉLIMINATIONS — PERSONNE NE VOUS A EU' : `PLACE · ÉLIMINATIONS — VAINQUEUR : ${(w?.name || '?').toUpperCase()}`;
       }
       E.playBtn.querySelector('span').textContent = 'REJOUER'; E.restartBtn.classList.add('hide');
       const p = ctx.player, s = p ? stat(p) : me, kills = s.kills ?? me.kills, deaths = s.deaths ?? me.deaths;
@@ -351,7 +380,8 @@ export function createHud(ctx) {
   ev.on('game:resumed', () => showMenu(null));
   ev.on('match:end', ({ weWon } = {}) => {
     endWon = !!weWon;
-    if (zmode()) banner('lose', 'FIN DE PARTIE', 'SUBMERGÉS', `Vague <b>${ctx.game?.zombie?.wave ?? 0}</b> · <b>${ctx.game?.zombie?.kills ?? 0}</b> zombies éliminés`, 3.2, true);
+    if (isFfa()) { const pl = ctx.player?.ffa?.place ?? 0, w = ctx.game?.winner; banner(pl === 1 ? 'win' : 'lose', 'FIN DE LA MÊLÉE', pl === 1 ? 'DERNIER SURVIVANT' : `${ord(pl).toUpperCase()} PLACE`, `Vainqueur : <b>${esc(w?.isPlayer ? 'vous' : w?.name || '?')}</b> · <b>${w?.stats?.kills ?? 0}</b> élimination${(w?.stats?.kills ?? 0) > 1 ? 's' : ''}`, 3.2, true); }
+    else if (zmode()) banner('lose', 'FIN DE PARTIE', 'SUBMERGÉS', `Vague <b>${ctx.game?.zombie?.wave ?? 0}</b> · <b>${ctx.game?.zombie?.kills ?? 0}</b> zombies éliminés`, 3.2, true);
     else banner(weWon ? 'win' : 'lose', 'FIN DU MATCH', weWon ? 'VICTOIRE' : 'DÉFAITE', `Score final <b>${ctx.game?.score?.us ?? 0} — ${ctx.game?.score?.them ?? 0}</b>`, 3.2, true);
     setTimeout(() => { if (document.pointerLockElement) document.exitPointerLock(); else showMenu('end'); }, 3400);
   });
@@ -376,7 +406,7 @@ export function createHud(ctx) {
     while (E.kills.children.length > 3) E.kills.lastChild.remove();
     anim(row, [{ opacity: 0, transform: 'translateY(6px) scale(1.15)' }, { opacity: 1, transform: 'none', offset: 0.12 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }], { duration: 2200 })
       ?.finished.then(() => row.remove(), () => {});
-    const st = ROUND_STREAK[Math.min(me.roundKills, 5)];
+    const st = isFfa() && me.roundKills >= 5 ? `SÉRIE DE ${me.roundKills}` : ROUND_STREAK[Math.min(me.roundKills, 5)];
     if (st) {
       const s = document.createElement('div'); s.className = 'nv-kill-streak'; s.textContent = st; E.kills.appendChild(s);
       anim(s, [{ opacity: 0, letterSpacing: '.6em' }, { opacity: 1, letterSpacing: '.3em', offset: 0.15 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }], { duration: 2400 })
@@ -418,7 +448,7 @@ export function createHud(ctx) {
     if (!victim) return;
     if (victim.isZombie && !killer?.isPlayer) { if (killer) { let t = tally.get(killer); if (!t) tally.set(killer, t = { kills: 0, deaths: 0 }); t.kills++; } return; } // zombie mode: feed only shows the player's kills
     if (killer && headshot) ex(killer).hs++;
-    for (const a of hurtBy.get(victim) || []) if (a !== killer && a.team !== victim.team) ex(a).assists++;
+    for (const a of hurtBy.get(victim) || []) if (a !== killer && foes(a, victim)) ex(a).assists++;
     hurtBy.delete(victim);
     for (const [a, k] of [[victim, 'deaths'], [killer, 'kills']]) {
       if (!a) continue; let t = tally.get(a); if (!t) tally.set(a, t = { kills: 0, deaths: 0 }); t[k]++;
@@ -436,7 +466,8 @@ export function createHud(ctx) {
   ev.on('player:died', ({ killer } = {}) => {
     html(E.deathT, killer && !killer.isPlayer ? `Éliminé par <b>${esc(killer.name)}</b>` : killer?.isPlayer ? 'Tué par vous-même' : 'Tué par l\'explosion');
     if (killer?.isZombie) { html(E.deathH, 'Vous revenez quand la vague est repoussée — observez vos coéquipiers'); return; }
-    html(E.deathH, killer?.alive ? `Santé restante de l'adversaire : <b>${Math.max(0, Math.round(killer.health))}</b>` : isCtf() ? '' : 'Observez vos coéquipiers jusqu\'à la fin de la manche');
+    html(E.deathH, killer?.alive ? `Santé restante de l'adversaire : <b>${Math.max(0, Math.round(killer.health))}</b>` : isCtf() || isFfa() ? '' : 'Observez vos coéquipiers jusqu\'à la fin de la manche');
+    if (isFfa()) me.roundKills = 0; // kill streaks count per life
   });
 
   // ---------------------------------------------------------------- toasts & banners
@@ -467,6 +498,7 @@ export function createHud(ctx) {
     const g = ctx.game, atk = (playerTeam || ctx.player?.team) === 'ATK';
     me.roundKills = 0; killerName = ''; hpGhost = lastHp = 100;
     for (const d of dmg) { d.from = null; op(d.el, 0); }
+    if (mode === 'ffa') { const L = g?.settings?.lives ?? 5; banner('alert', 'MÊLÉE GÉNÉRALE', 'CHACUN POUR SOI', `<b>${(ctx.actors || []).length}</b> joueurs · <b>${L}</b> vie${L > 1 ? 's' : ''} chacun · le dernier en lice gagne`, 3); return; }
     if (mode === 'zombie') { banner('alert', 'MODE ZOMBIES', 'TENEZ LA VILLE', 'Ils sortent de la mer, au <b>port</b> — trouvez une position', 2.8); return; }
     const mp = g?.isMatchPoint ? ' · <b>BALLE DE MATCH</b>' : '';
     if (isCtf()) {
@@ -502,6 +534,7 @@ export function createHud(ctx) {
       `${who(actor)} · <b>${c.us} — ${c.them}</b>`, 2.4, true);
   });
   ev.on('ctf:overtime', () => banner('gold', 'TEMPS ÉCOULÉ', 'PROLONGATION', 'La prochaine capture l\'emporte', 2.6, true));
+  ev.on('ffa:out', ({ actor, place } = {}) => { if (actor && !actor.isPlayer) toast(`${actor.name} est éliminé · ${ord(place)} · plus que ${ctx.game?.remaining ?? '?'} en lice`); });
   ev.on('ctf:out', ({ actor } = {}) => { if (actor && !actor.isPlayer) toast(`${actor.name} n'a plus de vie`, isAlly(actor) ? 'warn' : ''); });
   ev.on('bomb:planted', ({ site } = {}) => banner('alert', 'ALERTE', 'CHARGE POSÉE', site ? `Site <b>${esc(site)}</b> — ${ctx.player?.team === 'DEF' ? 'désamorcez-la !' : 'défendez-la !'}` : '', 2.4, true));
   ev.on('bomb:defused', () => toast('Charge désamorcée', 'gold'));
@@ -523,8 +556,25 @@ export function createHud(ctx) {
     if (td?.offsetHeight) sbRowH = td.offsetHeight + 3; // + border-spacing
     return Math.max(SB_TOP + 6, Math.floor((innerHeight * 0.92 - 130) / (sbRowH || 30)));
   }
+  // Mêlée générale: one ranking for everybody. Still in first (most kills, then lives), then the eliminated by place.
+  function buildFfaScoreboard(metaEl, tbEl, final) {
+    const g = ctx.game, actors = [...(ctx.actors || [])];
+    const list = final && g?.ranking?.length ? g.ranking : actors.sort((a, b) => (a.ffa?.out ? 1 : 0) - (b.ffa?.out ? 1 : 0) ||
+      (a.ffa?.out ? a.ffa.place - b.ffa.place : stat(b).kills - stat(a).kills || (b.ffa?.lives || 0) - (a.ffa?.lives || 0)));
+    const row = (a, i) => {
+      const s = stat(a), x = extra.get(a) || { assists: 0, hs: 0 }, f = a.ffa, win = final && a === g?.winner;
+      const lv = !f ? '' : f.out ? `<small class="lives out">${ord(f.place)}</small>` : `<small class="lives">${f.lives} VIE${f.lives > 1 ? 'S' : ''}</small>`;
+      return `<tr class="${a.alive || final ? '' : 'dead'} ${a.isPlayer ? 'me' : ''} ${win ? 'mvp' : ''}"><td class="n"><div class="nm"><span class="rk">${i + 1}</span><span class="st"></span><span class="nmt">${esc(a.name)}</span>` +
+        `${win ? '<b class="mvpb">VAINQUEUR</b>' : ''}${lv}</div></td>` +
+        `<td class="num">${s.kills}</td><td class="num">${x.assists}</td><td class="num">${s.deaths}</td><td class="num">${x.hs}</td>` +
+        `<td class="num">${f ? (f.out ? 0 : f.lives) : '—'}</td><td class="num sc">${scoreOf(a)}</td></tr>`;
+    };
+    html(metaEl, `MÊLÉE GÉNÉRALE &nbsp; EN LICE <b class="u">${g?.remaining ?? 0}</b> / ${actors.length}` + (final && g?.winner ? ` &nbsp; VAINQUEUR <b class="g">${esc(g.winner.name)}</b>` : ''));
+    html(tbEl, `<div class="cols ffa"><table class="us"><tr><th class="team">CLASSEMENT · CHACUN POUR SOI</th><th>É</th><th>A</th><th>M</th><th>TÊTE</th><th>VIES</th><th>SCORE</th></tr>${list.map(row).join('')}</table></div>`);
+  }
   function buildScoreboard(metaEl = E.sbMeta, tbEl = E.sbTb, final = false) {
     const g = ctx.game, p = ctx.player, actors = ctx.actors || [], mvp = final ? matchMvp() : null;
+    if (isFfa()) return buildFfaScoreboard(metaEl, tbEl, final);
     const sorted = list => list.sort((a, b) => scoreOf(b) - scoreOf(a) || stat(b).kills - stat(a).kills);
     const ours = sorted(actors.filter(isAlly)), theirs = sorted(actors.filter(a => !isAlly(a)));
     const row = (a, i) => {
@@ -584,6 +634,8 @@ export function createHud(ctx) {
     const g = ctx.game, p = ctx.player; if (!g || !p) return;
     cls(root, 'is-zombie', g.mode === 'zombie');
     if (g.mode === 'zombie') return updateTopZombie(g, p);
+    cls(root, 'is-ffa', g.mode === 'ffa');
+    if (g.mode === 'ffa') return updateTopFfa(g, p);
     const ctf = isCtf();
     const rtw = g.roundsToWin ?? 4;
     if (winsN !== rtw) { winsN = rtw; for (const t of [E.us, E.them]) t.querySelector('.nv-wins').innerHTML = '<i></i>'.repeat(rtw); }
@@ -639,6 +691,28 @@ export function createHud(ctx) {
     else { text(E.tm, String(Z?.remaining ?? 0)); cls(E.tm, 'low', false); text(E.ph, g.phase === 'over' ? 'FIN DE PARTIE' : 'ZOMBIES RESTANTS'); }
   }
 
+  // Mêlée générale: left = you (kills, lives as icons), right = players still in (icons: alive / respawning / out)
+  function updateTopFfa(g, p) {
+    const f = p.ffa, lives = f && !f.out ? f.lives : 0, others = (ctx.actors || []).filter(a => !a.isPlayer);
+    text(E.us.querySelector('.side'), 'VOUS'); text(E.them.querySelector('.side'), 'EN LICE');
+    text(E.us.querySelector('.sc'), String(p.stats?.kills ?? 0));
+    text(E.them.querySelector('.sc'), String(g.remaining ?? 0));
+    const st = a => (a.alive ? 1 : a.ffa?.out ? 2 : 0);
+    const sig = 'f' + lives + (p.alive ? 1 : 0) + '|' + others.map(st).join('');
+    if (sig !== aliveSig) {
+      aliveSig = sig;
+      E.us.querySelector('.nv-alive').innerHTML = Array.from({ length: Math.min(lives, 15) }, (_, i) => `<span class="me ${i === 0 && !p.alive ? 'dead' : ''}">${ICONS.person}</span>`).join('');
+      E.them.querySelector('.nv-alive').innerHTML = others.map(a => `<span class="${a.alive ? '' : 'dead'} ${a.ffa?.out ? 'out' : ''}">${ICONS.person}</span>`).join('');
+    }
+    cls(E.clock, 'planted', false); cls(E.flags, 'on', false);
+    text(E.rd, 'MÊLÉE GÉNÉRALE');
+    const rt = g.roundTimeLeft ?? 0;
+    text(E.tm, fmtTime(g.phase === 'freeze' ? g.phaseTimeLeft : rt)); cls(E.tm, 'low', g.phase === 'live' && rt < 30);
+    const lead = g.leader;
+    text(E.ph, g.phase === 'freeze' ? `PRÉPARATION · ${Math.max(1, Math.ceil(g.phaseTimeLeft || 0))}` : g.phase === 'over' ? 'FIN DE LA MÊLÉE'
+      : lead && (lead.stats?.kills || 0) > 0 ? `EN TÊTE : ${lead.isPlayer ? 'VOUS' : lead.name.toUpperCase()} · ${lead.stats.kills}` : 'CHACUN POUR SOI');
+  }
+
   // CTF: state of both flags + lives left per team, under the score
   function flagState(F, ours) {
     if (!F) return '';
@@ -656,8 +730,9 @@ export function createHud(ctx) {
   }
   // death screen: respawn countdown / out of lives
   function updateRespawn(g, p) {
-    const s = isCtf() && g?.started ? p?.ctf : null;
+    const s = (isCtf() || isFfa()) && g?.started ? (isFfa() ? p?.ffa : p?.ctf) : null;
     if (!s || p.alive) { html(E.deathR, ''); text(E.deathK, 'VOUS ÊTES MORT'); return; }
+    if (s.out && isFfa()) { text(E.deathK, `ÉLIMINÉ · ${ord(s.place || 0).toUpperCase()} PLACE`); html(E.deathR, `Plus de vie — encore <b>${g.remaining}</b> en lice, suivez la fin de la mêlée`); return; }
     if (s.out) { text(E.deathK, 'ÉLIMINÉ POUR LA MANCHE'); html(E.deathR, 'Plus de vie — attendez la manche suivante'); return; }
     text(E.deathK, 'VOUS ÊTES MORT');
     if (s.respawnAt != null) html(E.deathR, `Réapparition dans <b>${Math.max(0, ctx.time < s.respawnAt ? (s.respawnAt - ctx.time) : 0).toFixed(1)} s</b> · ${s.lives} vie${s.lives > 1 ? 's' : ''} restante${s.lives > 1 ? 's' : ''}`);
@@ -710,7 +785,7 @@ export function createHud(ctx) {
     // spectator first-person view (before the name tags: they must be projected with the camera that gets rendered)
     if (!ctx.paused) { try { specView?.update(dt, { killcam: !!killcam?.active }); } catch (e) { console.warn('[hud] specview', e); } }
     { const sp = !alive ? ctx.player?.spectating : null; const key = sp ? sp.name + '|' + (specView?.mode || '') : '';
-      if (key !== lastSpec) { lastSpec = key; if (sp) html(E.deathH, `Spectateur : <b>${esc(sp.name)}</b> — clic gauche ou Espace : allié suivant · V ou clic droit : vue ${specView?.mode === 'fps' ? '3e personne' : 'FPS'}`); } }
+      if (key !== lastSpec) { lastSpec = key; if (sp) html(E.deathH, `Spectateur : <b>${esc(sp.name)}</b> — clic gauche ou Espace : ${isFfa() ? 'joueur' : 'allié'} suivant · V ou clic droit : vue ${specView?.mode === 'fps' ? '3e personne' : 'FPS'}`); } }
 
     // crosshair
     kick = Math.max(0, kick - dt * 60);
