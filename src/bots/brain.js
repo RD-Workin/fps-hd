@@ -26,6 +26,7 @@ export class Brain {
     if ((this.t -= dt) > 0) return; this.t = 0.4;
     const { ctx } = this, game = ctx.game, nav = this.mgr.nav;
     if (this.mgr.goalProvider) { if (nav) this.mgr.goalProvider(this.mgr.list.filter(b => b.alive)); return; } // zombie mode
+    if (game?.mode === 'ffa') { if (nav && game.phase === 'live') this.assignFFA(this.mgr.list.filter(b => b.alive)); return; } // Mêlée générale
     if (!game || !nav || !this.sites().length) return;
     const bots = this.mgr.list.filter(b => b.alive);
     this.updateThreat();
@@ -38,6 +39,30 @@ export class Brain {
     this.assignDEF(def, game);
     this.retakeUtility(def, game);
     this.spreadGoals(atk); this.spreadGoals(def);
+  }
+
+  // Mêlée générale (everyone for himself): each bot goes hunting. It roughly knows where the nearest player is (a few
+  // metres of error, less when few are left) and walks there, sometimes it roams instead; it keeps a destination 6-12 s
+  // or until it gets there. Fights themselves are handled by bot.js (target = closest visible foe, then hunt).
+  assignFFA(bots) {
+    const nav = this.mgr.nav, t = this.ctx.time, all = (this.ctx.actors || []).filter(a => a.alive);
+    const few = all.length <= 4;
+    for (const b of bots) {
+      let m = b._ffa;
+      if (!m || m.at !== b.spawnedAt) m = b._ffa = { at: b.spawnedAt, until: 0, x: b.position.x, z: b.position.z, speed: 'run' };
+      if (t > m.until || hd(b.position, m) < 2.5) {
+        let best = null, bd = Infinity;
+        for (const a of all) { if (a === b) continue; const d = hd(a.position, b.position); if (d < bd) { bd = d; best = a; } }
+        let p = null;
+        if (best && (few || Math.random() < 0.7)) {
+          const j = few ? 3 : Math.min(10, 2 + bd * 0.2);
+          p = nav.randomPointNear(best.position.x + rand(-j, j), best.position.z + rand(-j, j), 3, Math.random, 1);
+        } else p = nav.randomPointNear(b.position.x, b.position.z, 30, Math.random, 2);
+        if (p) { m.x = p.x; m.z = p.z; }
+        m.until = t + rand(6, 12); m.speed = bd < 25 ? 'tac' : 'run';
+      }
+      b.goal = { x: m.x, z: m.z, tol: 2, speed: m.speed, huntRange: 60 };
+    }
   }
 
   // 10v10: several bots often get the same spot. Reserve each final position per bot: a goal closer than

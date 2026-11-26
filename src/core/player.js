@@ -35,7 +35,7 @@ export class Player {
   updateSpectator(dt) {
     const { input, camera, physics } = this.ctx;
     if (this.deadTime < 2.2) return false;
-    const mates = this.ctx.actors.filter(a => !a.isPlayer && a.alive && a.team === this.team);
+    const mates = this.ctx.actors.filter(a => !a.isPlayer && a.alive && (this.ffa || a.team === this.team)); // Mêlée générale: anyone
     if (!mates.length) { this.spectating = null; return false; }
     const cyc = input.firePressed || (input.jump && !this._jumpHeld);
     this._jumpHeld = input.jump;

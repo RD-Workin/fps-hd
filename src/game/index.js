@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { createBombVisuals } from './bombModel.js';
 import { createCtf } from './ctf.js';
 import { createZombieMode } from './zombie.js';
+import { createFfa } from './ffa.js';
+import { foes } from '../core/teams.js';
 
 export const RULES = {
   FREEZE: 4, ROUND: 105, POST: 5, PLANT: 3, DEFUSE: 6, BOMB: 40,
@@ -25,20 +27,22 @@ const other = t => (t === 'ATK' ? 'DEF' : 'ATK');
 const hdist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
-// Game modes: 'sd' (Recherche & Destruction) and 'ctf' (Capture du drapeau, ./ctf.js). ctx.game is a facade that forwards
+// Game modes: 'sd' (Recherche & Destruction), 'ctf' (Capture du drapeau, ./ctf.js), 'zombie' (inside the S&D object,
+// ./zombie.js) and 'ffa' (Mêlée générale, ./ffa.js). ctx.game is a facade that forwards
 // every read / write / call to the active mode, so the HUD, bots, weapon and audio keep reading ctx.game.* as before.
 // game.mode, game.setMode(m): applied at once in the main menu, otherwise at the next restart (pendingMode).
 export function createGame(ctx, options = {}) {
   const sd = createSearchDestroy(ctx, options);
   if (options.selfTest || options.noCtf) return sd;
   const ctf = createCtf(ctx, sd, options);
-  const modes = { sd, ctf, zombie: sd };
+  const ffa = createFfa(ctx, sd, options);
+  const modes = { sd, ctf, zombie: sd, ffa };
   let active = sd;
   const facade = {
-    get mode() { return active === ctf ? 'ctf' : sd.zmode ? 'zombie' : 'sd'; },
+    get mode() { return active === ctf ? 'ctf' : active === ffa ? 'ffa' : sd.zmode ? 'zombie' : 'sd'; },
     pendingMode: null,
     setMode(m) {
-      m = m === 'ctf' || m === 'zombie' ? m : 'sd';
+      m = Object.hasOwn(modes, m) ? m : 'sd';
       if (active.started) { this.pendingMode = m === this.mode ? null : m; return; }
       switchTo(m);
     },
@@ -52,11 +56,12 @@ export function createGame(ctx, options = {}) {
     if (next === sd && active === sd) { sd.setZombie(m === 'zombie'); return; } // R&D <-> Zombies: same object
     if (next === active) return;
     if (active === sd && sd.zmode) { sd.started = false; sd.setZombie(false); }
-    if (active === ctf) ctf.leave(); else sd.resetVisuals?.();
+    if (active === ctf) ctf.leave(); else if (active === ffa) ffa.leave(); else sd.resetVisuals?.();
     active = next;
     if (active === ctf) { if (sd.phase === 'off') sd.init(); ctf.enter(); }
+    else if (active === ffa) ffa.enter();
     else if (m === 'zombie') sd.setZombie(true);
-    else if (!sd.started) sd.init();
+    else if (!sd.started || sd.phase === 'off') sd.init();
   }
   return new Proxy(facade, {
     get(t, k) { return k in t ? t[k] : active[k]; },
@@ -521,7 +526,7 @@ function createSearchDestroy(ctx, options = {}) {
       if (bomb.carrier === victim) dropBomb(victim);
       stopUse(victim);
     }
-    if (killer && victim && killer !== victim && killer.team !== victim.team) {
+    if (killer && victim && foes(killer, victim)) {
       ensureStats(killer); killer.stats.kills++; killer.stats.score += 100;
       roundKills.set(killer, (roundKills.get(killer) || 0) + 1);
     } else if (killer && victim && killer !== victim) { // friendly fire
