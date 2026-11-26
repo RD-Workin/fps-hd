@@ -117,7 +117,7 @@ function markup() {
       </div></div>
     </div>
   </div>
-  <div class="nv-sb nv-sb-end"><div class="hd"><h2>TABLEAU FINAL</h2><div class="meta"></div><button class="nv-sb-x" data-sfx title="Fermer (Échap)">✕</button></div><div class="tb"></div><div class="nv-sb-leg">É éliminations · A assistances · M morts · TÊTE éliminations à la tête · <span class="obj">OBJ poses + désamorçages</span> · MVP manches MVP</div></div>
+  <div class="nv-sb nv-sb-end"><div class="hd"><h2>TABLEAU FINAL</h2><div class="meta"></div><button class="nv-sb-x" data-sfx title="Fermer (Échap)">✕</button></div><div class="tb"></div><div class="nv-sb-leg">É éliminations · A assistances · M morts · TÊTE éliminations à la tête · DÉG dégâts infligés · <span class="obj">OBJ poses + désamorçages</span> · MVP manches MVP</div></div>
   <div class="nv-foot">OPÉRATION NOVA · PROJET PERSONNEL · CODE ET VISUELS ORIGINAUX</div>
 </div>`;
 }
@@ -532,14 +532,14 @@ export function createHud(ctx) {
       return `<tr class="${a.alive || final ? '' : 'dead'} ${a.isPlayer ? 'me' : ''} ${isMvp ? 'mvp' : ''}"><td class="n"><div class="nm"><span class="rk">${i + 1}</span><span class="st"></span><span class="nmt">${esc(a.name)}</span>` +
         `${isMvp ? '<b class="mvpb">MVP</b>' : ''}${!final && a.hasBomb && isAlly(a) ? ICONS.bomb : ''}${!final && a.hasFlag ? '<b class="flagb">⚑</b>' : ''}` +
         `${!final && a.ctf ? `<small class="lives${a.ctf.out ? ' out' : ''}">${a.ctf.out ? 'ÉLIMINÉ' : a.ctf.lives + ' VIE' + (a.ctf.lives > 1 ? 'S' : '')}</small>` : ''}</div></td>` +
-        `<td class="num">${s.kills}</td><td class="num">${x.assists}</td><td class="num">${s.deaths}</td><td class="num">${x.hs}</td>` +
+        `<td class="num">${s.kills}</td><td class="num">${x.assists}</td><td class="num">${s.deaths}</td><td class="num">${x.hs}</td><td class="num">${Math.round(s.damage || 0)}</td>` +
         `<td class="num">${(s.plants || 0) + (s.defuses || 0) + (s.captures || 0) + (s.returns || 0)}</td><td class="num">${s.mvps || 0}</td><td class="num sc">${scoreOf(a)}</td></tr>`;
     };
     // Live board (Tab) in big battles (40c40): too many rows for the screen, so each column shows the top of the ranking,
     // then a window centred on the player's rank (same ranks on both sides, rows stay aligned), "··· n" rows for the cut parts.
     // The final board shows every row and scrolls to the player instead (toggleEndScores).
     const meIdx = Math.max(0, ours.findIndex(a => a.isPlayer)), cap = final ? Infinity : sbRows(tbEl);
-    const gap = n => `<tr class="gap"><td colspan="8">··· ${n} joueur${n > 1 ? 's' : ''}</td></tr>`;
+    const gap = n => `<tr class="gap"><td colspan="9">··· ${n} joueur${n > 1 ? 's' : ''}</td></tr>`;
     const rows = list => {
       const L = list.length, all = () => list.map(row).join('');
       if (L <= cap) return all();
@@ -549,7 +549,7 @@ export function createHud(ctx) {
       if (start + W >= L - 1) { const from = L - (cap - SB_TOP - 1); return seg(0, SB_TOP) + gap(from - SB_TOP) + seg(from, L); } // near the bottom
       return seg(0, SB_TOP) + gap(start - SB_TOP) + seg(start, start + W) + gap(L - start - W);
     };
-    const tbl = (k, name, list) => `<table class="${k}"><tr><th class="team">${name}</th><th>É</th><th>A</th><th>M</th><th>TÊTE</th><th>OBJ</th><th>MVP</th><th>SCORE</th></tr>${rows(list)}</table>`;
+    const tbl = (k, name, list) => `<table class="${k}"><tr><th class="team">${name}</th><th>É</th><th>A</th><th>M</th><th>TÊTE</th><th>DÉG</th><th>OBJ</th><th>MVP</th><th>SCORE</th></tr>${rows(list)}</table>`;
     const side = t => (isCtf() ? (t === 'DEF' ? 'CITADELLE' : 'PORT') : t === 'DEF' ? 'DÉFENSE' : 'ATTAQUE');
     const lbl = final ? ['ALLIÉS', 'ENNEMIS'] : [`ALLIÉS · ${side(p?.team)}`, `ENNEMIS · ${side(p?.team === 'ATK' ? 'DEF' : 'ATK')}`];
     html(metaEl, (final ? (mvp ? `MVP DU MATCH <b class="g">${esc(mvp.name)}</b> &nbsp; ` : '') : `MANCHE <b>${g?.round ?? 1}</b> &nbsp; `) +
