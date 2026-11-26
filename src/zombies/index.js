@@ -148,11 +148,12 @@ export function createHorde(ctx) {
     if (nav.links) for (const [a, ls] of nav.links) for (const l of ls) { if (!linksTo.has(l.to)) linksTo.set(l.to, []); linksTo.get(l.to).push({ from: a, cost: Math.round(l.cost * 2) }); }
     return { nav, w: nav.w, h: nav.h, dist: new Int32Array(n).fill(INF), next: new Int32Array(n).fill(INF), port: null, linksTo };
   }
+  // Fields run on the main grid (F) or on the small grid of one storey / roof (same shape: {nav, w, h, linksTo}).
   // Dial's algorithm (integer costs: 2 orthogonal, 3 diagonal, +penalty near walls) from every source cell.
   // Resumable: fieldBegin() seeds the sources, fieldRun(job, budgetMs) expands until done or out of time budget, so the
   // ~3 ms full pass over the 0.5 m grid is spread over a few frames instead of one hitch.
-  function fieldBegin(out, sources) {
-    const { nav } = F; const job = { out, cur: 0, pending: 0, buckets: Array.from({ length: NB }, () => []) };
+  function fieldBegin(out, sources, G = F) {
+    const { nav } = G; const job = { G, out, cur: 0, pending: 0, buckets: Array.from({ length: NB }, () => []) };
     out.fill(INF);
     for (const [x, z] of sources) {
       const i = nav.nearestWalkable(nav.index(x, z), 8); if (i < 0 || out[i] === 0) continue;
@@ -161,7 +162,7 @@ export function createHorde(ctx) {
     return job;
   }
   function fieldRun(job, budgetMs = Infinity) {
-    const { nav, w, h, linksTo } = F, bl = nav.blocked, cl = nav.clear, out = job.out, buckets = job.buckets;
+    const { nav, w, h, linksTo } = job.G, bl = nav.blocked, cl = nav.clear, out = job.out, buckets = job.buckets;
     const t0 = performance.now(); let ops = 0;
     while (job.pending > 0) {
       const cur = job.cur, b = buckets[cur % NB];
@@ -215,9 +216,11 @@ export function createHorde(ctx) {
   }
   let flowT = 0, job = null, jobMs = 0, first = true;
   // flow toward the humans: a new pass starts every FLOW_DT, runs ≤ 1 ms per frame, then replaces the current field
+  // a human upstairs / on a roof pulls the horde to the foot of that house's stairs
+  const seedOf = a => { const L = humL.get(a); if (!L) return [a.position.x, a.position.z]; const b = L.house.portals[0].bottom; return [b.x, b.z]; };
   function flowTick(dt, humans) {
     flowT -= dt;
-    if (!job && flowT <= 0 && humans.length) { flowT = ZCFG.FLOW_DT; job = fieldBegin(F.next, humans.map(a => [a.position.x, a.position.z])); jobMs = 0; }
+    if (!job && flowT <= 0 && humans.length) { flowT = ZCFG.FLOW_DT; job = fieldBegin(F.next, humans.map(seedOf)); jobMs = 0; }
     if (!job) return;
     const t0 = performance.now(), done = fieldRun(job, first ? Infinity : 1);
     jobMs += performance.now() - t0;
@@ -225,8 +228,8 @@ export function createHorde(ctx) {
   }
   // next step down a field from cell i: the move (8 neighbours or a jump link) whose cost + remaining distance is lowest,
   // i.e. the one the field was built from. out.i = cell (-1 if none), out.link = link taken or null.
-  function down(D, i, out) {
-    const nav = F.nav, w = F.w, bl = nav.blocked, cl = nav.clear;
+  function down(D, i, out, G = F) {
+    const nav = G.nav, w = G.w, bl = nav.blocked, cl = nav.clear;
     let best = -1, bv = INF;
     const x = i % w, z = (i / w) | 0;
     if (D[i] === 0) { out.i = -1; out.link = null; return out; } // at a source
@@ -239,11 +242,71 @@ export function createHorde(ctx) {
       if (D[j] + c < bv) { bv = D[j] + c; best = j; }
     }
     out.link = null;
-    const ls = nav.links?.get(i);
+    const ls = G === F ? nav.links?.get(i) : null;
     if (ls) for (const l of ls) { const v = D[l.to] + Math.min(NB - 1, Math.round(l.cost * 2)); if (D[l.to] < INF && v < bv) { bv = v; best = l.to; out.link = l; } }
     out.i = best; return out;
   }
   const _dn = { i: -1, link: null };
+
+  // ------------------------------------------------------------------ storeys and roofs
+  // The houses' upper floors and the flat roofs are small grids of their own (bots/nav.js setLayers: floor objects
+  // {k, y, grid, house}, stair portals between floor k and k+1). A zombie knows the floor it stands on (z.L, null =
+  // the main grid). Toward a human upstairs, the main field leads to the foot of that house's stairs; the zombie then
+  // walks the flight (z.climb) and follows a small field on each floor: toward the next stairs up, the stairs down, or
+  // the humans on that floor. These floor fields are tiny (a few hundred cells) and computed on demand.
+  const NOLINKS = new Map(), LC = new Map(); // floor -> {G, up, down, hum, humT}
+  const humL = new Map(); // human -> floor he stands on (null = main grid), refreshed every frame
+  let clock = 0;
+  function layerOf(x, z, y) {
+    const nav = F.nav; if (!nav.houses || y == null) return null;
+    const st = nav.stairAt(x, z, y);
+    if (st) { // on a flight: the closer of its two floors
+      const { h, p } = st, ya = p.k === 0 ? h.base : h.floors.get(p.k).y, yb = h.floors.get(p.k + 1).y;
+      const k = y > (ya + yb) / 2 ? p.k + 1 : p.k; return k ? h.floors.get(k) || null : null;
+    }
+    return nav.layerAt(x, z, y);
+  }
+  function lcache(L) {
+    let c = LC.get(L);
+    if (!c) { const g = L.grid; c = { G: { nav: g, w: g.w, h: g.h, linksTo: NOLINKS }, up: null, down: null, hum: null, humT: -1 }; LC.set(L, c); }
+    return c;
+  }
+  const lfill = (c, pts) => { const D = new Int32Array(c.G.w * c.G.h); fieldRun(fieldBegin(D, pts, c.G)); return D; };
+  // field on floor L: 'up' (foot of the stairs to L.k+1), 'down' (head of the stairs to L.k-1), 'hum' (humans on L)
+  function lfield(L, kind) {
+    const c = lcache(L), H = L.house;
+    if (kind === 'up') { const p = H.portals[L.k]; return p ? (c.up ||= lfill(c, [[p.bottom.x, p.bottom.z]])) : null; }
+    if (kind === 'down') { const p = H.portals[L.k - 1]; return p ? (c.down ||= lfill(c, [[p.top.x, p.top.z]])) : null; }
+    if (c.humT < 0 || clock - c.humT > 0.25) {
+      const pts = []; for (const [a, l] of humL) if (l === L) pts.push([a.position.x, a.position.z]);
+      if (!pts.length) return c.hum;
+      c.hum ||= new Int32Array(c.G.w * c.G.h); fieldRun(fieldBegin(c.hum, pts, c.G)); c.humT = clock;
+    }
+    return c.hum;
+  }
+  const floorY = (H, k) => (k === 0 ? H.base : H.floors.get(k).y);
+  // walk the flight of portal p of house H, up (k -> k+1) or down; the points carry their height
+  function startClimb(z, H, p, up) {
+    const ya = floorY(H, p.k), yb = floorY(H, p.k + 1);
+    const pts = [{ x: p.bottom.x, z: p.bottom.z, y: ya }, ...(p.via || []).map(v => ({ x: v.x, z: v.z, y: yb })), { x: p.top.x, z: p.top.z, y: yb }];
+    if (!up) pts.reverse();
+    z.climb = { pts, i: 0, sx: z.position.x, sz: z.position.z, sy: z.position.y, to: up ? H.floors.get(p.k + 1) : (p.k ? H.floors.get(p.k) : null) };
+    z.velocity.set(0, 0, 0);
+  }
+  function stepClimb(z, dt) {
+    const C = z.climb, p = z.position, q = C.pts[C.i];
+    const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz), v = z.speed * (z.flinch > 0 ? 0.3 : 0.72);
+    const seg = Math.hypot(q.x - C.sx, q.z - C.sz) || 1;
+    if (d <= v * dt + 0.05) {
+      p.set(q.x, q.y, q.z); C.sx = q.x; C.sz = q.z; C.sy = q.y;
+      if (++C.i >= C.pts.length) { z.L = C.to; z.climb = null; if (z.L) p.y = z.L.y; }
+    } else {
+      p.x += dx / d * v * dt; p.z += dz / d * v * dt;
+      p.y = C.sy + (q.y - C.sy) * Math.min(1, 1 - Math.hypot(q.x - p.x, q.z - p.z) / seg);
+      z.yaw = turn(z.yaw, Math.atan2(-dx, -dz), dt * 10);
+    }
+    z.velocity.set(dx / (d || 1) * v, 0, dz / (d || 1) * v); z.moveSpeed = v; z.phase += dt * (2 + v * 1.55);
+  }
 
   // ------------------------------------------------------------------ spatial hash (separation), 1.2 m cells
   const HC = 1.2; let hw = 0, hh = 0, hx0 = 0, hz0 = 0, head = null; const nextIdx = new Int32Array(ZCFG.MAX);
@@ -275,7 +338,7 @@ export function createHorde(ctx) {
       active: true, alive: true, state: 'emerge', t: -(opts.delay || 0), health: opts.health ?? 100, maxHealth: opts.health ?? 100,
       speed: (opts.speed ?? 6.4) * rand(0.92, 1.08), damage: opts.damage ?? 12, scale: rand(0.92, 1.08), phase: Math.random() * 6.28,
       seed: Math.random() * 6.28, tilt: rand(-0.3, 0.3), armOff: rand(-0.15, 0.15), fallDir: 1, fallSide: rand(-1, 1),
-      sx: p.x, sz: p.z, target: null, targetT: 0, dirT: 0, dx: 0, dz: -1, swingT: 0, cd: 0, flinch: 0, leap: null, stuckT: 0, moveSpeed: 0, stats: null,
+      sx: p.x, sz: p.z, target: null, targetT: 0, dirT: 0, dx: 0, dz: -1, swingT: 0, cd: 0, flinch: 0, leap: null, stuckT: 0, moveSpeed: 0, stats: null, L: null, climb: null,
     });
     z.position.set(p.x, -1.8, p.z + 3.2); z.velocity.set(0, 0, 0); z.yaw = 0;
     paint(z); horde.aliveCount++; horde.activeCount++;
@@ -349,6 +412,8 @@ export function createHorde(ctx) {
     frame++;
     const nav = ensureNav(); if (!nav) return;
     const floorAt = ctx.world?.nav?.floorAt;
+    clock += dt; humL.clear();
+    for (const a of humans) humL.set(a, layerOf(a.position.x, a.position.z, a.position.y));
     flowTick(dt, humans);
     hashBuild();
     const cam = ctx.camera; cam.updateMatrixWorld();
@@ -398,6 +463,8 @@ export function createHorde(ctx) {
     let tdx = 0, tdz = 0, td = Infinity;
     if (tg) { tdx = tg.position.x - p.x; tdz = tg.position.z - p.z; td = Math.hypot(tdx, tdz); }
     const sameLevel = tg && Math.abs(tg.position.y - p.y) < 1.3;
+    if (z.climb) { stepClimb(z, dt); return; }
+    const L = z.L, g = L ? L.grid : nav, tgL = tg ? humL.get(tg) ?? null : null;
     // melee
     if (z.state === 'attack') {
       z.velocity.multiplyScalar(Math.max(0, 1 - dt * 10));
@@ -406,7 +473,7 @@ export function createHorde(ctx) {
       if (prev < ZCFG.WINDUP && z.swingT >= ZCFG.WINDUP && tg?.alive && td < ZCFG.ATTACK_R + 0.45 && sameLevel) onAttack?.(z, tg, z.damage);
       if (z.swingT > ZCFG.WINDUP + 0.35) { z.state = 'walk'; z.cd = ZCFG.COOLDOWN - 0.35; }
       z.moveSpeed = Math.hypot(z.velocity.x, z.velocity.z); z.phase += dt * 3;
-      move(z, dt, nav, floorAt);
+      move(z, dt, g, floorAt);
       return;
     }
     z.cd -= dt;
@@ -415,8 +482,27 @@ export function createHorde(ctx) {
     if ((z.dirT -= dt) <= 0) {
       z.dirT = td < 25 ? 0.1 : 0.25;
       let dx = 0, dz = 0;
-      if (tg && td < ZCFG.DIRECT_R && sameLevel && nav.los(p.x, p.z, tg.position.x, tg.position.z)) { dx = tdx; dz = tdz; }
-      else {
+      if (tg && td < ZCFG.DIRECT_R && sameLevel && tgL === L && g.los(p.x, p.z, tg.position.x, tg.position.z)) { dx = tdx; dz = tdz; }
+      else if (L) {
+        // on a storey / roof: the stairs up, the stairs down, or the humans of this floor
+        const H = L.house, kind = tgL && tgL.house === H ? (tgL.k === L.k ? 'hum' : tgL.k > L.k ? 'up' : 'down') : 'down';
+        const pt = kind === 'up' ? H.portals[L.k] : kind === 'down' ? H.portals[L.k - 1] : null, end = pt && (kind === 'up' ? pt.bottom : pt.top);
+        if (end && Math.hypot(end.x - p.x, end.z - p.z) < 0.9) { startClimb(z, H, pt, kind === 'up'); return; }
+        const D2 = lfield(L, kind), i = g.index(p.x, p.z);
+        if (D2 && i >= 0 && !g.blocked[i] && D2[i] < INF) {
+          const G = lcache(L).G; let c = i;
+          for (let s = 0; s < 3; s++) { down(D2, c, _dn, G); if (_dn.i < 0) break; c = _dn.i; }
+          if (c !== i) { dx = g.centerX(c) - p.x; dz = g.centerZ(c) - p.z; }
+          else if (end) { dx = end.x - p.x; dz = end.z - p.z; }
+          else if (tg) { dx = tdx; dz = tdz; }
+        } else {
+          const j = i >= 0 ? g.nearestWalkable(i, 6) : -1;
+          if (j >= 0) { dx = g.centerX(j) - p.x; dz = g.centerZ(j) - p.z; } else if (end) { dx = end.x - p.x; dz = end.z - p.z; }
+        }
+      } else {
+        // on the main grid toward a human upstairs: at the foot of his house's stairs, climb
+        const pt = tgL ? tgL.house.portals[0] : null;
+        if (pt && Math.hypot(pt.bottom.x - p.x, pt.bottom.z - p.z) < 1.3 && Math.abs(p.y - tgL.house.base) < 1.2) { startClimb(z, tgL.house, pt, true); return; }
         const i = nav.index(p.x, p.z);
         if (i >= 0 && !nav.blocked[i] && D[i] < INF) {
           // follow the field 3 cells ahead (string-pull-lite); take a jump link only from its start cell
@@ -424,11 +510,12 @@ export function createHorde(ctx) {
           for (let s = 0; s < 3; s++) { down(D, c, _dn); if (_dn.i < 0) break; if (_dn.link) { const l = _dn.link; if (s === 0 || Math.hypot(l.ax - p.x, l.az - p.z) < 0.9) link = l; break; } c = _dn.i; }
           if (link) {
             const fa = floorAt?.(link.ax, link.az) ?? p.y, fb = floorAt?.(link.bx, link.bz) ?? p.y;
-            const L = Math.hypot(link.bx - p.x, link.bz - p.z);
-            z.leap = { ax: p.x, az: p.z, fa: p.y, bx: link.bx, bz: link.bz, fb, t: 0, dur: 0.3 + L * 0.07, arc: Math.max(0.4, fb - fa + 0.5) };
+            const len = Math.hypot(link.bx - p.x, link.bz - p.z);
+            z.leap = { ax: p.x, az: p.z, fa: p.y, bx: link.bx, bz: link.bz, fb, t: 0, dur: 0.3 + len * 0.07, arc: Math.max(0.4, fb - fa + 0.5) };
             z.yaw = Math.atan2(-(link.bx - p.x), -(link.bz - p.z)); return;
           }
           if (c !== i) { dx = nav.centerX(c) - p.x; dz = nav.centerZ(c) - p.z; }
+          else if (pt) { dx = pt.bottom.x - p.x; dz = pt.bottom.z - p.z; }
           else if (tg) { dx = tdx; dz = tdz; }
         } else {
           const j = nav.nearestWalkable(i, 6); // pushed into a wall / off the field: back to the nearest walkable cell
@@ -461,16 +548,18 @@ export function createHorde(ctx) {
     z.moveSpeed = Math.hypot(z.velocity.x, z.velocity.z);
     if (z.moveSpeed > 0.3) z.yaw = turn(z.yaw, Math.atan2(-z.velocity.x, -z.velocity.z), dt * 7);
     z.phase += dt * (2 + z.moveSpeed * 1.55);
-    move(z, dt, nav, floorAt);
+    move(z, dt, g, floorAt, L);
   }
   // grid-constrained move: axis slide on the inflated nav grid, height from the terrain (stairs included)
-  function move(z, dt, nav, floorAt) {
+  // (on a storey / roof: that floor's grid, flat at its height)
+  function move(z, dt, nav, floorAt, L = z.L) {
     const p = z.position, nx = p.x + z.velocity.x * dt, nz = p.z + z.velocity.z * dt;
     const inside = !nav.blocked[nav.index(p.x, p.z)];
     if (!inside || nav.isWalkable(nx, nz)) { p.x = nx; p.z = nz; }
     else if (nav.isWalkable(nx, p.z)) { p.x = nx; z.velocity.z *= 0.5; }
     else if (nav.isWalkable(p.x, nz)) { p.z = nz; z.velocity.x *= 0.5; }
     else { z.velocity.x *= -0.2; z.velocity.z *= -0.2; }
+    if (L) { p.y = L.y; return; }
     const fy = floorAt?.(p.x, p.z);
     if (fy != null) p.y += (fy - p.y) * Math.min(1, dt * 14);
   }
@@ -487,6 +576,8 @@ export function createHorde(ctx) {
     return l > 0.5 ? { x: dx / l, z: dz / l } : { x: 0, z: 1 };
   };
   horde.shore = () => { ensureNav(); return shore || []; };
+  // floor object (storey / roof, see setLayers) an actor at (x, y, z) stands on, null = the main grid
+  horde.layerOf = (x, z, y) => (ensureNav() ? layerOf(x, z, y) : null);
   horde.dots = () => pool.filter(z => z.alive && z.state !== 'emerge');
   horde.dispose = () => { horde.clear(); for (const m of meshes) scene.remove(m); };
   horde.clear();

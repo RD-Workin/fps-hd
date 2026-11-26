@@ -236,25 +236,44 @@ export function createZombieMode(ctx, game, { names }) {
     if (m > 2 && !ctx.physics.lineOfSight(new THREE.Vector3(x, y + 1.5, z), new THREE.Vector3(x + dir.x * m, y + 0.8, z + dir.z * m))) m *= 0.5;
     return m;
   }
-  function computeAnchor(P) {
+  // Storeys and roofs: the player upstairs / on a roof -> the spot is on that floor; on the street, a roof or an upper
+  // floor (high holds of world.nav) within ~12 m by the stairs is a candidate too, if the whole squad fits on it.
+  // A spot on a floor carries L (floor object, see horde.layerOf) and the goals then carry its height y.
+  function computeAnchor(P, PL, n) {
     const nav = ctx.bots?.nav, fa = ctx.world?.nav?.floorAt, H = horde(); if (!nav) return null;
-    const py = fa?.(P.x, P.z) ?? P.y;
+    const py = PL ? PL.y : fa?.(P.x, P.z) ?? P.y;
     let best = null, bs = -Infinity;
-    const cands = [{ x: P.x, z: P.z }];
-    for (let k = 0; k < 36; k++) { const c = nav.randomPointNear(P.x, P.z, 10, Math.random, 2); if (c) cands.push(c); }
+    const cands = [{ x: P.x, z: P.z, L: PL, y: py }];
+    for (let k = 0; k < 36; k++) {
+      const c = PL ? PL.grid.randomPointNear(P.x, P.z, 10, Math.random, 2) : nav.randomPointNear(P.x, P.z, 10, Math.random, 2);
+      if (c) cands.push({ x: c.x, z: c.z, L: PL, y: PL ? PL.y : fa?.(c.x, c.z) });
+    }
+    const fits = L => L.grid.walkableCount * 0.25 >= Math.max(1, n) * 2.5;
+    const seen = new Set();
+    for (const h of ctx.world?.nav?.highHolds || []) {
+      const L = H.layerOf(h.x, h.z, h.y + 0.1); if (!L || !fits(L)) continue;
+      if (PL ? L !== PL : hd(L.house.portals[0].bottom, P) > 12) continue;
+      cands.push({ x: h.x, z: h.z, L, y: L.y, climb: !PL });
+      if (!PL && !seen.has(L)) { // a few more points on that roof / floor, around its stairs
+        seen.add(L); const t = L.house.portals[L.k - 1]?.top;
+        for (let k = 0; t && k < 6; k++) { const c = L.grid.randomPointNear(t.x, t.z, 7, Math.random, 2); if (c) cands.push({ x: c.x, z: c.z, L, y: L.y, climb: true }); }
+      }
+    }
     for (const c of cands) {
-      const y = fa?.(c.x, c.z); if (y == null || y < py - 1.6) continue;
+      const y = c.y; if (y == null || (!c.L && y < py - 1.6)) continue;
+      const g = c.L ? c.L.grid : nav;
       const dir = H.incomingDir(c.x, c.z);
-      const cl = nav.clearance(c.x, c.z);
+      const cl = g.clearance(c.x, c.z);
       // a wall behind: probe 2 m opposite the incoming direction
-      const back = !nav.isWalkable(c.x - dir.x * 2, c.z - dir.z * 2) ? 1.2 : 0;
-      const s = y * 0.7 + back + (cl >= 3 && cl <= 6 ? 0.6 : 0) + sight(c.x, c.z, y, dir) * 0.14 - hd(c, P) * 0.18;
-      if (s > bs) { bs = s; best = { x: c.x, z: c.z, y, face: dir, ref: { x: P.x, z: P.z }, t: ctx.time }; }
+      const back = !g.isWalkable(c.x - dir.x * 2, c.z - dir.z * 2) ? 1.2 : 0;
+      const dist = c.climb ? hd(c.L.house.portals[0].bottom, P) + hd(c.L.house.portals[0].bottom, c) * 0.5 : hd(c, P);
+      const s = Math.min(y - py, 6) * 0.7 + back + (cl >= 3 && cl <= 6 ? 0.6 : 0) + sight(c.x, c.z, y, dir) * 0.14 - dist * 0.18;
+      if (s > bs) { bs = s; best = { x: c.x, z: c.z, y, L: c.L || null, face: dir, ref: { x: P.x, z: P.z }, pl: PL, t: ctx.time }; }
     }
     return best;
   }
   function slots(anchor, n) {
-    const nav = ctx.bots?.nav, f = anchor.face, side = { x: -f.z, z: f.x }, out = [];
+    const nav = anchor.L ? anchor.L.grid : ctx.bots?.nav, f = anchor.face, side = { x: -f.z, z: f.x }, out = [];
     const perRow = Math.max(3, Math.ceil(n / 2));
     for (let i = 0; i < n; i++) {
       const row = Math.floor(i / perRow), k = i % perRow, m = Math.min(perRow, n - row * perRow);
@@ -268,12 +287,13 @@ export function createZombieMode(ctx, game, { names }) {
   function assignAllies(list) {
     const p = ctx.player, dt = ctx.time - rallyT; rallyT = ctx.time;
     const P = p?.alive ? p.position : (list[0]?.position || null); if (!P) return;
-    if (lastP) { const v = hd(P, lastP) / Math.max(0.05, dt); still = v < 1.2 ? still + dt : 0; }
-    lastP = { x: P.x, z: P.z };
-    const away = !Z.anchor || hd(P, Z.anchor.ref) > 10;
-    if (away && (still > 0.9 || !Z.anchor)) Z.anchor = computeAnchor(P);
+    const PL = horde().layerOf(P.x, P.z, P.y);
+    if (lastP) { const v = (hd(P, lastP) + Math.abs(P.y - lastP.y)) / Math.max(0.05, dt); still = v < 1.2 ? still + dt : 0; }
+    lastP = { x: P.x, z: P.z, y: P.y };
+    const away = !Z.anchor || hd(P, Z.anchor.ref) > 10 || Z.anchor.pl !== PL; // moved off, or went up / down a floor
+    if (away && (still > 0.9 || !Z.anchor)) Z.anchor = computeAnchor(P, PL, list.length);
     const A = Z.anchor; if (!A) return;
-    const follow = p?.alive && hd(P, A.ref) > 10;
+    const follow = p?.alive && (hd(P, A.ref) > 10 || (A.pl !== PL && still <= 0.9));
     const order = [...list].sort((a, b) => (a.id < b.id ? -1 : 1));
     if (follow) {
       // column behind the player, 2.5 m + 1.4 m per ally
@@ -281,15 +301,18 @@ export function createZombieMode(ctx, game, { names }) {
       order.forEach((b, i) => {
         const lat = (i % 2 ? 1 : -1) * 1.1, back = 2.5 + Math.floor(i / 2) * 1.6;
         let x = P.x + bx * back + bz * lat, z = P.z + bz * back - bx * lat;
-        const q = ctx.bots?.nav?.snap(x, z); if (q) { x = q.x; z = q.z; }
-        b.goal = { x, z, tol: 2.2, speed: 'run', noHunt: true, noCover: true, stand: true, huntRange: 0 };
+        const q = (PL ? PL.grid : ctx.bots?.nav)?.snap(x, z); if (q) { x = q.x; z = q.z; }
+        b.goal = { x, z, y: PL ? PL.y : undefined, tol: 2.2, speed: 'run', noHunt: true, noCover: true, stand: true, huntRange: 0 };
       });
       return;
     }
     const S = slots(A, order.length), look = { x: A.x + A.face.x * 15, z: A.z + A.face.z * 15 };
     order.forEach((b, i) => {
       const s = S[i];
-      b.goal = { x: s.x, z: s.z, tol: 0.8, speed: 'run', look, crouch: s.row === 0 && order.length > 2, noHunt: true, noCover: true, stand: true, huntRange: 0 };
+      // still far from the slot (or on another floor): keep running there while shooting (push), instead of stopping
+      // to fight halfway — e.g. on the stairs of a roof
+      const push = Math.hypot(s.x - b.position.x, s.z - b.position.z) > 4 || (A.L ? Math.abs(A.y - b.position.y) > 1.5 : b.position.y > (ctx.world?.nav?.floorAt?.(s.x, s.z) ?? b.position.y) + 1.5);
+      b.goal = { x: s.x, z: s.z, y: A.L ? A.y : undefined, tol: 0.8, speed: 'run', look, push, crouch: s.row === 0 && order.length > 2, noHunt: true, noCover: true, stand: true, huntRange: 0 };
     });
   }
 

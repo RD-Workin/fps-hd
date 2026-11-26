@@ -193,7 +193,8 @@ export class NavGrid {
     for (const h of this.houses) {
       const r = h.rect; if (x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1) continue;
       for (const p of h.portals) {
-        const ya = p.k === 0 ? h.base : h.floors.get(p.k)?.y, yb = h.floors.get(p.k + 1)?.y; if (ya == null || yb == null || y < ya + 0.3 || y > yb - 0.3) continue;
+        const ya = p.k === 0 ? h.base : h.floors.get(p.k)?.y, yb = h.floors.get(p.k + 1)?.y; if (ya == null || yb == null || y < ya + 0.3) continue;
+        if (y > yb - 0.3 && !(p.via && y > yb + 0.3 && y < yb + 1.1)) continue; // roof stairs: the last treads / landing stand above the roof
         const pts = [p.bottom, p.top, ...(p.via || [])];
         if (x < Math.min(...pts.map(q => q.x)) - 0.9 || x > Math.max(...pts.map(q => q.x)) + 0.9 || z < Math.min(...pts.map(q => q.z)) - 0.9 || z > Math.max(...pts.map(q => q.z)) + 0.9) continue;
         return { h, p };

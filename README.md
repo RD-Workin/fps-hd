@@ -20,7 +20,7 @@ Modes (au choix dans le menu) :
 - Capture du drapeau : un drapeau côté port, un côté citadelle ; 3 captures ou meilleur score après 10 min, en BO3 (camps
   inversés en manche 2, tirés au sort en manche 3). Réapparition 3 s qui s'allonge à chaque mort (plus fort en grandes équipes),
   remise à zéro à chaque capture de son équipe ; nombre de vies limité par manche. Réglages dans le menu.
-- Zombies : vagues de zombies sortant de la mer au port, munitions illimitées, nombre d'alliés au choix (ils vous suivent et tiennent la position avec vous), difficulté qui monte par le nombre, la vitesse ou les deux. Voir [docs/decisions/zombies.md](docs/decisions/zombies.md).
+- Zombies : vagues de zombies sortant de la mer au port, munitions illimitées, nombre d'alliés au choix (ils vous suivent et tiennent la position avec vous, y compris dans les étages et sur les toits, où les zombies montent aussi par les escaliers), difficulté qui monte par le nombre, la vitesse ou les deux. Voir [docs/decisions/zombies.md](docs/decisions/zombies.md).
 
 ## Architecture
 Contrat complet : [ARCHITECTURE.md](ARCHITECTURE.md). Chaque module expose `createX(ctx)` et ne lit les autres que via `ctx`.
