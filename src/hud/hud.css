@@ -554,3 +554,11 @@
 .nv-bm-leg i.al { background: #40d9ff; } .nv-bm-leg i.en { background: #ff4a3a; }
 .nv-bm-leg i.si { border: 2px dashed #ffcf4d; background: transparent; } .nv-bm-leg i.bo { background: #ffcf4d; border-radius: 2px; }
 .nv-bm-leg span { opacity: .55; margin-left: 8px; }
+
+/* Mêlée générale (mode 'ffa'): own menu rows, no team widgets, single ranking board */
+.nv-menu:not(.m-ffa) [data-only="ffa"] { display: none; }
+.nv-menu.m-ffa [data-only]:not([data-only="ffa"]), .nv-menu.m-ffa [data-noffa] { display: none !important; }
+.nv-hud.is-ffa .nv-wins, .nv-hud.is-ffa .nv-bombpill, .nv-hud.is-ffa .nv-flags { display: none; }
+.nv-hud.is-ffa .nv-tm.them .side { color: #ffb36b; }
+.nv-result.ffa .r { font-size: 76px; }
+.nv-sb .cols.ffa { grid-template-columns: minmax(0, 820px); justify-content: center; }

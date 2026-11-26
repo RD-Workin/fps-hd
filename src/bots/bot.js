@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { SoldierModel, DIM } from '../soldiers/index.js';
 import { SKILLS } from './skill.js';
 import { nightSight, NIGHT_SIGHT } from './lamps.js';
+import { friends } from '../core/teams.js';
 const NORMAL = SKILLS.normal;
 
 export const DIFFICULTY = {
@@ -121,7 +122,7 @@ export class Bot {
     let best = null, bestScore = Infinity, bestDark = false;
     const pool = this.mgr.targetsFor ? this.mgr.targetsFor(this) : ctx.actors; // zombie mode: nearest zombies only
     for (const e of pool) {
-      if (!e.alive || e.team === this.team) continue;
+      if (!e.alive || e === this || friends(this, e)) continue; // Mêlée générale: no teammate
       const dx = e.position.x - this.position.x, dz = e.position.z - this.position.z, d = Math.hypot(dx, dz);
       // hearing: gunshots + running footsteps
       const shotAgo = t - (e.lastShotTime ?? -100);
@@ -168,7 +169,7 @@ export class Bot {
       else if (t - this.targetSeenAt > 3) this.target = null;
     }
     // team callouts (veteran): no contact of its own -> check the freshest nearby enemy position a teammate reported
-    if (S.shareIntel && !this.target && t - this.lastKnownT > 2) {
+    if (S.shareIntel && !this.ffa && !this.target && t - this.lastKnownT > 2) {
       let bi = null, bd = 40;
       for (const [e, info] of this.mgr.intel[this.team] || []) {
         if (!e.alive || t - info.t > 1.5) continue;
@@ -358,7 +359,7 @@ export class Bot {
   allyInLine(from, to) {
     const dx = to.x - from.x, dz = to.z - from.z, len2 = dx * dx + dz * dz; if (len2 < 1e-4) return false;
     const hit = a => {
-      if (a === this || a === this.target || !a.alive || a.team !== this.team) return false;
+      if (a === this || a === this.target || !a.alive || !friends(this, a)) return false;
       const px = a.position.x - from.x, pz = a.position.z - from.z;
       const u = (px * dx + pz * dz) / len2; if (u <= 0.02 || u >= 0.98) return false;
       const ex = px - u * dx, ez = pz - u * dz; return ex * ex + ez * ez < 0.3;
