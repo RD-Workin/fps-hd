@@ -27,6 +27,17 @@ Statut : FAIT (build vert). Choix dans le menu « Mode de jeu » (R&D / CTF / Zo
 - Le joueur s'arrête (> 0,9 s) : point d'appui choisi dans 10 m autour de lui (hauteur, mur dans le dos, ligne de vue dégagée vers
   d'où vient la horde — champ de distance au port —, proximité). Les alliés s'y mettent en 1 à 2 rangs face à la horde, 1er rang accroupi,
   sans déplacement latéral en combat. Le joueur s'en éloigne de plus de 10 m : ils le suivent en colonne derrière lui.
+## Étages et toits
+- Les étages des maisons (capitainerie…) et les toits plats à escalier extérieur (`toit-N`) sont les « étages » de `bots/nav.js setLayers`
+  (petites grilles par étage, portails d'escalier). Chaque zombie connaît son étage (`z.L`, null = grille principale).
+- Un humain en hauteur tire le champ principal vers le pied de l'escalier de sa maison / son toit. Arrivé là, le zombie monte la volée
+  (`z.climb` : points bas → `via` → haut, hauteur interpolée, sans physique), puis suit sur chaque étage un petit champ calculé à la demande :
+  vers l'escalier qui monte, celui qui descend, ou les humains de l'étage (recalcul ≤ 4 fois/s, quelques centaines de cellules).
+  Cible redescendue : il redescend par le même chemin.
+- Alliés : le joueur monte (étage ou toit) → le point d'appui est choisi sur cet étage et ils le suivent par l'escalier (buts avec `y`).
+  Au sol, un toit ou un étage (positions hautes de `world.nav.highHolds` + quelques points autour de l'escalier) dont l'escalier est
+  à < 12 m du joueur est candidat s'il peut accueillir toute l'escouade ; le gain de hauteur (relatif au joueur, plafonné à 6 m) le favorise.
+
 ## Événements / HUD
 - `round:start {mode:'zombie'}` une fois, `round:live`, `zombie:wave {wave, count, speed}`, `zombie:cleared {wave, next}`.
 - HUD : barre du haut ESCOUADE / VAGUE n + zombies restants (ou compte à rebours du répit) / ZOMBIES ; minimap : points verts ;
