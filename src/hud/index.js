@@ -566,11 +566,11 @@ export function createHud(ctx) {
       const lv = !f ? '' : f.out ? `<small class="lives out">${ord(f.place)}</small>` : `<small class="lives">${f.lives} VIE${f.lives > 1 ? 'S' : ''}</small>`;
       return `<tr class="${a.alive || final ? '' : 'dead'} ${a.isPlayer ? 'me' : ''} ${win ? 'mvp' : ''}"><td class="n"><div class="nm"><span class="rk">${i + 1}</span><span class="st"></span><span class="nmt">${esc(a.name)}</span>` +
         `${win ? '<b class="mvpb">VAINQUEUR</b>' : ''}${lv}</div></td>` +
-        `<td class="num">${s.kills}</td><td class="num">${x.assists}</td><td class="num">${s.deaths}</td><td class="num">${x.hs}</td>` +
+        `<td class="num">${s.kills}</td><td class="num">${x.assists}</td><td class="num">${s.deaths}</td><td class="num">${x.hs}</td><td class="num">${Math.round(s.damage || 0)}</td>` +
         `<td class="num">${f ? (f.out ? 0 : f.lives) : '—'}</td><td class="num sc">${scoreOf(a)}</td></tr>`;
     };
     html(metaEl, `MÊLÉE GÉNÉRALE &nbsp; EN LICE <b class="u">${g?.remaining ?? 0}</b> / ${actors.length}` + (final && g?.winner ? ` &nbsp; VAINQUEUR <b class="g">${esc(g.winner.name)}</b>` : ''));
-    html(tbEl, `<div class="cols ffa"><table class="us"><tr><th class="team">CLASSEMENT · CHACUN POUR SOI</th><th>É</th><th>A</th><th>M</th><th>TÊTE</th><th>VIES</th><th>SCORE</th></tr>${list.map(row).join('')}</table></div>`);
+    html(tbEl, `<div class="cols ffa"><table class="us"><tr><th class="team">CLASSEMENT · CHACUN POUR SOI</th><th>É</th><th>A</th><th>M</th><th>TÊTE</th><th>DÉG</th><th>VIES</th><th>SCORE</th></tr>${list.map(row).join('')}</table></div>`);
   }
   function buildScoreboard(metaEl = E.sbMeta, tbEl = E.sbTb, final = false) {
     const g = ctx.game, p = ctx.player, actors = ctx.actors || [], mvp = final ? matchMvp() : null;

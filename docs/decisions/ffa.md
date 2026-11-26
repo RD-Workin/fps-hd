@@ -21,7 +21,7 @@ Choix « MÊLÉE GÉNÉRALE » dans le menu Mode de jeu (`game.mode === 'ffa'`, 
 ## API / événements
 - `game.settings {bots, lives, minutes}` via `setFfaSettings` ; `remaining`, `leader`, `winner`, `ranking[]` (fin de partie), `placeOf(a)`.
 - `round:start {mode:'ffa'}` une fois, `round:live`, `ffa:out {actor, place}`, `player:respawn` / `actor:respawn`, `match:end {weWon, mode:'ffa', winner, place, reason}`.
-- HUD : barre du haut VOUS (éliminations, vies en icônes) / EN LICE ; meneur sous l'horloge ; Tab = un seul classement (É, A, M, TÊTE, VIES, SCORE) ;
+- HUD : barre du haut VOUS (éliminations, vies en icônes) / EN LICE ; meneur sous l'horloge ; Tab = un seul classement (É, A, M, TÊTE, DÉG, VIES, SCORE) ;
   écran de mort avec compte à rebours ou place finale ; fin : place + éliminations, vainqueur.
 ## TODO / idées
 - Zone qui se resserre pour les grandes parties ; protection de 1–2 s à la réapparition ; record local.
